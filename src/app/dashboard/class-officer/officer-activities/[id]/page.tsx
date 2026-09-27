@@ -1,0 +1,1 @@
+export { default } from "@/app/dashboard/faculty-officer/officer-activities/[id]/page";

@@ -1,0 +1,4 @@
+mssv,full_name,email,phone,date_of_birth,gender,note
+21110010,Nguyen Van A,a@example.com,0901000001,2003-01-15,Nam,Sinh vien lop truong hop le
+21110011,Tran Thi B,b@example.com,0901000002,2003-03-20,Nu,Sinh vien thu 2
+21110012,Le Van C,,0901000003,2003-07-05,Nam,Khong co email van import duoc

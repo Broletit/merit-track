@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@keyframes loading-bar {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(410%); }
+}
+
+@keyframes top-loading-flow {
+  0% { transform: translateX(-120%) scaleX(.65); }
+  45% { transform: translateX(110%) scaleX(1); }
+  100% { transform: translateX(360%) scaleX(.72); }
+}
+
+.top-loading-gradient {
+  animation: top-loading-flow 1.35s cubic-bezier(.4, 0, .2, 1) infinite;
+  background: linear-gradient(90deg, #2563eb 0%, #06b6d4 45%, #22c55e 100%);
+  border-radius: 9999px;
+  box-shadow: 0 0 12px rgb(6 182 212 / .75);
+  transform-origin: center;
+}
+
+/* Nút điều hướng ngược trong mọi header xanh. */
+section[class*="from-blue-900"] a:has(.lucide-arrow-left) {
+  border: 1px solid rgb(255 255 255 / 0.3) !important;
+  background: rgb(255 255 255 / 0.1) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+section[class*="from-blue-900"] a:has(.lucide-arrow-left):hover {
+  background: rgb(255 255 255 / 0.15) !important;
+}
+
+input:user-invalid,
+select:user-invalid,
+textarea:user-invalid,
+[aria-invalid="true"] {
+  border-color: #f43f5e !important;
+  box-shadow: 0 0 0 3px rgb(244 63 94 / 0.12);
+}
+
+[data-validation-valid="true"]:not([aria-invalid="true"]):not(:user-invalid) {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 3px rgb(34 197 94 / 0.13);
+}
+
+/* Chuẩn nút thao tác trong cột cuối của mọi bảng. */
+table td:last-child a,
+table td:last-child button {
+  display: inline-flex;
+  height: 2rem !important;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: .5rem !important;
+  background: #fff !important;
+  padding: .375rem .75rem !important;
+  font-size: .75rem !important;
+  font-weight: 600 !important;
+  white-space: nowrap;
+  box-shadow: none !important;
+}
+
+table td:last-child a:not([href*="/edit"]) {
+  border: 1px solid #93c5fd !important;
+  color: #1d4ed8 !important;
+}
+
+table td:last-child a[data-action-variant="view"] {
+  border: 1px solid #60a5fa !important;
+  background: #fff !important;
+  color: #1d4ed8 !important;
+}
+
+table td:last-child a[data-action-variant="view"]:hover {
+  background: #eff6ff !important;
+}
+
+table td:last-child a[href*="/edit"],
+table td:last-child button:not([class*="rose"]):not([class*="red"]):not([class*="emerald"]):not([class*="green"]):not([class*="amber"]) {
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+table td:last-child button[class*="rose"],
+table td:last-child button[class*="red"] {
+  border: 1px solid #fda4af !important;
+  color: #be123c !important;
+}
+
+table td:last-child a:hover,
+table td:last-child button:hover {
+  background: #f8fafc !important;
+}
