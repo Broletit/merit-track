@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Chương 3 - Phân tích và thiết kế MeritTrack</title>
+<style>
+@page{size:A4;margin:2cm 2cm 2cm 3cm}
+body{font-family:"Times New Roman",serif;font-size:13pt;line-height:1.35;color:#000}
+h1{text-align:center;font-size:18pt;margin:12pt 0}
+h2{font-size:15pt;margin-top:18pt}
+h3{font-size:13pt;margin:14pt 0 5pt}
+p{text-align:justify;margin:6pt 0}
+table{border-collapse:collapse;width:100%;margin:8pt 0 14pt}
+th,td{border:1px solid #666;padding:5px;vertical-align:top}
+th{background:#eaf2f8;text-align:center}
+.uc .section td{background:#d9eaf7;font-weight:bold}
+.uc .header th{background:#eef5fa}
+.note{background:#fff7df;border:1px solid #d6b656;padding:8px}
+.code{font-family:Consolas,monospace;font-size:10pt;white-space:pre-wrap;border:1px solid #aaa;padding:8px}
+.small{font-size:11pt}
+.pagebreak{page-break-before:always}
+</style>
+</head>
+<body>
+<h1>CHƯƠNG 3<br>PHÂN TÍCH VÀ THIẾT KẾ HỆ THỐNG MERITTRACK</h1>
+<p><i>Tài liệu được xây dựng từ mã nguồn hiện tại của repository Broletit/merit-track, nhánh main tại thời điểm phân tích.</i></p>
+
+<h2>3.1. Tổng quan hệ thống</h2>
+<p>MeritTrack là hệ thống quản lý hoạt động, ghi nhận điểm rèn luyện và hỗ trợ quy trình xét hồ sơ cho sinh viên và cán bộ của khoa. Hệ thống tổ chức dữ liệu theo học kỳ, quản lý người dùng và lớp, hoạt động, đăng ký/điểm danh, khung điểm rèn luyện, bộ tiêu chuẩn, đợt xét, hồ sơ minh chứng, xét duyệt nhiều cấp, thông báo, báo cáo và nhật ký hệ thống.</p>
+<p>Kiến trúc hiện tại sử dụng Next.js App Router và React ở lớp giao diện; Server Actions và API Routes ở lớp ứng dụng; các dịch vụ nghiệp vụ trong <b>src/server</b>; cơ sở dữ liệu SQLite thông qua <b>better-sqlite3</b>.</p>
+
+<h2>3.2. Tác nhân và yêu cầu</h2>
+<table><tr><th>Tác nhân</th><th>Vai trò</th></tr>
+<tr><td>Sinh viên</td><td>Tham gia hoạt động, theo dõi ĐRL, tham gia đợt xét và nộp hồ sơ sinh viên.</td></tr>
+<tr><td>Cán bộ lớp</td><td>Duyệt hồ sơ sinh viên vòng 1 và tham gia nghiệp vụ hoạt động/xét cán bộ.</td></tr>
+<tr><td>Cán bộ khoa</td><td>Theo dõi lớp được phân công, điểm danh, duyệt vòng 2 và tham gia xét cán bộ.</td></tr>
+<tr><td>Quản trị viên</td><td>Quản trị dữ liệu, học kỳ, hoạt động, ĐRL, bộ tiêu chuẩn, đợt xét, hồ sơ cán bộ, báo cáo và audit.</td></tr>
+</table>
+
+<h3>3.2.1. Yêu cầu phi chức năng</h3>
+<ul>
+<li>Phân quyền được kiểm tra ở phía server; UI chỉ gửi ý định thao tác.</li>
+<li>Dữ liệu lịch sử theo học kỳ phải được bảo toàn.</li>
+<li>Thao tác nhiều bảng quan trọng được thực hiện trong transaction khi source đã triển khai.</li>
+<li>Minh chứng phải được kiểm tra quyền sở hữu, định dạng và dung lượng.</li>
+<li>Thao tác quản trị nhạy cảm có khả năng truy vết bằng audit log.</li>
+<li>Hệ thống hỗ trợ lọc theo học kỳ cho vận hành và báo cáo lịch sử.</li>
+</ul>
+
+<h3>3.2.2. Quy tắc nghiệp vụ</h3>
+<table><tr><th>Mã</th><th>Quy tắc</th></tr><tr><td>BR01</td><td>Tại một thời điểm chỉ có một học kỳ hiện hành.</td></tr><tr><td>BR02</td><td>Activity/Event thuộc học kỳ cũ bị giới hạn thao tác thay đổi; chủ yếu dùng để xem lịch sử.</td></tr><tr><td>BR03</td><td>Thời gian đăng ký/diễn ra activity phải nằm trong học kỳ.</td></tr><tr><td>BR04</td><td>Đăng ký activity yêu cầu published, đúng audience, đúng thời gian, đúng scope và không khóa.</td></tr><tr><td>BR05</td><td>Attendance chỉ được tính khi registration đã tồn tại và activity đang diễn ra.</td></tr><tr><td>BR06</td><td>Điểm ĐRL từng node được cap bởi score_max.</td></tr><tr><td>BR07</td><td>Template đã được event sử dụng không được thay đổi trực tiếp; phải clone.</td></tr><tr><td>BR08</td><td>event.type phải khớp criteria_template.for_type.</td></tr><tr><td>BR09</td><td>Event snapshot chỉ đồng bộ khi chưa có submission.</td></tr><tr><td>BR10</td><td>Auto activity criterion chỉ đạt khi registration.status=attended.</td></tr><tr><td>BR11</td><td>Student submission: 2 vòng duyệt; Officer submission: Admin duyệt 1 vòng.</td></tr><tr><td>BR12</td><td>Faculty officer chỉ duyệt lớp được phân công trong faculty_class_assignments.</td></tr><tr><td>BR13</td><td>Minh chứng sinh viên chỉ chấp nhận PDF/PNG tối đa 10MB theo source hiện tại.</td></tr><tr><td>BR14</td><td>Các thao tác quản trị nhạy cảm có thể yêu cầu lý do và ghi audit log.</td></tr></table>
+
+<h2>3.3. Biểu đồ Use Case</h2>
+<p>Các biểu đồ Use Case được cung cấp riêng ở định dạng XMI 2.1 để nhập vào Visual Paradigm và tiếp tục chỉnh sửa. Bộ file gồm sơ đồ tổng quát và sơ đồ theo bốn tác nhân. Sau khi import XMI, có thể dùng Auto Layout hoặc kéo model element từ Model Explorer vào Use Case Diagram.</p>
+<table><tr><th>File XMI</th><th>Nội dung</th></tr>
+<tr><td>01_MeritTrack_UseCase_TongQuan.xmi</td><td>Use Case tổng quát toàn hệ thống</td></tr>
+<tr><td>02_MeritTrack_UseCase_SinhVien.xmi</td><td>Use Case phân hệ Sinh viên</td></tr>
+<tr><td>03_MeritTrack_UseCase_CanBoLop.xmi</td><td>Use Case phân hệ Cán bộ lớp</td></tr>
+<tr><td>04_MeritTrack_UseCase_CanBoKhoa.xmi</td><td>Use Case phân hệ Cán bộ khoa</td></tr>
+<tr><td>05_MeritTrack_UseCase_Admin.xmi</td><td>Use Case phân hệ Quản trị viên</td></tr>
+</table>
+
+<h3>3.3.1. Danh mục Use Case</h3>
+<table><tr><th>Mã</th><th>Use Case</th><th>Actor chính</th></tr><tr><td>UC01</td><td>Đăng nhập</td><td>Người dùng</td></tr><tr><td>UC02</td><td>Đổi mật khẩu</td><td>Người dùng</td></tr><tr><td>UC03</td><td>Chuyển ngữ cảnh sử dụng</td><td>Cán bộ lớp, Cán bộ khoa</td></tr><tr><td>UC04</td><td>Đăng xuất</td><td>Người dùng</td></tr><tr><td>UC05</td><td>Xem thông tin cá nhân</td><td>Sinh viên, Cán bộ lớp, Cán bộ khoa</td></tr><tr><td>UC06</td><td>Hiển thị QR cá nhân</td><td>Sinh viên, Cán bộ lớp, Cán bộ khoa</td></tr><tr><td>UC07</td><td>Xem thông báo</td><td>Người dùng</td></tr><tr><td>UC08</td><td>Đánh dấu thông báo đã đọc</td><td>Người dùng</td></tr><tr><td>UC09</td><td>Xem danh sách hoạt động</td><td>Sinh viên</td></tr><tr><td>UC10</td><td>Xem chi tiết hoạt động</td><td>Sinh viên</td></tr><tr><td>UC11</td><td>Đăng ký hoạt động</td><td>Sinh viên</td></tr><tr><td>UC12</td><td>Hủy đăng ký hoạt động</td><td>Sinh viên</td></tr><tr><td>UC13</td><td>Xem điểm rèn luyện</td><td>Sinh viên</td></tr><tr><td>UC14</td><td>Xem danh sách đợt xét sinh viên</td><td>Sinh viên</td></tr><tr><td>UC15</td><td>Xem chi tiết đợt xét sinh viên</td><td>Sinh viên</td></tr><tr><td>UC16</td><td>Khởi tạo hồ sơ sinh viên</td><td>Sinh viên</td></tr><tr><td>UC17</td><td>Bổ sung minh chứng sinh viên</td><td>Sinh viên</td></tr><tr><td>UC18</td><td>Yêu cầu hỗ trợ hồ sơ</td><td>Sinh viên</td></tr><tr><td>UC19</td><td>Nộp hồ sơ sinh viên</td><td>Sinh viên</td></tr><tr><td>UC20</td><td>Theo dõi hồ sơ sinh viên</td><td>Sinh viên</td></tr><tr><td>UC21</td><td>Xem hồ sơ chờ duyệt vòng 1</td><td>Cán bộ lớp</td></tr><tr><td>UC22</td><td>Đánh giá tiêu chí vòng 1</td><td>Cán bộ lớp</td></tr><tr><td>UC23</td><td>Duyệt hồ sơ vòng 1</td><td>Cán bộ lớp</td></tr><tr><td>UC24</td><td>Theo dõi lớp được phân công</td><td>Cán bộ khoa</td></tr><tr><td>UC25</td><td>Điểm danh QR/thủ công</td><td>Cán bộ khoa</td></tr><tr><td>UC26</td><td>Xem hồ sơ chờ duyệt vòng 2</td><td>Cán bộ khoa</td></tr><tr><td>UC27</td><td>Đánh giá tiêu chí vòng 2</td><td>Cán bộ khoa</td></tr><tr><td>UC28</td><td>Duyệt hồ sơ vòng 2</td><td>Cán bộ khoa</td></tr><tr><td>UC29</td><td>Xem hoạt động cán bộ</td><td>Cán bộ lớp, Cán bộ khoa</td></tr><tr><td>UC30</td><td>Đăng ký hoạt động cán bộ</td><td>Cán bộ lớp, Cán bộ khoa</td></tr><tr><td>UC31</td><td>Xem đợt xét cán bộ</td><td>Cán bộ lớp, Cán bộ khoa</td></tr><tr><td>UC32</td><td>Khởi tạo hồ sơ cán bộ</td><td>Cán bộ lớp, Cán bộ khoa</td></tr><tr><td>UC33</td><td>Bổ sung minh chứng cán bộ</td><td>Cán bộ lớp, Cán bộ khoa</td></tr><tr><td>UC34</td><td>Nộp hồ sơ cán bộ</td><td>Cán bộ lớp, Cán bộ khoa</td></tr><tr><td>UC35</td><td>Theo dõi hồ sơ cán bộ</td><td>Cán bộ lớp, Cán bộ khoa</td></tr><tr><td>UC36</td><td>Quản lý học kỳ</td><td>Quản trị viên</td></tr><tr><td>UC37</td><td>Quản lý người dùng</td><td>Quản trị viên</td></tr><tr><td>UC38</td><td>Quản lý lớp của người dùng</td><td>Quản trị viên</td></tr><tr><td>UC39</td><td>Import danh sách sinh viên</td><td>Quản trị viên</td></tr><tr><td>UC40</td><td>Phân công cán bộ khoa quản lý lớp</td><td>Quản trị viên</td></tr><tr><td>UC41</td><td>Quản lý hoạt động</td><td>Quản trị viên</td></tr><tr><td>UC42</td><td>Khóa/mở đăng ký hoạt động</td><td>Quản trị viên</td></tr><tr><td>UC43</td><td>Quản lý danh sách điểm danh</td><td>Quản trị viên, Cán bộ khoa</td></tr><tr><td>UC44</td><td>Import kết quả hoạt động</td><td>Quản trị viên</td></tr><tr><td>UC45</td><td>Quản lý khung điểm rèn luyện</td><td>Quản trị viên</td></tr><tr><td>UC46</td><td>Quản lý bộ tiêu chuẩn</td><td>Quản trị viên</td></tr><tr><td>UC47</td><td>Cấu hình tiêu chuẩn và tiêu chí</td><td>Quản trị viên</td></tr><tr><td>UC48</td><td>Gắn hoạt động vào tiêu chí</td><td>Quản trị viên</td></tr><tr><td>UC49</td><td>Gắn điều kiện ĐRL vào tiêu chí</td><td>Quản trị viên</td></tr><tr><td>UC50</td><td>Quản lý đợt xét</td><td>Quản trị viên</td></tr><tr><td>UC51</td><td>Đồng bộ snapshot tiêu chuẩn</td><td>Quản trị viên</td></tr><tr><td>UC52</td><td>Theo dõi hồ sơ sinh viên</td><td>Quản trị viên</td></tr><tr><td>UC53</td><td>Theo dõi hồ sơ cán bộ</td><td>Quản trị viên</td></tr><tr><td>UC54</td><td>Duyệt hồ sơ cán bộ</td><td>Quản trị viên</td></tr><tr><td>UC55</td><td>Xem dashboard và báo cáo</td><td>Quản trị viên</td></tr><tr><td>UC56</td><td>Xuất báo cáo</td><td>Quản trị viên</td></tr><tr><td>UC57</td><td>Xem nhật ký hệ thống</td><td>Quản trị viên</td></tr></table>
+
+<div class="pagebreak"></div>
+<h2>3.4. Đặc tả Use Case</h2>
+<p>Mỗi Use Case được trình bày theo mẫu: Tên use case, mô tả sơ lược, Actor chính/phụ, tiền điều kiện, hậu điều kiện, luồng sự kiện chính, luồng thay thế và luồng ngoại lệ.</p>
+
+  <h3>UC01 – Đăng nhập</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC01 – Đăng nhập</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xác thực tài khoản bằng MSSV/email và mật khẩu để truy cập hệ thống.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Người dùng</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Người dùng đã có tài khoản.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Tạo session và điều hướng tới dashboard phù hợp.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Nhập MSSV/email và mật khẩu.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra dữ liệu, tìm tài khoản, kiểm tra is_active và mật khẩu.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống xác định login context mặc định, tạo session và điều hướng.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Cán bộ lớp/cán bộ khoa đăng nhập mặc định vào ngữ cảnh sinh viên và có thể chuyển ngữ cảnh sau đó.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Thiếu thông tin; tài khoản không tồn tại; tài khoản bị khóa; sai mật khẩu.</li></ol></td></tr>
+  </table>
+
+  <h3>UC02 – Đổi mật khẩu</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC02 – Đổi mật khẩu</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Cho phép người dùng đổi mật khẩu hiện tại.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Người dùng</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Đã đăng nhập.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Mật khẩu mới được lưu.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Nhập mật khẩu hiện tại, mật khẩu mới và xác nhận.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra dữ liệu và xác nhận mật khẩu mới.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống xác minh mật khẩu hiện tại, cập nhật mật khẩu và điều hướng.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Admin trở về dashboard admin; tài khoản khác trở về giao diện người dùng.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Thiếu dữ liệu; xác nhận mật khẩu không khớp; mật khẩu hiện tại sai.</li></ol></td></tr>
+  </table>
+
+  <h3>UC03 – Chuyển ngữ cảnh sử dụng</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC03 – Chuyển ngữ cảnh sử dụng</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Chuyển giữa giao diện người dùng và giao diện cán bộ trên cùng tài khoản.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Đã đăng nhập; role hỗ trợ context yêu cầu.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> sessions.login_context được cập nhật.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn ngữ cảnh muốn sử dụng.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra role có quyền dùng context đó.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống cập nhật session và chuyển dashboard.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Cán bộ lớp: student ↔ class_officer; Cán bộ khoa: student ↔ faculty_officer.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Context không hợp lệ; session hết hạn.</li></ol></td></tr>
+  </table>
+
+  <h3>UC04 – Đăng xuất</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC04 – Đăng xuất</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Kết thúc phiên đăng nhập hiện tại.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Người dùng</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Có session đang hoạt động.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Phiên kết thúc và trở về trang đăng nhập.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn Đăng xuất.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống thu hồi/xóa session.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống điều hướng về trang đăng nhập.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Session đã hết hạn: vẫn đưa về trang đăng nhập.</li></ol></td></tr>
+  </table>
+
+  <h3>UC05 – Xem thông tin cá nhân</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC05 – Xem thông tin cá nhân</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Hiển thị thông tin tài khoản, vai trò, context và lớp liên kết.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên, Cán bộ lớp, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Đã đăng nhập; không phải admin.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Thông tin được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở trang Thông tin cá nhân.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống lấy session user và lớp có left_at IS NULL.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống hiển thị họ tên, MSSV, email, role, context, lớp.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể có nhiều lớp liên kết lịch sử nhưng chỉ lớp hiện tại được xem là đang hoạt động.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Admin truy cập được chuyển về dashboard admin.</li></ol></td></tr>
+  </table>
+
+  <h3>UC06 – Hiển thị QR cá nhân</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC06 – Hiển thị QR cá nhân</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Tạo QR động phục vụ điểm danh.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên, Cán bộ lớp, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Đã đăng nhập; không phải admin.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> QR hợp lệ được hiển thị và tự làm mới.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn Mở QR điểm danh.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống tạo payload QR từ user id và MSSV.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. QR được hiển thị và làm mới định kỳ.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể đóng QR bằng nút đóng/Escape.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Admin không có QR sinh viên.</li></ol></td></tr>
+  </table>
+
+  <h3>UC07 – Xem thông báo</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC07 – Xem thông báo</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem thông báo nghiệp vụ của tài khoản.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Người dùng</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Đã đăng nhập.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Danh sách thông báo được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở trang Thông báo.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống truy vấn notifications theo user_id.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống hiển thị nội dung, thời gian, trạng thái đọc và liên kết.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Thông báo có thể liên kết tới hồ sơ/hoạt động.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có thông báo: hiển thị trạng thái rỗng.</li></ol></td></tr>
+  </table>
+
+  <h3>UC08 – Đánh dấu thông báo đã đọc</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC08 – Đánh dấu thông báo đã đọc</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Đánh dấu một hoặc toàn bộ thông báo là đã đọc.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Người dùng</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Đã đăng nhập; thông báo thuộc user.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> is_read=1 và read_at được cập nhật.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn đánh dấu đã đọc.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống cập nhật notification thuộc user.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Trang thông báo được làm mới.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể đánh dấu từng thông báo hoặc tất cả.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Notification không thuộc user: không cập nhật.</li></ol></td></tr>
+  </table>
+
+  <h3>UC09 – Xem danh sách hoạt động</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC09 – Xem danh sách hoạt động</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem hoạt động theo học kỳ, phạm vi lớp và bộ lọc.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Student context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Danh sách phù hợp được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở trang Hoạt động.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống xác định học kỳ và lọc activity published, audience student, đúng scope.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Người dùng lọc từ khóa/trạng thái/thời gian nếu cần.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể xem học kỳ cũ ở chế độ lịch sử.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có học kỳ hiện hành; dữ liệu lọc không tồn tại.</li></ol></td></tr>
+  </table>
+
+  <h3>UC10 – Xem chi tiết hoạt động</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC10 – Xem chi tiết hoạt động</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem chi tiết activity và trạng thái đăng ký cá nhân.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Student context; activity thuộc phạm vi.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Chi tiết và canRegister/canCancel được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn hoạt động.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra published, audience và scope.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống lấy registration hiện tại, tính quyền đăng ký/hủy và hiển thị.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Activity external chỉ xem, không đăng ký trực tiếp.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không tồn tại/không thuộc scope: 404.</li></ol></td></tr>
+  </table>
+
+  <h3>UC11 – Đăng ký hoạt động</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC11 – Đăng ký hoạt động</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Đăng ký activity nội bộ dành cho sinh viên.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Activity published, đang mở đăng ký, không khóa, đúng scope; user có lớp.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> activity_registrations=registered.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn Đăng ký.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra status, thời gian, audience, lớp/scope, khóa và nguồn tham gia.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống tạo hoặc kích hoạt lại registration=registered.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Registration cancelled có thể được kích hoạt lại.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Chưa mở/hết hạn; sai audience; chưa có lớp; ngoài scope; khóa đăng ký; external; đã đăng ký.</li></ol></td></tr>
+  </table>
+
+  <h3>UC12 – Hủy đăng ký hoạt động</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC12 – Hủy đăng ký hoạt động</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Hủy đăng ký trước khi hoạt động bắt đầu.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Registration=registered; chưa hết hạn; chưa bắt đầu; không khóa.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Registration=cancelled.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn Hủy đăng ký.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra registration, thời gian và trạng thái khóa.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống cập nhật status=cancelled và ghi chú.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Nếu còn thời gian có thể đăng ký lại.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có registration; hết hạn; đã bắt đầu; registration_locked.</li></ol></td></tr>
+  </table>
+
+  <h3>UC13 – Xem điểm rèn luyện</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC13 – Xem điểm rèn luyện</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Theo dõi điểm ĐRL theo học kỳ và khung điểm phân cấp.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Student context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Điểm hiệu lực và nguồn điểm được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở trang Điểm rèn luyện.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống lấy conduct_score_categories và conduct_scores theo học kỳ.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống tính điểm từ node con lên cha, cap bởi score_max và hiển thị.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể lọc activity/trạng thái cộng điểm.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Học kỳ chưa có khung điểm.</li></ol></td></tr>
+  </table>
+
+  <h3>UC14 – Xem danh sách đợt xét sinh viên</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC14 – Xem danh sách đợt xét sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem các event type=student phù hợp.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Student context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Danh sách đợt xét được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Đợt xét.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống lọc event theo học kỳ/type/phạm vi.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống tính phase nhận hồ sơ và trạng thái submission.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể xem lịch sử học kỳ cũ.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có event phù hợp.</li></ol></td></tr>
+  </table>
+
+  <h3>UC15 – Xem chi tiết đợt xét sinh viên</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC15 – Xem chi tiết đợt xét sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem event, snapshot tiêu chuẩn và hồ sơ cá nhân.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Event type=student thuộc phạm vi.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Chi tiết event/criteria được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn event.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống tải event_criteria_groups/items và submission nếu có.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống xác định khả năng tạo/chỉnh sửa/nộp hồ sơ.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Nếu đã có hồ sơ, hiển thị tiến trình hiện tại.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Event không tồn tại/không phù hợp.</li></ol></td></tr>
+  </table>
+
+  <h3>UC16 – Khởi tạo hồ sơ sinh viên</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC16 – Khởi tạo hồ sơ sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Tạo hoặc tiếp tục submission draft.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Event published, đang nhận hồ sơ; user có lớp.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Có một submission duy nhất cho event-user.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn bắt đầu hồ sơ.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra event phase và submission hiện có.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Nếu chưa có, tạo draft với class_id hiện tại và chạy auto evaluation.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Nếu đã có hồ sơ còn chỉnh sửa được, dùng lại hồ sơ.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Event hết hạn; hồ sơ không editable; chưa gán lớp.</li></ol></td></tr>
+  </table>
+
+  <h3>UC17 – Bổ sung minh chứng sinh viên</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC17 – Bổ sung minh chứng sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Lưu note/file minh chứng theo tiêu chí.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Submission thuộc user; editable; event còn nhận hồ sơ.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> submission_items/files cập nhật; auto evaluation chạy lại.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Nhập note hoặc chọn file.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra quyền, trạng thái và phase.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống kiểm tra PDF/PNG, tối đa 10MB, lưu evidence và đánh giá lại.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể chỉ note hoặc chỉ file.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Sai định dạng/dung lượng/MIME; hết hạn; không có quyền.</li></ol></td></tr>
+  </table>
+
+  <h3>UC18 – Yêu cầu hỗ trợ hồ sơ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC18 – Yêu cầu hỗ trợ hồ sơ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Gửi yêu cầu hỗ trợ trước khi nộp chính thức.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Admin/Khoa</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Submission thuộc user và còn editable.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> submission_support_requests=open.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Nhập nội dung hỗ trợ.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra tối thiểu 10 ký tự và quyền sở hữu.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống upsert yêu cầu open và làm mới trang liên quan.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Yêu cầu cũ được cập nhật thay vì tạo trùng.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Nội dung quá ngắn; hồ sơ không tìm thấy/không editable.</li></ol></td></tr>
+  </table>
+
+  <h3>UC19 – Nộp hồ sơ sinh viên</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC19 – Nộp hồ sơ sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Gửi hồ sơ vào vòng xét 1.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Cán bộ lớp</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Submission thuộc user; event nhận hồ sơ; status cho phép.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> status=submitted_v1; timeline được ghi.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn Nộp hồ sơ.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra quyền, phase và status.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống chạy auto evaluation, kiểm tra required/min_required, cập nhật submitted_v1 và timeline.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Nộp lại sau needs_revision_v1.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Thiếu tiêu chí; event đóng/hết hạn; status không cho phép.</li></ol></td></tr>
+  </table>
+
+  <h3>UC20 – Theo dõi hồ sơ sinh viên</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC20 – Theo dõi hồ sơ sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Theo dõi trạng thái, phản hồi và lịch sử hồ sơ.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Có submission thuộc user.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Chi tiết hồ sơ được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở hồ sơ.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống tải submission, event, criteria, evidence, auto results, reviews, timeline.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống hiển thị trạng thái và thao tác còn khả dụng.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>needs_revision cho phép chỉnh sửa/nộp lại nếu còn hạn.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không tìm thấy/không thuộc user.</li></ol></td></tr>
+  </table>
+
+  <h3>UC21 – Xem hồ sơ chờ duyệt vòng 1</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC21 – Xem hồ sơ chờ duyệt vòng 1</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem queue submitted_v1 thuộc lớp.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Class officer context; có lớp hiện tại.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Queue vòng 1 được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Duyệt vòng 1.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống xác định lớp cán bộ.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống tải hồ sơ submitted_v1 thuộc lớp và hiển thị.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể mở chi tiết từng hồ sơ.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có hồ sơ: trạng thái rỗng.</li></ol></td></tr>
+  </table>
+
+  <h3>UC22 – Đánh giá tiêu chí vòng 1</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC22 – Đánh giá tiêu chí vòng 1</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Đánh giá từng tiêu chí thủ công ở vòng 1.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> submitted_v1; đúng lớp; tiêu chí có evidence và không auto-pass.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> submission_criteria_reviews round=1.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở tiêu chí.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra round, auto result và evidence.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Reviewer chọn pass/fail; hệ thống lưu quyết định.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể cập nhật lại trước khi chốt review tổng.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Sai lớp; auto-pass; thiếu evidence; sai status.</li></ol></td></tr>
+  </table>
+
+  <h3>UC23 – Duyệt hồ sơ vòng 1</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC23 – Duyệt hồ sơ vòng 1</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Chốt kết quả vòng 1.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> submitted_v1; event còn review; đúng lớp.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> submitted_v2 / needs_revision_v1 / failed.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn quyết định.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra quyền và trạng thái.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Nếu approve, kiểm tra điều kiện; sau đó ghi review round=1, status, timeline và notification.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Approve→submitted_v2; Revision→needs_revision_v1; Reject→failed.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Hết hạn review; sai lớp; hồ sơ chưa đủ điều kiện approve.</li></ol></td></tr>
+  </table>
+
+  <h3>UC24 – Theo dõi lớp được phân công</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC24 – Theo dõi lớp được phân công</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem dữ liệu các lớp trong faculty_class_assignments.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Faculty officer context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Dữ liệu phạm vi lớp được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở dashboard/theo dõi lớp.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống lấy faculty_class_assignments.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống tải dữ liệu lớp/hoạt động/hồ sơ theo phạm vi.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Một cán bộ có thể phụ trách nhiều lớp.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Chưa có assignment.</li></ol></td></tr>
+  </table>
+
+  <h3>UC25 – Điểm danh QR/thủ công</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC25 – Điểm danh QR/thủ công</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xác nhận người tham gia thực tế.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Người tham gia</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Đủ quyền; activity published, đang diễn ra; user đã đăng ký.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> registration=attended; log/ĐRL/notification được ghi.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Quét QR hoặc nhập MSSV.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống xác thực payload, activity, thời gian, user và registration.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống cập nhật attended, log success, cộng ĐRL nếu có và gửi thông báo.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể điểm danh thủ công bằng MSSV.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>invalid; out_of_window; not_registered; duplicate; QR không khớp.</li></ol></td></tr>
+  </table>
+
+  <h3>UC26 – Xem hồ sơ chờ duyệt vòng 2</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC26 – Xem hồ sơ chờ duyệt vòng 2</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem queue submitted_v2 thuộc lớp phụ trách.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Faculty officer context; có assignment.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Queue vòng 2 được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Duyệt vòng 2.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống lấy class assignments.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống tải submission submitted_v2 trong phạm vi.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể lọc theo học kỳ/đợt.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có assignment hoặc hồ sơ.</li></ol></td></tr>
+  </table>
+
+  <h3>UC27 – Đánh giá tiêu chí vòng 2</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC27 – Đánh giá tiêu chí vòng 2</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Đánh giá từng tiêu chí thủ công ở vòng 2.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> submitted_v2; đúng assignment; có evidence; không auto-pass.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> submission_criteria_reviews round=2.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở tiêu chí.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra round, evidence và assignment.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Reviewer chọn pass/fail; hệ thống lưu round=2.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể cập nhật quyết định trước review tổng.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Sai assignment; auto-pass; thiếu evidence; sai status.</li></ol></td></tr>
+  </table>
+
+  <h3>UC28 – Duyệt hồ sơ vòng 2</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC28 – Duyệt hồ sơ vòng 2</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Chốt kết quả cuối hồ sơ sinh viên.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> submitted_v2; event còn review; đúng assignment.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> passed / failed / needs_revision_v2 (logic source).</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn quyết định.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra quyền và trạng thái.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Nếu approve, kiểm tra điều kiện; ghi review round=2, status, timeline và notification.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Approve→passed; Revision→needs_revision_v2; Reject→failed.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Sai lớp; hết hạn; hồ sơ chưa đủ điều kiện approve; schema hiện cần đồng bộ needs_revision_v2.</li></ol></td></tr>
+  </table>
+
+  <h3>UC29 – Xem hoạt động cán bộ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC29 – Xem hoạt động cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem activity audience_type=officer.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Officer participant context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Danh sách hoạt động cán bộ được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Hoạt động cán bộ.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống lọc audience officer, published, đúng học kỳ/scope.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống hiển thị trạng thái đăng ký/nguồn tham gia.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>External chỉ xem, đăng ký ngoài MeritTrack.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có dữ liệu.</li></ol></td></tr>
+  </table>
+
+  <h3>UC30 – Đăng ký hoạt động cán bộ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC30 – Đăng ký hoạt động cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Đăng ký activity nội bộ dành cho cán bộ.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Activity officer, published, đúng thời gian/scope, internal.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> registration=registered.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn Đăng ký.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra activity, thời gian, lớp/scope và trùng.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống insert registration.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>External; sai audience; hết hạn; chưa có lớp; ngoài scope; đã đăng ký.</li></ol></td></tr>
+  </table>
+
+  <h3>UC31 – Xem đợt xét cán bộ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC31 – Xem đợt xét cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem events type=officer.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Officer participant context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Danh sách/chi tiết event cán bộ được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Đợt xét cán bộ.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống lọc event officer theo kỳ.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống tính phase và submission cá nhân.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể xem học kỳ cũ.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có event phù hợp.</li></ol></td></tr>
+  </table>
+
+  <h3>UC32 – Khởi tạo hồ sơ cán bộ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC32 – Khởi tạo hồ sơ cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Tạo submission draft cho event officer.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Event officer published và đang nhận hồ sơ.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Draft được tạo, auto-evaluate và tính điểm ban đầu.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn tham gia event.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra event/phase và submission hiện có.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Nếu chưa có, tạo draft; evaluate auto và score; điều hướng.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Nếu có submission, mở hồ sơ hiện có.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Event không hợp lệ/hết hạn.</li></ol></td></tr>
+  </table>
+
+  <h3>UC33 – Bổ sung minh chứng cán bộ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC33 – Bổ sung minh chứng cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Lưu evidence và cập nhật điểm hồ sơ cán bộ.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Submission thuộc user; draft/needs_revision_v1; còn hạn.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Evidence lưu; auto/score cập nhật.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Nhập note/file.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra quyền, status, thời hạn.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống lưu submission_items/files, chạy auto evaluation và evaluateSubmission.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể chỉ note.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có quyền; sai status; hết hạn.</li></ol></td></tr>
+  </table>
+
+  <h3>UC34 – Nộp hồ sơ cán bộ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC34 – Nộp hồ sơ cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Gửi officer submission tới Admin.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Admin</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> draft/needs_revision_v1; event nhận hồ sơ.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> submitted_v1 và score_total cập nhật.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn Nộp.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra quyền/status/phase.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống auto-evaluate, kiểm tra requirements, tính điểm và cập nhật submitted_v1.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Nộp lại sau revise.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Thiếu điều kiện; hết hạn; sai status/quyền.</li></ol></td></tr>
+  </table>
+
+  <h3>UC35 – Theo dõi hồ sơ cán bộ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC35 – Theo dõi hồ sơ cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Theo dõi điểm, trạng thái và phản hồi Admin.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Cán bộ lớp, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Admin</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Có officer submission thuộc user.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Chi tiết hồ sơ được hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Hồ sơ xét cán bộ.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống tải event, criteria, auto results, evidence, score, review.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống hiển thị thao tác theo status.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>needs_revision_v1 cho phép sửa/nộp lại.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không tìm thấy/không thuộc user.</li></ol></td></tr>
+  </table>
+
+  <h3>UC36 – Quản lý học kỳ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC36 – Quản lý học kỳ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Tạo học kỳ và đặt học kỳ hiện hành.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Academic term được tạo/cập nhật; chỉ một is_active=1.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Học kỳ.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Admin nhập thông tin tạo kỳ; hệ thống kiểm tra thời gian và insert inactive.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Admin chọn Đặt hiện hành; hệ thống bỏ active toàn bộ rồi active kỳ chọn.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể xem lịch sử.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Thiếu dữ liệu; thời gian sai; term không tồn tại.</li></ol></td></tr>
+  </table>
+
+  <h3>UC37 – Quản lý người dùng</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC37 – Quản lý người dùng</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Cập nhật role và trạng thái người dùng.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context; target không phải admin mặc định.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> users và assignments liên quan được cập nhật; audit nếu có.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở chi tiết user.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Chọn role/is_active và nhập lý do.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống kiểm tra business rules, cập nhật user, thu hồi assignment nếu cần, ghi audit/notification.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Cấp class_officer yêu cầu có lớp.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Sửa admin mặc định; role sai; chưa có lớp; lớp đã đủ tối đa 4 class officer.</li></ol></td></tr>
+  </table>
+
+  <h3>UC38 – Quản lý lớp của người dùng</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC38 – Quản lý lớp của người dùng</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Chuyển lớp và bảo toàn lịch sử membership.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Người dùng</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context; lớp đích active.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Membership cũ đóng, membership mới mở; role có thể đổi.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn lớp mới và lý do.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra lớp/user.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống set left_at cho membership cũ, mở membership mới, xử lý role class_officer và audit.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Nếu class officer chuyển lớp thì về student.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Lớp/user không hợp lệ.</li></ol></td></tr>
+  </table>
+
+  <h3>UC39 – Import danh sách sinh viên</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC39 – Import danh sách sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Import sinh viên vào lớp với preview và xử lý trùng.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context; file có dữ liệu; chọn lớp hiện có/mới.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Users/class_members được tạo/cập nhật.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn lớp và tải file.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống parse và preview từng dòng theo MSSV/lớp/trùng/lỗi.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Admin xác nhận policy update/transfer; hệ thống import và trả thống kê.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể tạo lớp mới hoặc dùng lớp có sẵn.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>File rỗng/sai; MSSV trùng; lớp không hợp lệ; transfer chưa được cho phép.</li></ol></td></tr>
+  </table>
+
+  <h3>UC40 – Phân công cán bộ khoa quản lý lớp</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC40 – Phân công cán bộ khoa quản lý lớp</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Gán tập lớp cho faculty officer.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Target role=faculty_officer; lớp active.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> faculty_class_assignments phản ánh tập mới.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn các lớp phụ trách.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra target và class ids.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống thay thế tập assignments trong transaction.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể bỏ toàn bộ lớp.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Target không phải faculty officer; class không active; không thay đổi dữ liệu.</li></ol></td></tr>
+  </table>
+
+  <h3>UC41 – Quản lý hoạt động</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC41 – Quản lý hoạt động</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Tạo, sửa, công bố, xóa activity trong học kỳ hiện hành.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên/Cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context; có active term.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Activity được quản lý theo quy tắc thời gian/học kỳ.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Hoạt động.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Tạo mới với title, description, audience, organizer, time, ĐRL.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống kiểm tra thời gian nằm trong term, tên không trùng, scope và score; lưu activity.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>4. Admin sửa/công bố/xóa khi hợp lệ.</td><td>4. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Class activity→internal + scope một lớp; faculty activity→external theo source hiện tại.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không active term; thời gian sai; trùng tên; điểm vượt max; activity cũ; đã có registration thì không xóa.</li></ol></td></tr>
+  </table>
+
+  <h3>UC42 – Khóa/mở đăng ký hoạt động</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC42 – Khóa/mở đăng ký hoạt động</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Tạm khóa/mở registration của activity published.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên/Cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Activity thuộc active term và published.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> registration_locked cập nhật.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn Khóa/Mở.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra activity/term/status.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống cập nhật registration_locked.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Mở lại vẫn chịu ràng buộc thời gian.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Activity cũ/chưa published/không tồn tại.</li></ol></td></tr>
+  </table>
+
+  <h3>UC43 – Quản lý danh sách điểm danh</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC43 – Quản lý danh sách điểm danh</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Theo dõi và điều chỉnh attendance theo quyền.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên, Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Người tham gia</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Đủ quyền; activity tồn tại.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Registration/attendance được cập nhật.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở danh sách điểm danh.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống tải registrations.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Thực hiện điểm danh/điều chỉnh hợp lệ; hệ thống cập nhật dữ liệu liên quan.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>CB khoa dùng QR/MSSV; Admin có import chính thức.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không đủ quyền; activity/registration không tồn tại.</li></ol></td></tr>
+  </table>
+
+  <h3>UC44 – Import kết quả hoạt động</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC44 – Import kết quả hoạt động</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Nạp XLSX/XLS/CSV attendance sau khi activity kết thúc.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Người tham gia</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin; activity đã kết thúc; file hợp lệ; có lý do.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Attendance/ĐRL/import log/audit cập nhật; hồ sơ liên quan re-evaluate.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn file, mode và lý do.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống đọc MSSV, đối chiếu user/lớp/scope và yêu cầu xác nhận unregistered nếu cần.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống tạo batch, upsert attended/conduct score, ghi row/audit, re-evaluate submissions.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>append hoặc replace.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Activity chưa kết thúc; file sai; user/lớp/scope lỗi; thiếu lý do.</li></ol></td></tr>
+  </table>
+
+  <h3>UC45 – Quản lý khung điểm rèn luyện</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC45 – Quản lý khung điểm rèn luyện</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xây dựng cây conduct_score_categories theo học kỳ.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context; term tồn tại.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Cấu trúc khung điểm được lưu.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Khung ĐRL.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Thêm/sửa mục với code, name, score_max, parent.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống kiểm tra trùng cùng cấp, code thứ tự và parent trước khi lưu.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Hỗ trợ nhiều cấp cha-con.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Code/name/score sai; trùng cùng cấp; parent sai/tự làm cha.</li></ol></td></tr>
+  </table>
+
+  <h3>UC46 – Quản lý bộ tiêu chuẩn</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC46 – Quản lý bộ tiêu chuẩn</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Tạo, sao chép, cập nhật, xóa criteria template.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Template và cấu trúc được quản lý; template đã dùng được bảo vệ.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Bộ tiêu chuẩn.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Tạo template student/officer.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Khi cần phiên bản mới, clone toàn bộ groups/items/rules.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>4. Xóa chỉ khi chưa event nào sử dụng.</td><td>4. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Template đang dùng phải clone để sửa.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>for_type sai; template đã dùng không được sửa/xóa.</li></ol></td></tr>
+  </table>
+
+  <h3>UC47 – Cấu hình tiêu chuẩn và tiêu chí</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC47 – Cấu hình tiêu chuẩn và tiêu chí</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Cấu hình group/item trong template.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Template tồn tại và mutable.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> criteria_template_groups/items cập nhật.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở cấu hình.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Thêm group với min_required.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Thêm item với title, description, required, score_max; hệ thống sinh code/sort và evidence_type.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có activityIds khi tạo item → evidence_type=both.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Template đã dùng; group không tồn tại; dữ liệu điểm/min sai.</li></ol></td></tr>
+  </table>
+
+  <h3>UC48 – Gắn hoạt động vào tiêu chí</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC48 – Gắn hoạt động vào tiêu chí</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Tạo activity rule và score_value cho criteria.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Template mutable; criteria auto/both; activity tồn tại.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> criteria_activity_rules upsert.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn activity và nhập score_value.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra criteria/activity/score.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống insert hoặc update rule.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Một tiêu chí có thể gắn nhiều hoạt động.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Criteria manual; activity không tồn tại; score âm; template locked.</li></ol></td></tr>
+  </table>
+
+  <h3>UC49 – Gắn điều kiện ĐRL vào tiêu chí</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC49 – Gắn điều kiện ĐRL vào tiêu chí</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Gắn ngưỡng conduct score vào criteria.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Template mutable; criteria hợp lệ.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> criteria_conduct_rules upsert.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Nhập minScore và period_scope.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra minScore&gt;=0 và scope current/any.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống upsert rule.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>current hoặc any.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>MinScore/scope sai; template locked.</li></ol></td></tr>
+  </table>
+
+  <h3>UC50 – Quản lý đợt xét</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC50 – Quản lý đợt xét</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Tạo, sửa, công bố, đóng, xóa event.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên/Cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin; active term; template phù hợp type.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Event quản lý đúng học kỳ và rule.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Đợt xét.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Tạo event với type, template, time, allow_late, status.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống kiểm tra template.for_type=event.type và thời gian; lưu term_id active.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>4. Admin cập nhật/status/xóa khi hợp lệ.</td><td>4. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Event đã dùng giữ type/template/start; chỉ cho kéo dài end và cập nhật allow_late theo source.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Template sai type; time sai; event học kỳ cũ; có submission thì không xóa/không về draft.</li></ol></td></tr>
+  </table>
+
+  <h3>UC51 – Đồng bộ snapshot tiêu chuẩn</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC51 – Đồng bộ snapshot tiêu chuẩn</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Copy template groups/items vào event snapshot.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Event có template; chưa có submission.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> event_criteria_groups/items được thay bằng snapshot mới.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn Đồng bộ.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra event/template và submission count.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống xóa snapshot cũ, copy groups/items từ template, làm mới event.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có cơ chế runtime phục hồi snapshot thiếu cho dữ liệu cũ.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Event chưa gắn template; đã có submission.</li></ol></td></tr>
+  </table>
+
+  <h3>UC52 – Theo dõi hồ sơ sinh viên</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC52 – Theo dõi hồ sơ sinh viên</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Giám sát toàn bộ student submissions.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Sinh viên/Reviewer</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Danh sách/chi tiết hồ sơ hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Hồ sơ sinh viên.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống lọc submissions của events type=student theo kỳ/đợt/lớp/status.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Mở chi tiết để xem evidence, auto results, reviews, timeline.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Admin theo dõi/kiểm soát, không thay thế reviewer thông thường.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có dữ liệu.</li></ol></td></tr>
+  </table>
+
+  <h3>UC53 – Theo dõi hồ sơ cán bộ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC53 – Theo dõi hồ sơ cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Giám sát officer submissions và điểm.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Danh sách/chi tiết officer submissions hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Hồ sơ cán bộ.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống lọc theo kỳ/đợt/status/từ khóa.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Mở chi tiết xem criteria, matched activities, evidence, score, review.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Hồ sơ hoàn tất nằm ở trang theo dõi; queue review tập trung hồ sơ chờ xử lý.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có dữ liệu.</li></ol></td></tr>
+  </table>
+
+  <h3>UC54 – Duyệt hồ sơ cán bộ</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC54 – Duyệt hồ sơ cán bộ</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Admin duyệt officer submission một vòng.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Cán bộ lớp/Cán bộ khoa</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Officer submission status=submitted_v1.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> passed / failed / needs_revision_v1; review round=1; notification/score cập nhật.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở hồ sơ và nhập quyết định/note.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống kiểm tra event officer/status.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Nếu pass, auto-evaluate và assert requirements.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>4. Hệ thống upsert review round=1, update status, gửi notification và tính lại score.</td><td>4. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>pass→passed; fail→failed; revise→needs_revision_v1.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không phải officer; sai status; pass khi requirements chưa đạt.</li></ol></td></tr>
+  </table>
+
+  <h3>UC55 – Xem dashboard và báo cáo</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC55 – Xem dashboard và báo cáo</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xem thống kê theo học kỳ về hoạt động, attendance, hồ sơ và kết quả.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context; term hợp lệ.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> KPI/biểu đồ/bảng báo cáo hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Dashboard/Báo cáo.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống tổng hợp dữ liệu theo selectedTerm.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Admin chọn loại report/filter; hệ thống tính tỷ lệ, biểu đồ, ranking và bảng.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Có thể xem học kỳ cũ; term trong report chỉ là phạm vi thống kê.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có dữ liệu → 0/trạng thái rỗng.</li></ol></td></tr>
+  </table>
+
+  <h3>UC56 – Xuất báo cáo</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC56 – Xuất báo cáo</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Xuất dữ liệu báo cáo theo bộ lọc hiện tại.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> Tệp báo cáo được tạo/trả về.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Chọn Xuất tại report.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống nhận term/event/class/top.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Hệ thống truy vấn phạm vi tương ứng và sinh tệp.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Hỗ trợ report cán bộ tiêu biểu và xét thưởng sinh viên theo source hiện tại.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có dữ liệu phù hợp.</li></ol></td></tr>
+  </table>
+
+  <h3>UC57 – Xem nhật ký hệ thống</h3>
+  <table class="uc">
+    <tr><td colspan="2"><b>- Tên use case:</b> UC57 – Xem nhật ký hệ thống</td></tr>
+    <tr><td colspan="2"><b>- Mô tả sơ lược:</b> Truy vết thay đổi quản trị quan trọng.</td></tr>
+    <tr><td colspan="2"><b>- Actor chính:</b> Quản trị viên</td></tr>
+    <tr><td colspan="2"><b>- Actor phụ:</b> Không</td></tr>
+    <tr><td colspan="2"><b>- Tiền Điều kiện:</b> Admin context.</td></tr>
+    <tr><td colspan="2"><b>- Hậu điều kiện:</b> audit_logs hiển thị.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện chính</b></td></tr>
+    <tr class="header"><th>Actor</th><th>System</th></tr>
+    <tr><td>1. Mở Nhật ký hệ thống.</td><td>1. Tiếp nhận thao tác và thực hiện kiểm tra/xử lý tương ứng theo nghiệp vụ.</td></tr><tr><td>2. Hệ thống truy vấn audit log, actor, entity, reason, before/after.</td><td>2. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr><tr><td>3. Admin xem/lọc bản ghi.</td><td>3. Xử lý bước nghiệp vụ và cập nhật/hiển thị dữ liệu tương ứng.</td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện thay thế</b></td></tr>
+    <tr><td colspan="2"><ol><li>Các nguồn audit nổi bật: xóa activity/event/template, chuyển lớp, cập nhật quyền, import attendance.</li></ol></td></tr>
+    <tr class="section"><td colspan="2"><b>- Luồng sự kiện ngoại lệ</b></td></tr>
+    <tr><td colspan="2"><ol><li>Không có log.</li></ol></td></tr>
+  </table>
+
+<div class="pagebreak"></div>
+<h2>3.5. Phân tích quy trình nghiệp vụ</h2>
+<h3>3.5.1. Quy trình đăng ký hoạt động</h3>
+<div class="code">Sinh viên → Xem activity → Kiểm tra published/audience/thời gian
+→ Kiểm tra lớp và activity_scope → Kiểm tra registration_locked/participation_source
+→ Tạo hoặc kích hoạt activity_registrations(status=registered)</div>
+
+<h3>3.5.2. Quy trình điểm danh</h3>
+<div class="code">Cán bộ khoa → Quét QR / nhập MSSV
+→ Xác thực QR/user → Kiểm tra activity đang diễn ra
+→ Kiểm tra registration → chống duplicate
+→ UPDATE status=attended
+→ INSERT activity_attendance_logs
+→ Ghi conduct_scores nếu có → notification</div>
+
+<h3>3.5.3. Quy trình hồ sơ sinh viên</h3>
+<div class="code">draft → submitted_v1
+submitted_v1 → needs_revision_v1 | failed | submitted_v2
+needs_revision_v1 → submitted_v1
+submitted_v2 → needs_revision_v2 | failed | passed
+needs_revision_v2 → submitted_v2</div>
+<p class="note"><b>Lưu ý đồng bộ source:</b> logic ứng dụng đang sử dụng <b>needs_revision_v2</b> nhưng CHECK constraint trong schema.sql hiện chưa có trạng thái này. Cần đồng bộ trước khi khóa bản thiết kế cuối.</p>
+
+<h3>3.5.4. Quy trình hồ sơ cán bộ</h3>
+<div class="code">draft → submitted_v1
+submitted_v1 → needs_revision_v1 | failed | passed
+needs_revision_v1 → submitted_v1</div>
+<p>Khác hồ sơ sinh viên, hồ sơ cán bộ chỉ có một vòng review do Admin thực hiện.</p>
+
+<h3>3.5.5. Đánh giá tiêu chí tự động</h3>
+<p>Hệ thống đối chiếu <b>criteria_activity_rules</b> với <b>activity_registrations</b> có trạng thái <b>attended</b>. Đồng thời, nếu tiêu chí có <b>criteria_conduct_rules</b>, hệ thống tính tổng điểm rèn luyện theo phạm vi kỳ và so sánh với ngưỡng <b>min_score</b>. Kết quả được lưu tại <b>submission_auto_results</b>, bao gồm các activity đã khớp.</p>
+
+<h2>3.6. Thiết kế trình tự</h2>
+<h3>3.6.1. Sequence – Điểm danh QR</h3>
+<div class="code">Người tham gia → QR UI → API tạo QR
+Cán bộ khoa → Scanner/Server Action → SQLite
+Server Action → activity_registrations / activity_attendance_logs / conduct_scores
+Server Action → notifications → Người tham gia</div>
+<h3>3.6.2. Sequence – Nộp hồ sơ sinh viên</h3>
+<div class="code">Sinh viên → Submission UI → submitStudentSubmission
+→ evaluateSubmissionAuto → submission_auto_results
+→ assertSubmissionRequirements
+→ UPDATE submissions(submitted_v1) + submission_timeline</div>
+<h3>3.6.3. Sequence – Duyệt hồ sơ</h3>
+<div class="code">Reviewer UI → reviewSubmission
+→ Kiểm tra role + class scope
+→ Nếu approve: assertSubmissionCanBeApproved
+→ reviews + submissions + submission_timeline + notifications</div>
+
+<h2>3.7. Thiết kế cơ sở dữ liệu</h2>
+<p>Schema hiện có 39 bảng. Các nhóm dữ liệu chính gồm: tài khoản/phiên/lớp; học kỳ/hoạt động/điểm danh/ĐRL; bộ tiêu chuẩn và snapshot event; hồ sơ, minh chứng, auto evaluation, review; thông báo, audit và dữ liệu hỗ trợ báo cáo.</p>
+<table><tr><th>Nhóm</th><th>Bảng chính</th></tr>
+<tr><td>Tài khoản & lớp</td><td>users, sessions, classes, class_members, faculty_class_assignments</td></tr>
+<tr><td>Học kỳ & ĐRL</td><td>academic_terms, conduct_periods, conduct_scores, conduct_score_categories</td></tr>
+<tr><td>Hoạt động</td><td>activities, activity_scopes, activity_registrations, activity_attendance_logs, activity_import_batches, activity_import_rows</td></tr>
+<tr><td>Tiêu chuẩn</td><td>criteria_templates, criteria_template_groups, criteria_template_items, criteria_activity_rules, criteria_conduct_rules</td></tr>
+<tr><td>Đợt xét</td><td>events, event_scopes, event_criteria_groups, event_criteria_items</td></tr>
+<tr><td>Hồ sơ</td><td>submissions, submission_items, submission_files, submission_auto_results, submission_selected_criteria, submission_support_requests, submission_timeline</td></tr>
+<tr><td>Duyệt & kết quả</td><td>reviews, submission_criteria_reviews, event_results</td></tr>
+<tr><td>Hệ thống</td><td>notifications, audit_logs, role_requests, news_posts, banners</td></tr>
+</table>
+
+<h3>3.7.1. Quan hệ dữ liệu trọng tâm</h3>
+<ul>
+<li>users – class_members – classes: lớp sinh hoạt và lịch sử lớp.</li>
+<li>users – faculty_class_assignments – classes: phạm vi cán bộ khoa.</li>
+<li>activities – activity_registrations – users: đăng ký/attendance.</li>
+<li>academic_terms – activities/events: phạm vi học kỳ.</li>
+<li>criteria_templates – groups/items/rules: mẫu tiêu chuẩn.</li>
+<li>events – event_criteria_groups/items: snapshot tiêu chuẩn của đợt xét.</li>
+<li>submissions – items/files/auto_results/reviews/timeline: toàn bộ vòng đời hồ sơ.</li>
+</ul>
+
+<h2>3.8. Các quyết định thiết kế quan trọng</h2>
+<ol>
+<li><b>Role tách khỏi login context:</b> cán bộ vẫn có ngữ cảnh người dùng mà không cần tài khoản khác.</li>
+<li><b>Snapshot tiêu chuẩn:</b> tránh thay đổi tiêu chuẩn lịch sử khi template gốc thay đổi.</li>
+<li><b>Auto evaluation chỉ dựa trên attended:</b> đăng ký không đồng nghĩa hoàn thành hoạt động.</li>
+<li><b>Hai cấp review cho sinh viên:</b> cán bộ lớp vòng 1, cán bộ khoa vòng 2 theo assignment.</li>
+<li><b>Một vòng review cho cán bộ:</b> Admin quyết định.</li>
+<li><b>Khung ĐRL phân cấp:</b> điểm mỗi node được giới hạn bởi score_max.</li>
+<li><b>Audit thay đổi nhạy cảm:</b> hỗ trợ truy vết lý do và before/after.</li>
+</ol>
+
+<h2>3.9. Các điểm cần hoàn thiện trước bản luận văn cuối</h2>
+<ol>
+<li>Đồng bộ CHECK constraint của <b>submissions.status</b> với <b>needs_revision_v2</b> đang dùng trong logic vòng 2.</li>
+<li>Runtime đã có <b>score_max</b> ở criteria_template_groups/event_criteria_groups; cần kiểm tra cơ chế snapshot và tính cap theo nhóm trước khi chốt công thức điểm cán bộ.</li>
+<li>Report cán bộ hiện sắp theo normalized_score, score_total, full_name. Nếu quy tắc tie-break cuối dùng chất lượng/số activity phù hợp thì cần cập nhật report trước khi mô tả thuật toán cuối.</li>
+</ol>
+
+<h2>3.10. Kết luận chương</h2>
+<p>Thiết kế MeritTrack xoay quanh học kỳ, hoạt động, điểm rèn luyện, bộ tiêu chuẩn, đợt xét và hồ sơ. Các module liên kết thông qua cơ chế phân quyền theo context/lớp, snapshot tiêu chuẩn, đánh giá tự động và review theo cấp. Mô hình này bảo đảm khả năng tra cứu lịch sử, giảm đánh giá thủ công ở các tiêu chí có dữ liệu hệ thống và hỗ trợ quản trị tập trung.</p>
+</body></html>
