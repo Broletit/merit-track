@@ -1,0 +1,92 @@
+name: Build MeritTrack thesis Word file
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'thesis/Chuong_3_Phan_tich_Thiet_ke_MeritTrack.html'
+      - '.github/workflows/build-thesis-docx.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build DOCX package
+        shell: python
+        run: |
+          from pathlib import Path
+          import shutil
+
+          root = Path("docx_root")
+          (root / "_rels").mkdir(parents=True, exist_ok=True)
+          (root / "word" / "_rels").mkdir(parents=True, exist_ok=True)
+          (root / "docProps").mkdir(parents=True, exist_ok=True)
+
+          (root / "[Content_Types].xml").write_text("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+            <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+            <Default Extension="xml" ContentType="application/xml"/>
+            <Default Extension="htm" ContentType="text/html"/>
+            <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+            <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+            <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+          </Types>""", encoding="utf-8")
+
+          (root / "_rels" / ".rels").write_text("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+            <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+            <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+          </Relationships>""", encoding="utf-8")
+
+          (root / "word" / "document.xml").write_text("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            <w:body>
+              <w:altChunk r:id="htmlChunk"/>
+              <w:sectPr>
+                <w:pgSz w:w="11906" w:h="16838"/>
+                <w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1701"/>
+              </w:sectPr>
+            </w:body>
+          </w:document>""", encoding="utf-8")
+
+          (root / "word" / "_rels" / "document.xml.rels").write_text("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="htmlChunk" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk" Target="afchunk.htm"/>
+          </Relationships>""", encoding="utf-8")
+
+          shutil.copyfile(
+              "thesis/Chuong_3_Phan_tich_Thiet_ke_MeritTrack.html",
+              root / "word" / "afchunk.htm"
+          )
+
+          (root / "docProps" / "core.xml").write_text("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+           xmlns:dc="http://purl.org/dc/elements/1.1/"
+           xmlns:dcterms="http://purl.org/dc/terms/"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <dc:title>Chương 3 - Phân tích và thiết kế hệ thống MeritTrack</dc:title>
+            <dc:creator>MeritTrack Thesis</dc:creator>
+            <dcterms:created xsi:type="dcterms:W3CDTF">2026-09-28T00:00:00Z</dcterms:created>
+          </cp:coreProperties>""", encoding="utf-8")
+
+          (root / "docProps" / "app.xml").write_text("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">
+            <Application>Microsoft Office Word</Application>
+          </Properties>""", encoding="utf-8")
+
+      - name: Upload DOCX package as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeritTrack-Chuong-3-DOCX
+          path: docx_root/*
+          include-hidden-files: true
+          compression-level: 6
+          if-no-files-found: error
