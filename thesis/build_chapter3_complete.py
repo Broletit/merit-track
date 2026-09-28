@@ -812,19 +812,8 @@ add_text("Biểu mẫu đặc tả tuân theo cấu trúc Actor/Hệ thống. C�
 for u in USECASES:
     add_uc_table(u)
 
-# Appendix: source alignment notes
-doc.add_heading("3.9. Ghi chú đồng bộ giữa thiết kế và mã nguồn hiện tại",level=1)
-notes=[
-("needs_revision_v2","Logic review vòng 2 và submission status helper có sử dụng needs_revision_v2, nhưng CHECK constraint submissions.status trong schema.sql hiện chưa khai báo trạng thái này. Cần đồng bộ schema trước bản cuối."),
-("Group score_max","sqlite.ts bổ sung score_max cho criteria_template_groups/event_criteria_groups ở runtime; cloneCriteriaTemplateToEvent hiện chưa copy score_max của group và evaluateSubmission hiện cap ở item nhưng chưa cap tổng theo group."),
-("Ranking cán bộ","Báo cáo hiện sử dụng normalized_score/score_total và họ tên làm sắp xếp; nếu business rule cuối yêu cầu tie-break theo chất lượng/số hoạt động thì cần hoàn thiện trước khi khóa thuật toán trong báo cáo.")
-]
-tb=doc.add_table(rows=1,cols=2); tb.style="Table Grid"
-set_cell(tb.rows[0].cells[0],"Hạng mục",True,10.5,WD_ALIGN_PARAGRAPH.CENTER); set_cell(tb.rows[0].cells[1],"Ghi chú",True,10.5,WD_ALIGN_PARAGRAPH.CENTER)
-shade(tb.rows[0].cells[0],"E7E6E6"); shade(tb.rows[0].cells[1],"E7E6E6")
-for a,b in notes:
-    c=tb.add_row().cells; set_cell(c[0],a,True,10); set_cell(c[1],b,False,10)
 
+# End of Chapter 3 after section 3.8 as requested.
 out=ROOT/"Chuong_3_Phan_tich_Thiet_ke_MeritTrack_HoanChinh.docx"
 doc.save(out)
 print(out)
