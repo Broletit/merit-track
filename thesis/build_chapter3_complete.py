@@ -340,10 +340,10 @@ def flatten_main(u):
     n = 1
     for actor, system in u["main"]:
         if actor and actor.strip():
-            steps.append((n, "Actor", clean_actor(actor)))
+            steps.append((n, "Actor", humanize(clean_actor(actor))))
             n += 1
         if system and system.strip():
-            steps.append((n, "Hệ thống", clean_system(system)))
+            steps.append((n, "Hệ thống", humanize(clean_system(system))))
             n += 1
     return steps
 
@@ -378,7 +378,7 @@ def branch_actions(items, main_steps, kind):
         if not raw or raw.lower() == "không có.":
             continue
         side = side_for_branch(raw)
-        txt = clean_actor(raw) if side == "Actor" else clean_system(raw)
+        txt = humanize(clean_actor(raw) if side == "Actor" else clean_system(raw))
         # Rewrite descriptive conditions into action-oriented language for the System column.
         if side == "Hệ thống" and not re.match(r"^(Kiểm tra|Hiển thị|Từ chối|Cho phép|Giữ|Áp dụng|Chuyển|Cập nhật|Ghi|Trả|Kết thúc|Phát hiện|Xác định|Yêu cầu|Thông báo|Không|Đưa|Khôi phục|Chỉ|Sử dụng|Thực hiện)", txt):
             txt = "Xử lý trường hợp: " + txt[:1].lower() + txt[1:]
@@ -635,13 +635,13 @@ def make_xmi(path, model_name, actors, usecases, assocs):
     path.write_text("\n".join(parts), encoding="utf-8")
 
 overall_actors=["Sinh viên","Cán bộ lớp","Cán bộ khoa","Quản trị viên"]
-overall_ucs=["Xác thực & tài khoản","Tham gia hoạt động","Điểm rèn luyện","Hồ sơ xét sinh viên","Duyệt vòng 1","Duyệt vòng 2","Nghiệp vụ cán bộ","Quản lý học kỳ","Người dùng & lớp","Hoạt động & điểm danh","Khung điểm ĐRL","Bộ tiêu chuẩn","Đợt xét","Duyệt hồ sơ cán bộ","Báo cáo & nhật ký"]
+overall_ucs=["Đăng nhập và quản lý tài khoản","Tham gia hoạt động","Theo dõi điểm rèn luyện","Quản lý hồ sơ xét sinh viên","Duyệt hồ sơ vòng 1","Duyệt hồ sơ vòng 2","Tham gia nghiệp vụ cán bộ","Quản lý học kỳ","Quản lý người dùng và lớp","Quản lý hoạt động và điểm danh","Quản lý khung điểm rèn luyện","Quản lý bộ tiêu chuẩn","Quản lý đợt xét","Duyệt hồ sơ cán bộ","Xem báo cáo và nhật ký"]
 overall_assoc=[]
 omap={
-"Sinh viên":["Xác thực & tài khoản","Tham gia hoạt động","Điểm rèn luyện","Hồ sơ xét sinh viên"],
-"Cán bộ lớp":["Xác thực & tài khoản","Duyệt vòng 1","Nghiệp vụ cán bộ"],
-"Cán bộ khoa":["Xác thực & tài khoản","Duyệt vòng 2","Nghiệp vụ cán bộ","Hoạt động & điểm danh"],
-"Quản trị viên":["Quản lý học kỳ","Người dùng & lớp","Hoạt động & điểm danh","Khung điểm ĐRL","Bộ tiêu chuẩn","Đợt xét","Duyệt hồ sơ cán bộ","Báo cáo & nhật ký"]
+"Sinh viên":["Đăng nhập và quản lý tài khoản","Tham gia hoạt động","Theo dõi điểm rèn luyện","Quản lý hồ sơ xét sinh viên"],
+"Cán bộ lớp":["Đăng nhập và quản lý tài khoản","Duyệt hồ sơ vòng 1","Tham gia nghiệp vụ cán bộ"],
+"Cán bộ khoa":["Đăng nhập và quản lý tài khoản","Duyệt hồ sơ vòng 2","Tham gia nghiệp vụ cán bộ","Quản lý hoạt động và điểm danh"],
+"Quản trị viên":["Quản lý học kỳ","Quản lý người dùng và lớp","Quản lý hoạt động và điểm danh","Quản lý khung điểm rèn luyện","Quản lý bộ tiêu chuẩn","Quản lý đợt xét","Duyệt hồ sơ cán bộ","Xem báo cáo và nhật ký"]
 }
 for a,us in omap.items():
     overall_assoc += [(a,u) for u in us]
@@ -749,11 +749,11 @@ def add_uc_table(u):
     doc.add_heading(f'{u["id"]}. Use Case {u["name"]}',level=3)
     t=doc.add_table(rows=0,cols=2); t.style="Table Grid"; t.alignment=WD_TABLE_ALIGNMENT.CENTER
     add_meta_row(t,"- Tên use case: ",f'{u["id"]} – {u["name"]}')
-    add_meta_row(t,"- Mô tả sơ lược: ",u["desc"])
+    add_meta_row(t,"- Mô tả sơ lược: ",humanize(u["desc"]))
     add_meta_row(t,"- Actor chính: ",u["actor"])
     add_meta_row(t,"- Actor phụ: ",u["secondary"])
-    add_meta_row(t,"- Tiền điều kiện: ",u["pre"])
-    add_meta_row(t,"- Hậu điều kiện: ",u["post"])
+    add_meta_row(t,"- Tiền điều kiện: ",humanize(u["pre"]))
+    add_meta_row(t,"- Hậu điều kiện: ",humanize(u["post"]))
     c=t.add_row().cells; m=c[0].merge(c[1]); set_cell(m,"- Luồng sự kiện chính (Main Flow)",True,10.5); shade(m,"D9D9D9")
     c=t.add_row().cells
     set_cell(c[0],"Actor",True,10.5,WD_ALIGN_PARAGRAPH.CENTER); set_cell(c[1],"Hệ thống",True,10.5,WD_ALIGN_PARAGRAPH.CENTER)
