@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://www.eclipse.org/uml2/3.0.0/UML">
+  <uml:Model xmi:id="_MeritTrack___Use_Case_Sinh_vien" name="MeritTrack - Use Case Sinh viên">
+    <packagedElement xmi:type="uml:Actor" xmi:id="_actor_Sinh_vien" name="Sinh viên"/>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc__ang_nhap" name="Đăng nhập">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc__oi_mat_khau" name="Đổi mật khẩu">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Xem_thong_tin_ca_nhan" name="Xem thông tin cá nhân">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Hien_thi_QR_ca_nhan" name="Hiển thị QR cá nhân">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Xem_thong_bao" name="Xem thông báo">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc__anh_dau_thong_bao__a__oc" name="Đánh dấu thông báo đã đọc">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Xem_danh_sach_hoat__ong" name="Xem danh sách hoạt động">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Xem_chi_tiet_hoat__ong" name="Xem chi tiết hoạt động">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc__ang_ky_hoat__ong" name="Đăng ký hoạt động">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Huy__ang_ky_hoat__ong" name="Hủy đăng ký hoạt động">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Xem__iem_ren_luyen" name="Xem điểm rèn luyện">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Xem_danh_sach__ot_xet_sinh_vien" name="Xem danh sách đợt xét sinh viên">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Xem_chi_tiet__ot_xet_sinh_vien" name="Xem chi tiết đợt xét sinh viên">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Khoi_tao_ho_so_sinh_vien" name="Khởi tạo hồ sơ sinh viên">
+      <include xmi:type="uml:Include" xmi:id="_inc_Khoi_tao_ho_so_sinh_vien_0" addition="_uc__anh_gia_tieu_chi_tu__ong"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Bo_sung_minh_chung_sinh_vien" name="Bổ sung minh chứng sinh viên">
+      <include xmi:type="uml:Include" xmi:id="_inc_Bo_sung_minh_chung_sinh_vien_0" addition="_uc__anh_gia_tieu_chi_tu__ong"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Yeu_cau_ho_tro_ho_so" name="Yêu cầu hỗ trợ hồ sơ">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Nop_ho_so_sinh_vien" name="Nộp hồ sơ sinh viên">
+      <include xmi:type="uml:Include" xmi:id="_inc_Nop_ho_so_sinh_vien_0" addition="_uc__anh_gia_tieu_chi_tu__ong"/>
+      <include xmi:type="uml:Include" xmi:id="_inc_Nop_ho_so_sinh_vien_1" addition="_uc_Kiem_tra__ieu_kien_ho_so"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Theo_doi_ho_so_sinh_vien" name="Theo dõi hồ sơ sinh viên">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc__anh_gia_tieu_chi_tu__ong" name="Đánh giá tiêu chí tự động">
+    </packagedElement>
+    <packagedElement xmi:type="uml:UseCase" xmi:id="_uc_Kiem_tra__ieu_kien_ho_so" name="Kiểm tra điều kiện hồ sơ">
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_1" memberEnd="_end_1_a _end_1_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_1_a" type="_actor_Sinh_vien" association="_assoc_1"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_1_u" type="_uc__ang_nhap" association="_assoc_1"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_2" memberEnd="_end_2_a _end_2_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_2_a" type="_actor_Sinh_vien" association="_assoc_2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_2_u" type="_uc__oi_mat_khau" association="_assoc_2"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_3" memberEnd="_end_3_a _end_3_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_3_a" type="_actor_Sinh_vien" association="_assoc_3"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_3_u" type="_uc_Xem_thong_tin_ca_nhan" association="_assoc_3"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_4" memberEnd="_end_4_a _end_4_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_4_a" type="_actor_Sinh_vien" association="_assoc_4"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_4_u" type="_uc_Hien_thi_QR_ca_nhan" association="_assoc_4"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_5" memberEnd="_end_5_a _end_5_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_5_a" type="_actor_Sinh_vien" association="_assoc_5"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_5_u" type="_uc_Xem_thong_bao" association="_assoc_5"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_6" memberEnd="_end_6_a _end_6_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_6_a" type="_actor_Sinh_vien" association="_assoc_6"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_6_u" type="_uc__anh_dau_thong_bao__a__oc" association="_assoc_6"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_7" memberEnd="_end_7_a _end_7_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_7_a" type="_actor_Sinh_vien" association="_assoc_7"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_7_u" type="_uc_Xem_danh_sach_hoat__ong" association="_assoc_7"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_8" memberEnd="_end_8_a _end_8_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_8_a" type="_actor_Sinh_vien" association="_assoc_8"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_8_u" type="_uc_Xem_chi_tiet_hoat__ong" association="_assoc_8"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_9" memberEnd="_end_9_a _end_9_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_9_a" type="_actor_Sinh_vien" association="_assoc_9"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_9_u" type="_uc__ang_ky_hoat__ong" association="_assoc_9"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_10" memberEnd="_end_10_a _end_10_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_10_a" type="_actor_Sinh_vien" association="_assoc_10"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_10_u" type="_uc_Huy__ang_ky_hoat__ong" association="_assoc_10"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_11" memberEnd="_end_11_a _end_11_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_11_a" type="_actor_Sinh_vien" association="_assoc_11"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_11_u" type="_uc_Xem__iem_ren_luyen" association="_assoc_11"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_12" memberEnd="_end_12_a _end_12_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_12_a" type="_actor_Sinh_vien" association="_assoc_12"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_12_u" type="_uc_Xem_danh_sach__ot_xet_sinh_vien" association="_assoc_12"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_13" memberEnd="_end_13_a _end_13_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_13_a" type="_actor_Sinh_vien" association="_assoc_13"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_13_u" type="_uc_Xem_chi_tiet__ot_xet_sinh_vien" association="_assoc_13"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_14" memberEnd="_end_14_a _end_14_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_14_a" type="_actor_Sinh_vien" association="_assoc_14"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_14_u" type="_uc_Khoi_tao_ho_so_sinh_vien" association="_assoc_14"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_15" memberEnd="_end_15_a _end_15_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_15_a" type="_actor_Sinh_vien" association="_assoc_15"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_15_u" type="_uc_Bo_sung_minh_chung_sinh_vien" association="_assoc_15"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_16" memberEnd="_end_16_a _end_16_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_16_a" type="_actor_Sinh_vien" association="_assoc_16"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_16_u" type="_uc_Yeu_cau_ho_tro_ho_so" association="_assoc_16"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_17" memberEnd="_end_17_a _end_17_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_17_a" type="_actor_Sinh_vien" association="_assoc_17"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_17_u" type="_uc_Nop_ho_so_sinh_vien" association="_assoc_17"/>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="_assoc_18" memberEnd="_end_18_a _end_18_u">
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_18_a" type="_actor_Sinh_vien" association="_assoc_18"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="_end_18_u" type="_uc_Theo_doi_ho_so_sinh_vien" association="_assoc_18"/>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
