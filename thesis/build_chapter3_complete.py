@@ -617,14 +617,24 @@ def xml_escape(s):
 def sid(s):
     s=re.sub(r"[^A-Za-z0-9_]+","_",s)
     return "_"+s
-def make_xmi(path, model_name, actors, usecases, assocs):
+
+def make_xmi(path, model_name, actors, usecases, assocs, includes=None, extends=None):
+    includes = includes or []
+    extends = extends or []
     parts=['<?xml version="1.0" encoding="UTF-8"?>',
            '<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://www.eclipse.org/uml2/3.0.0/UML">',
            f'  <uml:Model xmi:id="{sid(model_name)}" name="{xml_escape(model_name)}">']
     for a in actors:
         parts.append(f'    <packagedElement xmi:type="uml:Actor" xmi:id="{sid("actor_"+a)}" name="{xml_escape(a)}"/>')
     for u in usecases:
-        parts.append(f'    <packagedElement xmi:type="uml:UseCase" xmi:id="{sid("uc_"+u)}" name="{xml_escape(u)}"/>')
+        parts.append(f'    <packagedElement xmi:type="uml:UseCase" xmi:id="{sid("uc_"+u)}" name="{xml_escape(u)}">')
+        for i,(src,dst) in enumerate(includes,1):
+            if src==u:
+                parts.append(f'      <include xmi:type="uml:Include" xmi:id="{sid("inc_"+str(i)+"_"+src+"_"+dst)}" addition="{sid("uc_"+dst)}"/>')
+        for i,(src,dst) in enumerate(extends,1):
+            if src==u:
+                parts.append(f'      <extend xmi:type="uml:Extend" xmi:id="{sid("ext_"+str(i)+"_"+src+"_"+dst)}" extendedCase="{sid("uc_"+dst)}"/>')
+        parts.append('    </packagedElement>')
     for i,(a,u) in enumerate(assocs,1):
         aid=sid(f"assoc_{i}_{a}_{u}"); e1=sid(f"aend_{i}"); e2=sid(f"uend_{i}")
         parts.append(f'    <packagedElement xmi:type="uml:Association" xmi:id="{aid}" memberEnd="{e1} {e2}">')
@@ -633,6 +643,47 @@ def make_xmi(path, model_name, actors, usecases, assocs):
         parts.append('    </packagedElement>')
     parts.extend(['  </uml:Model>','</xmi:XMI>'])
     path.write_text("\n".join(parts), encoding="utf-8")
+
+def usecase_name(u):
+    return f'{u["id"]} - {u["name"]}'
+
+SUPPORT_UCS = [
+    "Kiểm tra điều kiện đăng ký",
+    "Đánh giá hồ sơ tự động",
+    "Kiểm tra điều kiện nộp hồ sơ",
+    "Gửi thông báo",
+    "Kiểm tra quyền xử lý hồ sơ",
+]
+INCLUDE_ID_PAIRS = [
+    ("UC11","Kiểm tra điều kiện đăng ký"),("UC30","Kiểm tra điều kiện đăng ký"),
+    ("UC16","Đánh giá hồ sơ tự động"),("UC19","Đánh giá hồ sơ tự động"),
+    ("UC32","Đánh giá hồ sơ tự động"),("UC34","Đánh giá hồ sơ tự động"),("UC54","Đánh giá hồ sơ tự động"),
+    ("UC19","Kiểm tra điều kiện nộp hồ sơ"),("UC34","Kiểm tra điều kiện nộp hồ sơ"),
+    ("UC23","Kiểm tra quyền xử lý hồ sơ"),("UC28","Kiểm tra quyền xử lý hồ sơ"),("UC54","Kiểm tra quyền xử lý hồ sơ"),
+    ("UC23","Gửi thông báo"),("UC25","Gửi thông báo"),("UC28","Gửi thông báo"),("UC54","Gửi thông báo"),
+]
+EXTEND_ID_PAIRS = [
+    ("UC11","UC10"),("UC12","UC10"),
+    ("UC16","UC15"),
+    ("UC17","UC20"),("UC18","UC20"),
+    ("UC30","UC29"),
+    ("UC32","UC31"),("UC33","UC35"),
+]
+
+by_id={u["id"]:u for u in USECASES}
+def relation_names(selected):
+    ids={u["id"] for u in selected}
+    includes=[]
+    extends=[]
+    needed_support=set()
+    for src,dst in INCLUDE_ID_PAIRS:
+        if src in ids:
+            includes.append((usecase_name(by_id[src]), dst))
+            needed_support.add(dst)
+    for src,dst in EXTEND_ID_PAIRS:
+        if src in ids and dst in ids:
+            extends.append((usecase_name(by_id[src]), usecase_name(by_id[dst])))
+    return includes,extends,sorted(needed_support)
 
 overall_actors=["Sinh viên","Cán bộ lớp","Cán bộ khoa","Quản trị viên"]
 overall_ucs=["Đăng nhập và quản lý tài khoản","Tham gia hoạt động","Theo dõi điểm rèn luyện","Quản lý hồ sơ xét sinh viên","Duyệt hồ sơ vòng 1","Duyệt hồ sơ vòng 2","Tham gia nghiệp vụ cán bộ","Quản lý học kỳ","Quản lý người dùng và lớp","Quản lý hoạt động và điểm danh","Quản lý khung điểm rèn luyện","Quản lý bộ tiêu chuẩn","Quản lý đợt xét","Duyệt hồ sơ cán bộ","Xem báo cáo và nhật ký"]
@@ -648,37 +699,114 @@ for a,us in omap.items():
 make_xmi(XMI/"01_MeritTrack_UseCase_TongQuan.xmi","MeritTrack - Use Case tổng quát",overall_actors,overall_ucs,overall_assoc)
 
 def role_xmi(filename, actor, selected):
-    names=[f'{u["id"]} - {u["name"]}' for u in selected]
-    make_xmi(XMI/filename, f"MeritTrack - {actor}", [actor], names, [(actor,n) for n in names])
+    base=[usecase_name(u) for u in selected]
+    includes,extends,support=relation_names(selected)
+    names=base+support
+    make_xmi(XMI/filename, f"MeritTrack - {actor}", [actor], names, [(actor,n) for n in base], includes, extends)
 
-role_xmi("02_MeritTrack_UseCase_SinhVien.xmi","Sinh viên",[u for u in USECASES if "Sinh viên" in uc_role(u) and int(u["id"][2:])<=20])
-role_xmi("03_MeritTrack_UseCase_CanBoLop.xmi","Cán bộ lớp",[u for u in USECASES if "Cán bộ lớp" in uc_role(u) and (int(u["id"][2:])<=8 or 21<=int(u["id"][2:])<=23 or 29<=int(u["id"][2:])<=35)])
-role_xmi("04_MeritTrack_UseCase_CanBoKhoa.xmi","Cán bộ khoa",[u for u in USECASES if "Cán bộ khoa" in uc_role(u) and (int(u["id"][2:])<=8 or 24<=int(u["id"][2:])<=35)])
-role_xmi("05_MeritTrack_UseCase_Admin.xmi","Quản trị viên",[u for u in USECASES if "Quản trị viên" in uc_role(u) and (int(u["id"][2:])<=8 or int(u["id"][2:])>=36)])
+student_selected=[u for u in USECASES if "Sinh viên" in uc_role(u) and int(u["id"][2:])<=20]
+class_selected=[u for u in USECASES if "Cán bộ lớp" in uc_role(u) and (int(u["id"][2:])<=8 or 21<=int(u["id"][2:])<=23 or 29<=int(u["id"][2:])<=35)]
+faculty_selected=[u for u in USECASES if "Cán bộ khoa" in uc_role(u) and (int(u["id"][2:])<=8 or 24<=int(u["id"][2:])<=35)]
+admin_selected=[u for u in USECASES if "Quản trị viên" in uc_role(u) and (u["id"] in ["UC01","UC02","UC04","UC07","UC08"] or int(u["id"][2:])>=36)]
+role_xmi("02_MeritTrack_UseCase_SinhVien.xmi","Sinh viên",student_selected)
+role_xmi("03_MeritTrack_UseCase_CanBoLop.xmi","Cán bộ lớp",class_selected)
+role_xmi("04_MeritTrack_UseCase_CanBoKhoa.xmi","Cán bộ khoa",faculty_selected)
+role_xmi("05_MeritTrack_UseCase_Admin.xmi","Quản trị viên",admin_selected)
 
-guide = """BỘ XMI 2.1 CHO VISUAL PARADIGM
-================================
-Các file .xmi là UML XMI 2.1, chứa Actor, Use Case và Association để nhập vào Visual Paradigm.
+# Editable draw.io helpers ------------------------------------------------------
+def drawio_doc(title, lanes, nodes, edges, path):
+    # nodes: [{id,label,lane,kind,x,y,w,h}]
+    # edges: [(src,dst,label,style)]
+    cells=['<mxCell id="0"/>','<mxCell id="1" parent="0"/>']
+    lane_ids={}
+    lane_w=320
+    total_h=max([n.get("y",80)+n.get("h",60) for n in nodes]+[600])+100
+    for i,lane in enumerate(lanes):
+        lid=f"lane{i+1}"; lane_ids[i]=lid
+        x=20+i*lane_w
+        cells.append(f'<mxCell id="{lid}" value="{xml_escape(lane)}" style="swimlane;horizontal=0;startSize=32;html=1;" vertex="1" parent="1"><mxGeometry x="{x}" y="20" width="{lane_w}" height="{total_h}" as="geometry"/></mxCell>')
+    for n in nodes:
+        kind=n.get("kind","task")
+        style="rounded=1;whiteSpace=wrap;html=1;"
+        if kind=="decision": style="rhombus;whiteSpace=wrap;html=1;"
+        elif kind in ("start","end"): style="ellipse;whiteSpace=wrap;html=1;"
+        elif kind=="actor": style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;"
+        parent=lane_ids.get(n.get("lane",0),"1")
+        cells.append(f'<mxCell id="{n["id"]}" value="{xml_escape(n["label"])}" style="{style}" vertex="1" parent="{parent}"><mxGeometry x="{n.get("x",60)}" y="{n.get("y",60)}" width="{n.get("w",190)}" height="{n.get("h",55)}" as="geometry"/></mxCell>')
+    for i,e in enumerate(edges,1):
+        src,dst,label,*rest=e
+        style=rest[0] if rest else "edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;"
+        cells.append(f'<mxCell id="e{i}" value="{xml_escape(label)}" style="{style}" edge="1" parent="1" source="{src}" target="{dst}"><mxGeometry relative="1" as="geometry"/></mxCell>')
+    xml='<?xml version="1.0" encoding="UTF-8"?><mxfile host="app.diagrams.net"><diagram name="'+xml_escape(title)+'"><mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827"><root>'+''.join(cells)+'</root></mxGraphModel></diagram></mxfile>'
+    path.write_text(xml,encoding="utf-8")
 
-Cách nhập:
-1. Mở Visual Paradigm Desktop.
-2. Project > Import > XMI...
-3. Chọn file .xmi tương ứng.
-4. Nếu có tùy chọn Auto Layout after imported thì bật.
-5. Nếu model element đã được nhập nhưng chưa có canvas: Diagram > New > Use Case Diagram,
-   kéo Actor/Use Case từ Model Explorer vào sơ đồ và chọn Auto Layout.
+def business_drawio(code,title,lanes,steps,path):
+    nodes=[]; edges=[]
+    for i,s in enumerate(steps):
+        lane,label,kind=s[:3]
+        nodes.append({"id":f"n{i+1}","label":label,"lane":lane,"kind":kind,"x":65,"y":60+i*85,"w":190,"h":55})
+        if i>0: edges.append((f"n{i}",f"n{i+1}",""))
+    drawio_doc(f"{code} - {title}",lanes,nodes,edges,path)
 
-Các file:
-01_MeritTrack_UseCase_TongQuan.xmi
-02_MeritTrack_UseCase_SinhVien.xmi
-03_MeritTrack_UseCase_CanBoLop.xmi
-04_MeritTrack_UseCase_CanBoKhoa.xmi
-05_MeritTrack_UseCase_Admin.xmi
+BUSINESS_EDITABLE = [
+("BP01","Đăng nhập và chuyển ngữ cảnh",["Người dùng","Hệ thống"],[(0,"Bắt đầu","start"),(0,"Nhập thông tin đăng nhập","task"),(1,"Kiểm tra tài khoản","decision"),(1,"Tạo phiên đăng nhập","task"),(0,"Chọn giao diện theo vai trò (nếu cần)","task"),(1,"Kiểm tra quyền chuyển giao diện","decision"),(1,"Hiển thị trang phù hợp","task"),(0,"Kết thúc","end")]),
+("BP02","Đăng ký và điểm danh hoạt động",["Người tham gia","Hệ thống","Cán bộ khoa/Quản trị viên"],[(0,"Xem hoạt động","start"),(1,"Hiển thị hoạt động phù hợp","task"),(0,"Chọn đăng ký","task"),(1,"Kiểm tra điều kiện đăng ký","decision"),(1,"Ghi nhận đăng ký","task"),(0,"Tham gia hoạt động","task"),(2,"Quét QR hoặc nhập MSSV","task"),(1,"Kiểm tra điều kiện điểm danh","decision"),(1,"Ghi nhận đã tham gia và điểm rèn luyện","task"),(0,"Nhận thông báo","end")]),
+("BP03","Xét hồ sơ sinh viên hai vòng",["Sinh viên","Hệ thống","Cán bộ lớp","Cán bộ khoa"],[(0,"Tạo hồ sơ","start"),(1,"Tự động kiểm tra tiêu chí","task"),(0,"Bổ sung minh chứng","task"),(0,"Nộp hồ sơ","task"),(1,"Kiểm tra điều kiện nộp","decision"),(2,"Duyệt vòng 1","task"),(1,"Chuyển trạng thái hồ sơ","decision"),(3,"Duyệt vòng 2","task"),(1,"Ghi nhận kết quả cuối","decision"),(0,"Theo dõi kết quả","end")]),
+("BP04","Xét hồ sơ cán bộ",["Cán bộ","Hệ thống","Quản trị viên"],[(0,"Tạo hồ sơ","start"),(1,"Tự động kiểm tra tiêu chí và tính điểm","task"),(0,"Bổ sung minh chứng","task"),(0,"Nộp hồ sơ","task"),(1,"Kiểm tra điều kiện nộp","decision"),(2,"Duyệt hồ sơ","task"),(1,"Ghi nhận kết quả","decision"),(0,"Theo dõi kết quả","end")]),
+("BP05","Cấu hình bộ tiêu chuẩn và đợt xét",["Quản trị viên","Hệ thống"],[(0,"Tạo hoặc sao chép bộ tiêu chuẩn","start"),(1,"Kiểm tra khả năng chỉnh sửa","decision"),(0,"Cấu hình nhóm, tiêu chí và điều kiện","task"),(1,"Lưu bộ tiêu chuẩn","task"),(0,"Tạo đợt xét","task"),(1,"Kiểm tra loại, thời gian và học kỳ","decision"),(0,"Đồng bộ tiêu chuẩn cho đợt xét","task"),(1,"Tạo bản tiêu chuẩn áp dụng","task"),(0,"Công bố đợt xét","end")]),
+("BP06","Nhập kết quả hoạt động và đồng bộ hồ sơ",["Quản trị viên","Hệ thống","Hồ sơ liên quan"],[(0,"Chọn hoạt động và tệp kết quả","start"),(1,"Đọc dữ liệu và đối chiếu người tham gia","decision"),(0,"Xác nhận dữ liệu cần nhập","task"),(1,"Ghi nhận kết quả tham gia và điểm rèn luyện","task"),(2,"Cập nhật lại tiêu chí và điểm hồ sơ","task"),(1,"Ghi nhật ký và cập nhật báo cáo","task"),(0,"Kết thúc","end")]),
+]
+for code,title,lanes,steps in BUSINESS_EDITABLE:
+    business_drawio(code,title,lanes,steps,DRAWIO_BP/f"{code}_{re.sub(r'[^A-Za-z0-9]+','_',title)}.drawio")
+
+# Editable use-case draw.io with <<include>> / <<extend>>
+def usecase_drawio(actor, selected, path):
+    includes,extends,support=relation_names(selected)
+    names=[usecase_name(u) for u in selected]+support
+    nodes=[{"id":"actor","label":actor,"lane":0,"kind":"actor","x":30,"y":220,"w":80,"h":110}]
+    # One wide lane is enough for editable use-case layout
+    lanes=["Mô hình Use Case"]
+    for i,name in enumerate(names):
+        col=i%3; row=i//3
+        nodes.append({"id":f"u{i+1}","label":name,"lane":0,"kind":"start","x":180+col*250,"y":40+row*90,"w":210,"h":55})
+    idmap={name:f"u{i+1}" for i,name in enumerate(names)}
+    edges=[]
+    for u in selected:
+        edges.append(("actor",idmap[usecase_name(u)],"","endArrow=none;html=1;"))
+    for src,dst in includes:
+        edges.append((idmap[src],idmap[dst],"&lt;&lt;include&gt;&gt;","dashed=1;endArrow=open;html=1;"))
+    for src,dst in extends:
+        edges.append((idmap[src],idmap[dst],"&lt;&lt;extend&gt;&gt;","dashed=1;endArrow=open;html=1;"))
+    drawio_doc(f"Use Case - {actor}",lanes,nodes,edges,path)
+
+usecase_drawio("Sinh viên",student_selected,DRAWIO_UC/"02_UseCase_SinhVien.drawio")
+usecase_drawio("Cán bộ lớp",class_selected,DRAWIO_UC/"03_UseCase_CanBoLop.drawio")
+usecase_drawio("Cán bộ khoa",faculty_selected,DRAWIO_UC/"04_UseCase_CanBoKhoa.drawio")
+usecase_drawio("Quản trị viên",admin_selected,DRAWIO_UC/"05_UseCase_Admin.drawio")
+
+guide = """BỘ SƠ ĐỒ CHỈNH SỬA
+====================
+1) visual-paradigm/*.xmi:
+   Import trong Visual Paradigm bằng Project > Import > XMI.
+   Các sơ đồ theo vai trò có Association và quan hệ <<include>> / <<extend>>.
+2) editable-diagrams/usecase-drawio/*.drawio:
+   Mở trực tiếp bằng diagrams.net/draw.io để chỉnh bố cục, nhãn và quan hệ.
+3) editable-diagrams/business-process-drawio/*.drawio:
+   Sơ đồ nghiệp vụ dạng swimlane có thể chỉnh sửa từng phần tử.
 """
-(XMI/"HUONG_DAN_IMPORT_VISUAL_PARADIGM.txt").write_text(guide,encoding="utf-8")
+(EDIT/"HUONG_DAN_CHINH_SUA_SO_DO.txt").write_text(guide,encoding="utf-8")
+
+(XMI/"HUONG_DAN_IMPORT_VISUAL_PARADIGM.txt").write_text("""BỘ XMI 2.1 CHO VISUAL PARADIGM
+================================
+Các file .xmi chứa Actor, Use Case, Association, <<include>> và <<extend>>.
+Cách nhập: Project > Import > XMI... Sau khi import, nếu chưa có canvas, tạo Use Case Diagram mới
+và kéo các phần tử từ Model Explorer vào sơ đồ rồi Auto Layout.
+""",encoding="utf-8")
 with zipfile.ZipFile(ROOT/"MeritTrack_VisualParadigm_XMI.zip","w",zipfile.ZIP_DEFLATED) as z:
-    for p in sorted(XMI.iterdir()):
-        z.write(p, arcname=p.name)
+    for p in sorted(XMI.iterdir()): z.write(p,arcname=p.name)
+with zipfile.ZipFile(ROOT/"MeritTrack_Editable_Diagrams.zip","w",zipfile.ZIP_DEFLATED) as z:
+    for p in sorted(EDIT.rglob("*")):
+        if p.is_file(): z.write(p,arcname=str(p.relative_to(EDIT)))
 
 # ------------------------------------------------------------
 # Word helpers
