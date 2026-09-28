@@ -1,0 +1,197 @@
+name: Build thesis DOCX
+
+on:
+  push:
+    branches:
+      - thesis-analysis-design
+    paths:
+      - 'thesis/Chuong_3_Phan_tich_Thiet_ke_MeritTrack.html'
+      - '.github/workflows/build-thesis-docx.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-docx:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install converter dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-docx beautifulsoup4
+
+      - name: Convert HTML source to DOCX
+        run: |
+          python - <<'PY'
+          from bs4 import BeautifulSoup, NavigableString, Tag
+          from docx import Document
+          from docx.shared import Cm, Pt
+          from docx.enum.text import WD_ALIGN_PARAGRAPH
+          from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
+          from docx.oxml import OxmlElement
+          from docx.oxml.ns import qn
+          from pathlib import Path
+
+          src = Path("thesis/Chuong_3_Phan_tich_Thiet_ke_MeritTrack.html")
+          out = Path("thesis/Chuong_3_Phan_tich_Thiet_ke_MeritTrack.docx")
+          soup = BeautifulSoup(src.read_text(encoding="utf-8"), "html.parser")
+
+          doc = Document()
+          sec = doc.sections[0]
+          sec.top_margin = Cm(2)
+          sec.bottom_margin = Cm(2)
+          sec.left_margin = Cm(3)
+          sec.right_margin = Cm(2)
+
+          normal = doc.styles["Normal"]
+          normal.font.name = "Times New Roman"
+          normal.font.size = Pt(13)
+          normal.paragraph_format.line_spacing = 1.3
+
+          for sty_name, size in [("Title",18),("Heading 1",16),("Heading 2",14),("Heading 3",13)]:
+              st = doc.styles[sty_name]
+              st.font.name = "Times New Roman"
+              st.font.size = Pt(size)
+              st.font.bold = True
+
+          def set_cell(cell, text="", bold=False, align=None):
+              cell.text = ""
+              p = cell.paragraphs[0]
+              if align is not None:
+                  p.alignment = align
+              r = p.add_run(text)
+              r.font.name = "Times New Roman"
+              r.font.size = Pt(11)
+              r.bold = bold
+              cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+          def shade(cell, fill="D9EAF7"):
+              tcPr = cell._tc.get_or_add_tcPr()
+              shd = OxmlElement("w:shd")
+              shd.set(qn("w:fill"), fill)
+              tcPr.append(shd)
+
+          def add_inline(par, node, bold=False, italic=False):
+              if isinstance(node, NavigableString):
+                  if str(node):
+                      r = par.add_run(str(node))
+                      r.font.name = "Times New Roman"
+                      r.font.size = Pt(13)
+                      r.bold = bold
+                      r.italic = italic
+                  return
+              if not isinstance(node, Tag):
+                  return
+              nb = bold or node.name in ("b","strong")
+              ni = italic or node.name in ("i","em")
+              if node.name == "br":
+                  par.add_run().add_break()
+                  return
+              for child in node.children:
+                  add_inline(par, child, nb, ni)
+
+          def add_paragraph_from_tag(tag, style=None):
+              p = doc.add_paragraph(style=style)
+              if tag.name == "p":
+                  p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+              for child in tag.children:
+                  add_inline(p, child)
+              return p
+
+          def add_list(tag, numbered=False):
+              for li in tag.find_all("li", recursive=False):
+                  p = doc.add_paragraph(style="List Number" if numbered else "List Bullet")
+                  for child in li.children:
+                      add_inline(p, child)
+
+          def add_table(tag):
+              rows = tag.find_all("tr", recursive=True)
+              if not rows:
+                  return
+              max_cols = max(len(r.find_all(["td","th"], recursive=False)) for r in rows)
+              table = doc.add_table(rows=0, cols=max_cols)
+              table.style = "Table Grid"
+              table.alignment = WD_TABLE_ALIGNMENT.CENTER
+              for ri, tr in enumerate(rows):
+                  cells = tr.find_all(["td","th"], recursive=False)
+                  row = table.add_row().cells
+                  ci = 0
+                  for cell_tag in cells:
+                      colspan = int(cell_tag.get("colspan", "1") or "1")
+                      target = row[ci]
+                      if colspan > 1 and ci + colspan - 1 < len(row):
+                          target = target.merge(row[ci + colspan - 1])
+                      txt = cell_tag.get_text("\n", strip=True)
+                      is_header = cell_tag.name == "th" or "header" in (tr.get("class") or []) or "section" in (tr.get("class") or [])
+                      set_cell(target, txt, is_header, WD_ALIGN_PARAGRAPH.CENTER if cell_tag.name == "th" else None)
+                      if is_header:
+                          shade(target, "EAF2F8" if cell_tag.name == "th" else "D9EAF7")
+                      ci += colspan
+              doc.add_paragraph()
+
+          body = soup.body or soup
+          for node in body.children:
+              if isinstance(node, NavigableString):
+                  continue
+              if not isinstance(node, Tag):
+                  continue
+              if node.name == "h1":
+                  p = add_paragraph_from_tag(node, "Title")
+                  p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+              elif node.name == "h2":
+                  add_paragraph_from_tag(node, "Heading 1")
+              elif node.name == "h3":
+                  add_paragraph_from_tag(node, "Heading 2")
+              elif node.name == "p":
+                  add_paragraph_from_tag(node)
+              elif node.name == "ul":
+                  add_list(node, False)
+              elif node.name == "ol":
+                  add_list(node, True)
+              elif node.name == "table":
+                  add_table(node)
+              elif node.name == "div":
+                  classes = node.get("class") or []
+                  if "pagebreak" in classes:
+                      doc.add_page_break()
+                  elif "code" in classes or "note" in classes:
+                      p = doc.add_paragraph()
+                      p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                      r = p.add_run(node.get_text("\n", strip=True))
+                      r.font.name = "Consolas" if "code" in classes else "Times New Roman"
+                      r.font.size = Pt(10 if "code" in classes else 12)
+                      if "note" in classes:
+                          r.bold = False
+
+          # Page number footer
+          footer = sec.footer
+          p = footer.paragraphs[0]
+          p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+          run = p.add_run()
+          fld1 = OxmlElement("w:fldChar"); fld1.set(qn("w:fldCharType"), "begin")
+          instr = OxmlElement("w:instrText"); instr.set(qn("xml:space"), "preserve"); instr.text = "PAGE"
+          fld2 = OxmlElement("w:fldChar"); fld2.set(qn("w:fldCharType"), "end")
+          run._r.extend([fld1, instr, fld2])
+
+          doc.save(out)
+          print(out)
+          PY
+
+      - name: Prepare DOCX package tree
+        run: |
+          mkdir -p artifact-docx
+          cd artifact-docx
+          unzip -q ../thesis/Chuong_3_Phan_tich_Thiet_ke_MeritTrack.docx
+
+      - name: Upload DOCX-compatible artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeritTrack-Chuong-3-DOCX
+          path: artifact-docx/*
+          include-hidden-files: true
+          compression-level: 6
+          if-no-files-found: error
