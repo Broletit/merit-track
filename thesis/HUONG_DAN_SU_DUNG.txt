@@ -1,0 +1,28 @@
+HƯỚNG DẪN SỬ DỤNG BỘ TÀI LIỆU MERITTRACK
+
+1. FILE WORD
+- Chuong_3_Phan_tich_Thiet_ke_MeritTrack.doc là tài liệu Word-compatible được lưu dưới dạng HTML có phần mở rộng .doc.
+- Tải file về và mở bằng Microsoft Word.
+- Chọn Save As > Word Document (*.docx) để lưu thành .docx chính thức nếu cần.
+- Bản .html đi kèm dùng làm nguồn dự phòng và dễ chỉnh sửa nội dung.
+
+2. FILE VISUAL PARADIGM
+Visual Paradigm hỗ trợ import XMI qua Project > Import > XMI.
+Các file:
+01_MeritTrack_UseCase_TongQuan.xmi
+02_MeritTrack_UseCase_SinhVien.xmi
+03_MeritTrack_UseCase_CanBoLop.xmi
+04_MeritTrack_UseCase_CanBoKhoa.xmi
+05_MeritTrack_UseCase_Admin.xmi
+
+Cách dùng:
+- Mở/tạo project trong Visual Paradigm.
+- Project > Import > XMI...
+- Chọn file .xmi.
+- Có thể bật Auto Layout after imported.
+- Nếu model element đã nhập nhưng chưa có diagram trình bày: Diagram > New > Use Case Diagram, kéo Actor/Use Case từ Model Explorer vào canvas rồi Auto Layout.
+- Sau khi nhập, có thể đổi tên, thêm/bớt association, include/extend và bố trí lại bình thường.
+
+3. NHÁNH GITHUB
+Toàn bộ file nằm trên branch: thesis-analysis-design
+Không thay đổi source code của branch main.
