@@ -15,9 +15,16 @@ from docx.oxml.ns import qn
 ROOT = Path("thesis/generated_chapter3")
 IMG = ROOT / "diagrams"
 XMI = ROOT / "visual-paradigm"
+EDIT = ROOT / "editable-diagrams"
+DRAWIO_UC = EDIT / "usecase-drawio"
+DRAWIO_BP = EDIT / "business-process-drawio"
+ACTIVITY_XMI = EDIT / "business-process-xmi"
 ROOT.mkdir(parents=True, exist_ok=True)
 IMG.mkdir(parents=True, exist_ok=True)
 XMI.mkdir(parents=True, exist_ok=True)
+DRAWIO_UC.mkdir(parents=True, exist_ok=True)
+DRAWIO_BP.mkdir(parents=True, exist_ok=True)
+ACTIVITY_XMI.mkdir(parents=True, exist_ok=True)
 
 
 # Data is embedded so the generator is self-contained.
@@ -398,6 +405,68 @@ def uc_role(u):
     if a == "Người dùng":
         roles.extend(["Sinh viên","Cán bộ lớp","Cán bộ khoa","Quản trị viên"])
     return roles
+
+
+def humanize(text):
+    """Chuyển thuật ngữ triển khai thành ngôn ngữ nghiệp vụ dễ hiểu."""
+    s = str(text)
+    replacements = [
+        ("Officer participant context", "giao diện dành cho cán bộ"),
+        ("Faculty officer context", "giao diện cán bộ khoa"),
+        ("Class officer context", "giao diện cán bộ lớp"),
+        ("Student context", "giao diện sinh viên"),
+        ("Admin context", "giao diện quản trị"),
+        ("login_context", "giao diện theo vai trò"),
+        ("activity_registrations", "thông tin đăng ký tham gia"),
+        ("registration_locked", "trạng thái khóa đăng ký"),
+        ("conduct_score_categories", "khung điểm rèn luyện"),
+        ("conduct_scores", "điểm rèn luyện"),
+        ("criteria_template_groups/items", "nhóm tiêu chuẩn và tiêu chí"),
+        ("criteria_activity_rules", "quy tắc ghi nhận từ hoạt động"),
+        ("criteria_conduct_rules", "điều kiện điểm rèn luyện"),
+        ("event_criteria_groups/items", "bộ tiêu chuẩn áp dụng cho đợt xét"),
+        ("faculty_class_assignments", "phân công lớp cho cán bộ khoa"),
+        ("submission_items/files", "minh chứng của hồ sơ"),
+        ("submission_criteria_reviews", "kết quả đánh giá từng tiêu chí"),
+        ("submission_timeline", "lịch sử xử lý hồ sơ"),
+        ("notifications", "thông báo"),
+        ("audit_logs", "nhật ký hệ thống"),
+        ("activity", "hoạt động"),
+        ("Activity", "Hoạt động"),
+        ("events", "các đợt xét"),
+        ("event", "đợt xét"),
+        ("Event", "Đợt xét"),
+        ("submission", "hồ sơ"),
+        ("Submission", "Hồ sơ"),
+        ("registration", "đăng ký tham gia"),
+        ("Registration", "Đăng ký tham gia"),
+        ("published", "đã công bố"),
+        ("scope", "phạm vi áp dụng"),
+        ("role", "vai trò"),
+        ("context", "giao diện theo vai trò"),
+        ("auto-evaluation", "đánh giá tự động"),
+        ("auto evaluation", "đánh giá tự động"),
+        ("auto-evaluate", "đánh giá tự động"),
+        ("score_total", "tổng điểm"),
+        ("score_max", "điểm tối đa"),
+        ("evidence", "minh chứng"),
+        ("review", "xét duyệt"),
+        ("timeline", "lịch sử xử lý"),
+        ("queue", "danh sách chờ xử lý"),
+        ("attended", "đã tham gia"),
+        ("student", "sinh viên"),
+        ("officer", "cán bộ"),
+        ("Admin", "Quản trị viên"),
+    ]
+    for old,new in replacements:
+        s=s.replace(old,new)
+    s=re.sub(r"\bstatus\b","trạng thái",s,flags=re.I)
+    s=re.sub(r"\bphase\b","giai đoạn",s,flags=re.I)
+    s=re.sub(r"\bterm\b","học kỳ",s,flags=re.I)
+    s=re.sub(r"\bsource\b","nguồn ghi nhận",s,flags=re.I)
+    s=re.sub(r"\bfile\b","tệp",s,flags=re.I)
+    s=re.sub(r"\bnote\b","ghi chú",s,flags=re.I)
+    return s.replace("_"," ")
 
 # ------------------------------------------------------------
 # Diagrams
