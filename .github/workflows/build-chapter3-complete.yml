@@ -44,3 +44,5 @@ jobs:
           include-hidden-files: true
           compression-level: 6
           if-no-files-found: error
+
+# rebuild marker: 2026-09-28-final-eight-sections
