@@ -1,0 +1,2007 @@
+[
+  {
+    "id": "UC01",
+    "name": "Đăng nhập",
+    "actor": "Người dùng",
+    "secondary": "Không",
+    "desc": "Cho phép người dùng xác thực bằng MSSV/email và mật khẩu để truy cập MeritTrack.",
+    "pre": "Người dùng đã có tài khoản trong hệ thống.",
+    "post": "Phiên đăng nhập được tạo; người dùng được chuyển đến dashboard theo ngữ cảnh mặc định.",
+    "main": [
+      [
+        "Nhập MSSV/email và mật khẩu, chọn Đăng nhập.",
+        "Kiểm tra dữ liệu đầu vào."
+      ],
+      [
+        "",
+        "Tìm tài khoản theo MSSV hoặc email."
+      ],
+      [
+        "",
+        "Kiểm tra trạng thái hoạt động và xác minh mật khẩu."
+      ],
+      [
+        "",
+        "Xác định ngữ cảnh đăng nhập mặc định, tạo session và chuyển đến dashboard phù hợp."
+      ]
+    ],
+    "alt": [
+      "Tài khoản cán bộ lớp/cán bộ khoa đăng nhập thành công nhưng mặc định vào ngữ cảnh sinh viên và có thể chuyển ngữ cảnh sau đó."
+    ],
+    "exc": [
+      "Thiếu thông tin đăng nhập: yêu cầu nhập đầy đủ.",
+      "Tài khoản không tồn tại: thông báo lỗi.",
+      "Tài khoản bị khóa: từ chối đăng nhập.",
+      "Mật khẩu không đúng: thông báo sai mật khẩu."
+    ]
+  },
+  {
+    "id": "UC02",
+    "name": "Đổi mật khẩu",
+    "actor": "Người dùng",
+    "secondary": "Không",
+    "desc": "Cho phép người dùng thay đổi mật khẩu đang sử dụng.",
+    "pre": "Người dùng đã đăng nhập.",
+    "post": "Mật khẩu mới được lưu; người dùng được điều hướng về dashboard tương ứng.",
+    "main": [
+      [
+        "Nhập mật khẩu hiện tại, mật khẩu mới và xác nhận mật khẩu.",
+        "Kiểm tra các trường bắt buộc."
+      ],
+      [
+        "",
+        "Kiểm tra mật khẩu mới và xác nhận trùng khớp."
+      ],
+      [
+        "",
+        "Xác minh mật khẩu hiện tại và cập nhật mật khẩu mới."
+      ],
+      [
+        "",
+        "Điều hướng người dùng về dashboard."
+      ]
+    ],
+    "alt": [
+      "Admin được điều hướng về dashboard quản trị; các tài khoản khác về giao diện người dùng."
+    ],
+    "exc": [
+      "Thiếu dữ liệu: từ chối cập nhật.",
+      "Mật khẩu xác nhận không khớp: thông báo lỗi.",
+      "Mật khẩu hiện tại không hợp lệ: không thay đổi dữ liệu."
+    ]
+  },
+  {
+    "id": "UC03",
+    "name": "Chuyển ngữ cảnh sử dụng",
+    "actor": "Cán bộ lớp, Cán bộ khoa",
+    "secondary": "Không",
+    "desc": "Cho phép cán bộ chuyển giữa giao diện người dùng và giao diện nghiệp vụ cán bộ mà không cần tài khoản khác.",
+    "pre": "Người dùng đã đăng nhập và role được phép sử dụng ngữ cảnh cần chuyển.",
+    "post": "sessions.login_context được cập nhật và người dùng được chuyển đến dashboard mới.",
+    "main": [
+      [
+        "Chọn ngữ cảnh muốn sử dụng.",
+        "Kiểm tra ngữ cảnh được yêu cầu."
+      ],
+      [
+        "",
+        "Kiểm tra role hiện tại có quyền sử dụng ngữ cảnh đó."
+      ],
+      [
+        "",
+        "Cập nhật login_context của session."
+      ],
+      [
+        "",
+        "Xác nhận session và điều hướng tới dashboard tương ứng."
+      ]
+    ],
+    "alt": [
+      "Cán bộ lớp: student ↔ class_officer.",
+      "Cán bộ khoa: student ↔ faculty_officer."
+    ],
+    "exc": [
+      "Ngữ cảnh không thuộc quyền của role: từ chối chuyển.",
+      "Session hết hạn/không hợp lệ: yêu cầu đăng nhập lại."
+    ]
+  },
+  {
+    "id": "UC04",
+    "name": "Đăng xuất",
+    "actor": "Người dùng",
+    "secondary": "Không",
+    "desc": "Kết thúc phiên làm việc hiện tại của người dùng.",
+    "pre": "Người dùng đang có session hợp lệ.",
+    "post": "Phiên đăng nhập bị thu hồi/kết thúc và người dùng trở về trang đăng nhập.",
+    "main": [
+      [
+        "Chọn Đăng xuất.",
+        "Thu hồi hoặc xóa session hiện tại."
+      ],
+      [
+        "",
+        "Điều hướng về trang đăng nhập."
+      ]
+    ],
+    "alt": [
+      "Không có."
+    ],
+    "exc": [
+      "Nếu session đã hết hạn, hệ thống vẫn đưa người dùng về trang đăng nhập."
+    ]
+  },
+  {
+    "id": "UC05",
+    "name": "Xem thông tin cá nhân",
+    "actor": "Sinh viên, Cán bộ lớp, Cán bộ khoa",
+    "secondary": "Không",
+    "desc": "Hiển thị thông tin tài khoản, lớp liên kết, vai trò và ngữ cảnh đang sử dụng.",
+    "pre": "Người dùng đã đăng nhập; tài khoản không phải admin.",
+    "post": "Thông tin cá nhân được hiển thị, không thay đổi dữ liệu.",
+    "main": [
+      [
+        "Mở trang Thông tin cá nhân.",
+        "Lấy thông tin session user."
+      ],
+      [
+        "",
+        "Truy vấn các lớp hiện còn liên kết."
+      ],
+      [
+        "",
+        "Hiển thị họ tên, MSSV, email, trạng thái, role, login context và lớp."
+      ]
+    ],
+    "alt": [
+      "Chỉ các class_members có left_at IS NULL được hiển thị như lớp hiện tại."
+    ],
+    "exc": [
+      "Admin truy cập chức năng này được chuyển về dashboard admin."
+    ]
+  },
+  {
+    "id": "UC06",
+    "name": "Hiển thị QR cá nhân",
+    "actor": "Sinh viên, Cán bộ lớp, Cán bộ khoa",
+    "secondary": "Cán bộ khoa (người quét)",
+    "desc": "Tạo và hiển thị mã QR động phục vụ điểm danh.",
+    "pre": "Người dùng đã đăng nhập và không phải admin.",
+    "post": "QR hợp lệ được hiển thị và tự làm mới định kỳ.",
+    "main": [
+      [
+        "Chọn Mở QR điểm danh.",
+        "Tạo payload QR gắn với user ID và MSSV."
+      ],
+      [
+        "",
+        "Mã hóa payload và hiển thị QR."
+      ],
+      [
+        "Giữ cửa sổ QR mở.",
+        "Định kỳ lấy payload mới từ API và cập nhật QR."
+      ]
+    ],
+    "alt": [
+      "Người dùng có thể đóng QR bằng nút đóng, phím Escape hoặc nhấn ra ngoài hộp thoại."
+    ],
+    "exc": [
+      "Admin gọi API QR bị từ chối vì không có QR sinh viên."
+    ]
+  },
+  {
+    "id": "UC07",
+    "name": "Xem thông báo",
+    "actor": "Người dùng",
+    "secondary": "Không",
+    "desc": "Hiển thị các thông báo nghiệp vụ phát sinh cho tài khoản.",
+    "pre": "Người dùng đã đăng nhập.",
+    "post": "Danh sách thông báo được hiển thị.",
+    "main": [
+      [
+        "Mở mục Thông báo.",
+        "Truy vấn notifications của người dùng."
+      ],
+      [
+        "",
+        "Sắp xếp và hiển thị nội dung, trạng thái đọc, thời gian và liên kết liên quan."
+      ]
+    ],
+    "alt": [
+      "Thông báo có thể liên kết tới hồ sơ, hoạt động hoặc trang quản trị tương ứng."
+    ],
+    "exc": [
+      "Không có thông báo: hiển thị trạng thái rỗng."
+    ]
+  },
+  {
+    "id": "UC08",
+    "name": "Đánh dấu thông báo đã đọc",
+    "actor": "Người dùng",
+    "secondary": "Không",
+    "desc": "Cập nhật trạng thái đọc cho một hoặc toàn bộ thông báo.",
+    "pre": "Người dùng đã đăng nhập; thông báo thuộc người dùng.",
+    "post": "is_read=1 và read_at được ghi nhận.",
+    "main": [
+      [
+        "Chọn đánh dấu một thông báo hoặc tất cả thông báo là đã đọc.",
+        "Kiểm tra user_id của notification."
+      ],
+      [
+        "",
+        "Cập nhật is_read và read_at."
+      ],
+      [
+        "",
+        "Làm mới các trang thông báo theo ngữ cảnh."
+      ]
+    ],
+    "alt": [
+      "Có thể đánh dấu từng thông báo hoặc tất cả thông báo chưa đọc."
+    ],
+    "exc": [
+      "Notification không thuộc user: câu lệnh cập nhật không làm thay đổi dữ liệu."
+    ]
+  },
+  {
+    "id": "UC09",
+    "name": "Xem danh sách hoạt động",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Xem các hoạt động dành cho sinh viên theo học kỳ, phạm vi lớp và bộ lọc.",
+    "pre": "Đăng nhập trong student context.",
+    "post": "Danh sách hoạt động phù hợp được hiển thị.",
+    "main": [
+      [
+        "Mở trang Hoạt động.",
+        "Xác định học kỳ được chọn hoặc học kỳ hiện hành."
+      ],
+      [
+        "",
+        "Lọc hoạt động published, audience_type=student và đúng phạm vi lớp."
+      ],
+      [
+        "Chọn bộ lọc từ khóa/trạng thái/thời gian nếu cần.",
+        "Áp dụng bộ lọc và trả danh sách hoạt động."
+      ]
+    ],
+    "alt": [
+      "Người dùng có thể chọn học kỳ cũ để xem lại lịch sử."
+    ],
+    "exc": [
+      "Học kỳ không hợp lệ: quay về học kỳ hiện hành.",
+      "Chưa có học kỳ hiện hành: thông báo cấu hình thiếu."
+    ]
+  },
+  {
+    "id": "UC10",
+    "name": "Xem chi tiết hoạt động",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Hiển thị thông tin chi tiết và trạng thái đăng ký của một hoạt động.",
+    "pre": "Đăng nhập student context; hoạt động published, dành cho sinh viên và thuộc phạm vi được xem.",
+    "post": "Chi tiết hoạt động và khả năng đăng ký/hủy được hiển thị.",
+    "main": [
+      [
+        "Chọn một hoạt động.",
+        "Kiểm tra hoạt động tồn tại, published và phù hợp audience."
+      ],
+      [
+        "",
+        "Kiểm tra scope lớp và registration hiện tại."
+      ],
+      [
+        "",
+        "Tính canRegister/canCancel dựa trên thời gian, nguồn tham gia và trạng thái khóa."
+      ],
+      [
+        "",
+        "Hiển thị chi tiết hoạt động."
+      ]
+    ],
+    "alt": [
+      "Hoạt động external chỉ hiển thị thông tin, không cho đăng ký trực tiếp trên MeritTrack."
+    ],
+    "exc": [
+      "Không tìm thấy hoặc không thuộc phạm vi: trả trang 404."
+    ]
+  },
+  {
+    "id": "UC11",
+    "name": "Đăng ký hoạt động",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Cho phép sinh viên đăng ký một hoạt động nội bộ phù hợp.",
+    "pre": "Đăng nhập student context; hoạt động published; trong thời gian đăng ký; không khóa; audience student; sinh viên có lớp và thuộc scope nếu có.",
+    "post": "activity_registrations có trạng thái registered.",
+    "main": [
+      [
+        "Chọn Đăng ký tại hoạt động.",
+        "Kiểm tra hoạt động tồn tại, published và đang mở đăng ký."
+      ],
+      [
+        "",
+        "Kiểm tra audience_type, lớp hiện tại và phạm vi lớp."
+      ],
+      [
+        "",
+        "Kiểm tra registration_locked và participation_source."
+      ],
+      [
+        "",
+        "Kiểm tra đăng ký hiện có."
+      ],
+      [
+        "",
+        "Tạo mới hoặc kích hoạt lại registration với status=registered."
+      ],
+      [
+        "",
+        "Làm mới các trang liên quan và trả thông báo thành công."
+      ]
+    ],
+    "alt": [
+      "Nếu registration cũ ở trạng thái cancelled, hệ thống cập nhật lại thành registered thay vì tạo bản ghi mới."
+    ],
+    "exc": [
+      "Chưa mở/hết hạn đăng ký.",
+      "Hoạt động dành cho cán bộ.",
+      "Sinh viên chưa được gán lớp.",
+      "Không thuộc scope lớp.",
+      "Đăng ký đang khóa.",
+      "Hoạt động external đăng ký trên hệ thống khác.",
+      "Đã đăng ký trước đó."
+    ]
+  },
+  {
+    "id": "UC12",
+    "name": "Hủy đăng ký hoạt động",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Cho phép sinh viên chủ động hủy đăng ký trước khi hoạt động bắt đầu.",
+    "pre": "Registration hiện là registered; chưa hết hạn đăng ký; hoạt động chưa bắt đầu; không khóa thay đổi đăng ký.",
+    "post": "Registration chuyển sang cancelled và ghi chú lý do.",
+    "main": [
+      [
+        "Chọn Hủy đăng ký.",
+        "Tìm registration của sinh viên tại hoạt động."
+      ],
+      [
+        "",
+        "Kiểm tra status, registration_locked, hạn đăng ký và thời gian bắt đầu."
+      ],
+      [
+        "",
+        "Cập nhật status=cancelled và ghi chú sinh viên chủ động hủy."
+      ],
+      [
+        "",
+        "Làm mới các trang liên quan."
+      ]
+    ],
+    "alt": [
+      "Sau khi hủy, nếu hoạt động còn mở đăng ký thì sinh viên có thể đăng ký lại."
+    ],
+    "exc": [
+      "Không có registration.",
+      "Registration không còn ở registered.",
+      "Hoạt động đang khóa.",
+      "Đã hết hạn hủy.",
+      "Hoạt động đã bắt đầu."
+    ]
+  },
+  {
+    "id": "UC13",
+    "name": "Xem điểm rèn luyện",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Theo dõi điểm rèn luyện theo học kỳ, khung điểm phân cấp và các hoạt động đã ghi nhận.",
+    "pre": "Đăng nhập student context.",
+    "post": "Điểm thực tế, điểm tối đa từng mục và danh sách nguồn điểm được hiển thị.",
+    "main": [
+      [
+        "Mở trang Điểm rèn luyện.",
+        "Xác định học kỳ cần xem."
+      ],
+      [
+        "",
+        "Truy vấn khung conduct_score_categories và điểm conduct_scores của người dùng."
+      ],
+      [
+        "",
+        "Tính điểm hiệu lực từ dưới lên, giới hạn bởi score_max từng mục."
+      ],
+      [
+        "",
+        "Hiển thị tổng điểm, hoạt động đã tham gia, trạng thái ghi điểm và khung điểm."
+      ]
+    ],
+    "alt": [
+      "Có thể lọc theo trạng thái hoạt động hoặc trạng thái đã cộng điểm."
+    ],
+    "exc": [
+      "Học kỳ chưa cấu hình khung điểm: hiển thị thông báo chưa có khung."
+    ]
+  },
+  {
+    "id": "UC14",
+    "name": "Xem danh sách đợt xét sinh viên",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Xem các đợt xét dành cho sinh viên theo học kỳ và trạng thái.",
+    "pre": "Đăng nhập student context.",
+    "post": "Danh sách events type=student phù hợp được hiển thị.",
+    "main": [
+      [
+        "Mở mục Đợt xét.",
+        "Xác định học kỳ được chọn."
+      ],
+      [
+        "",
+        "Lọc các đợt xét dành cho sinh viên và phạm vi người dùng."
+      ],
+      [
+        "",
+        "Tính phase nhận hồ sơ và trạng thái hồ sơ hiện có."
+      ],
+      [
+        "",
+        "Hiển thị danh sách."
+      ]
+    ],
+    "alt": [
+      "Có thể xem lại đợt xét của học kỳ cũ ở chế độ lịch sử."
+    ],
+    "exc": [
+      "Không có đợt xét phù hợp: hiển thị danh sách rỗng."
+    ]
+  },
+  {
+    "id": "UC15",
+    "name": "Xem chi tiết đợt xét sinh viên",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Hiển thị thông tin đợt xét, tiêu chuẩn/tiêu chí và trạng thái hồ sơ cá nhân.",
+    "pre": "Đợt xét tồn tại, type=student và người dùng thuộc phạm vi.",
+    "post": "Chi tiết đợt xét và các tiêu chí snapshot được hiển thị.",
+    "main": [
+      [
+        "Chọn đợt xét.",
+        "Truy vấn event và event_criteria_groups/items."
+      ],
+      [
+        "",
+        "Đánh giá dữ liệu hoạt động/ĐRL tự động liên quan nếu có hồ sơ."
+      ],
+      [
+        "",
+        "Xác định khả năng tạo/chỉnh sửa/nộp hồ sơ."
+      ],
+      [
+        "",
+        "Hiển thị tiêu chuẩn, tiêu chí, trạng thái tự động và minh chứng."
+      ]
+    ],
+    "alt": [
+      "Nếu đã có hồ sơ, hiển thị trạng thái và dữ liệu hồ sơ hiện tại."
+    ],
+    "exc": [
+      "Đợt xét không tồn tại/không phù hợp: trả 404 hoặc từ chối."
+    ]
+  },
+  {
+    "id": "UC16",
+    "name": "Khởi tạo hồ sơ sinh viên",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Tạo hồ sơ nháp cho sinh viên trong một đợt xét.",
+    "pre": "Đợt xét published, type=student và đang nhận hồ sơ; sinh viên có lớp hiện tại.",
+    "post": "Một submission duy nhất cho event-user được tạo ở trạng thái draft và được auto-evaluate.",
+    "main": [
+      [
+        "Chọn bắt đầu/tiếp tục hồ sơ.",
+        "Kiểm tra đợt xét và phase nhận hồ sơ."
+      ],
+      [
+        "",
+        "Tìm submission hiện có của user trong event."
+      ],
+      [
+        "",
+        "Nếu chưa có, xác định lớp hiện tại và tạo submission status=draft."
+      ],
+      [
+        "",
+        "Chạy đánh giá tiêu chí tự động."
+      ],
+      [
+        "",
+        "Trả submissionId cho giao diện."
+      ]
+    ],
+    "alt": [
+      "Nếu đã có hồ sơ ở trạng thái cho phép chỉnh sửa, hệ thống dùng lại hồ sơ đó và đánh giá tự động lại."
+    ],
+    "exc": [
+      "Đợt xét chưa công khai/hết hạn.",
+      "Hồ sơ hiện không cho chỉnh sửa.",
+      "Tài khoản chưa được gán lớp."
+    ]
+  },
+  {
+    "id": "UC17",
+    "name": "Bổ sung minh chứng sinh viên",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Lưu nội dung mô tả và tệp minh chứng cho các tiêu chí cần chứng minh thủ công.",
+    "pre": "Hồ sơ thuộc user; trạng thái cho phép chỉnh sửa; event đang nhận hồ sơ.",
+    "post": "submission_items/submission_files được cập nhật; auto evaluation chạy lại.",
+    "main": [
+      [
+        "Nhập ghi chú và/hoặc chọn tệp minh chứng cho từng tiêu chí.",
+        "Kiểm tra quyền sở hữu và trạng thái hồ sơ."
+      ],
+      [
+        "",
+        "Kiểm tra phase của đợt xét."
+      ],
+      [
+        "",
+        "Kiểm tra định dạng PDF/PNG và dung lượng tối đa."
+      ],
+      [
+        "",
+        "Lưu note/tệp và cập nhật updated_at."
+      ],
+      [
+        "",
+        "Đánh giá tự động và cập nhật hồ sơ."
+      ]
+    ],
+    "alt": [
+      "Có thể chỉ nhập ghi chú hoặc chỉ tải tệp tùy tiêu chí."
+    ],
+    "exc": [
+      "Tệp không phải PDF/PNG.",
+      "Tệp vượt quá 10 MB.",
+      "MIME không phù hợp.",
+      "Hồ sơ không thuộc user hoặc không thể chỉnh sửa.",
+      "Đợt xét không còn nhận hồ sơ."
+    ]
+  },
+  {
+    "id": "UC18",
+    "name": "Yêu cầu hỗ trợ hồ sơ",
+    "actor": "Sinh viên",
+    "secondary": "Admin/Khoa",
+    "desc": "Gửi yêu cầu hỗ trợ khi sinh viên cần khoa xử lý vấn đề liên quan hồ sơ.",
+    "pre": "Hồ sơ thuộc user và còn ở trạng thái có thể chỉnh sửa.",
+    "post": "submission_support_requests ở trạng thái open được tạo hoặc cập nhật.",
+    "main": [
+      [
+        "Nhập nội dung yêu cầu hỗ trợ.",
+        "Kiểm tra nội dung tối thiểu và quyền sở hữu hồ sơ."
+      ],
+      [
+        "",
+        "Kiểm tra hồ sơ còn cho chỉnh sửa."
+      ],
+      [
+        "",
+        "Tạo/cập nhật yêu cầu support status=open."
+      ],
+      [
+        "",
+        "Làm mới trang hồ sơ và trang ứng viên phía quản trị."
+      ]
+    ],
+    "alt": [
+      "Nếu đã có yêu cầu cho submission, hệ thống cập nhật nội dung thay vì tạo bản ghi mới."
+    ],
+    "exc": [
+      "Nội dung dưới 10 ký tự.",
+      "Không tìm thấy hồ sơ.",
+      "Hồ sơ không còn cho chỉnh sửa."
+    ]
+  },
+  {
+    "id": "UC19",
+    "name": "Nộp hồ sơ sinh viên",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Gửi hồ sơ chính thức vào quy trình xét duyệt vòng 1.",
+    "pre": "Hồ sơ thuộc user; event đang nhận hồ sơ; trạng thái hồ sơ cho phép nộp.",
+    "post": "Submission chuyển sang submitted_v1; submitted_at và timeline được ghi nhận.",
+    "main": [
+      [
+        "Chọn Nộp hồ sơ.",
+        "Kiểm tra quyền sở hữu, trạng thái hồ sơ và phase của event."
+      ],
+      [
+        "",
+        "Chạy evaluateSubmissionAuto."
+      ],
+      [
+        "",
+        "Kiểm tra tiêu chí bắt buộc và min_required từng nhóm."
+      ],
+      [
+        "",
+        "Cập nhật status=submitted_v1, submitted_at, updated_at."
+      ],
+      [
+        "",
+        "Ghi submission_timeline action=submit."
+      ],
+      [
+        "",
+        "Làm mới hàng đợi duyệt vòng 1."
+      ]
+    ],
+    "alt": [
+      "Hồ sơ được nộp lại sau needs_revision_v1; source hiện còn mã tương thích cho một số trạng thái revision/rejected khác."
+    ],
+    "exc": [
+      "Đợt xét chưa mở/hết hạn/đóng.",
+      "Hồ sơ không ở trạng thái cho phép.",
+      "Thiếu tiêu chí bắt buộc hoặc chưa đủ min_required."
+    ]
+  },
+  {
+    "id": "UC20",
+    "name": "Theo dõi hồ sơ sinh viên",
+    "actor": "Sinh viên",
+    "secondary": "Không",
+    "desc": "Theo dõi trạng thái, minh chứng, phản hồi duyệt và lịch sử xử lý hồ sơ.",
+    "pre": "Người dùng đã có submission thuộc mình.",
+    "post": "Chi tiết hồ sơ và tiến trình được hiển thị.",
+    "main": [
+      [
+        "Mở danh sách hoặc chi tiết hồ sơ.",
+        "Truy vấn submission, event, tiêu chí, evidence, auto results, reviews và timeline."
+      ],
+      [
+        "",
+        "Chuyển trạng thái kỹ thuật thành nhãn nghiệp vụ."
+      ],
+      [
+        "",
+        "Hiển thị phản hồi theo từng vòng và các thao tác còn khả dụng."
+      ]
+    ],
+    "alt": [
+      "Nếu hồ sơ needs_revision, giao diện cho phép chỉnh sửa và nộp lại trong thời gian cho phép."
+    ],
+    "exc": [
+      "Không tìm thấy hoặc không thuộc user: từ chối truy cập."
+    ]
+  },
+  {
+    "id": "UC21",
+    "name": "Xem hồ sơ chờ duyệt vòng 1",
+    "actor": "Cán bộ lớp",
+    "secondary": "Sinh viên",
+    "desc": "Xem hàng đợi hồ sơ sinh viên của lớp cần cán bộ lớp xử lý.",
+    "pre": "Đăng nhập trong class_officer context và đang thuộc lớp tương ứng.",
+    "post": "Danh sách hồ sơ submitted_v1 thuộc phạm vi được hiển thị.",
+    "main": [
+      [
+        "Mở mục Duyệt vòng 1.",
+        "Xác định cán bộ lớp và lớp hiện tại."
+      ],
+      [
+        "",
+        "Truy vấn các submission của lớp ở trạng thái phù hợp."
+      ],
+      [
+        "",
+        "Hiển thị hàng đợi cùng thông tin sinh viên, đợt xét và trạng thái."
+      ]
+    ],
+    "alt": [
+      "Có thể mở chi tiết từng submission để đánh giá tiêu chí."
+    ],
+    "exc": [
+      "Không có hồ sơ chờ duyệt: hiển thị trạng thái rỗng."
+    ]
+  },
+  {
+    "id": "UC22",
+    "name": "Đánh giá tiêu chí vòng 1",
+    "actor": "Cán bộ lớp",
+    "secondary": "Sinh viên",
+    "desc": "Xác nhận đạt/chưa đạt cho từng tiêu chí thủ công trong hồ sơ vòng 1.",
+    "pre": "Submission status=submitted_v1; cán bộ lớp thuộc đúng lớp; tiêu chí không auto-pass và có minh chứng.",
+    "post": "submission_criteria_reviews round=1 được tạo/cập nhật.",
+    "main": [
+      [
+        "Mở hồ sơ và chọn một tiêu chí cần đánh giá.",
+        "Kiểm tra submission, tiêu chí và round hiện tại."
+      ],
+      [
+        "",
+        "Kiểm tra tiêu chí chưa đạt tự động và có file/note minh chứng."
+      ],
+      [
+        "",
+        "Kiểm tra cán bộ thuộc đúng lớp."
+      ],
+      [
+        "Chọn Đạt hoặc Chưa đạt.",
+        "Ghi decision pass/fail vào submission_criteria_reviews round=1."
+      ]
+    ],
+    "alt": [
+      "Có thể cập nhật lại quyết định của tiêu chí trước khi chốt review tổng."
+    ],
+    "exc": [
+      "Tiêu chí auto-pass: không cho đánh giá thủ công.",
+      "Chưa có minh chứng.",
+      "Không đúng lớp.",
+      "Hồ sơ không ở trạng thái chờ duyệt."
+    ]
+  },
+  {
+    "id": "UC23",
+    "name": "Duyệt hồ sơ vòng 1",
+    "actor": "Cán bộ lớp",
+    "secondary": "Sinh viên",
+    "desc": "Chốt quyết định vòng 1 đối với hồ sơ sinh viên.",
+    "pre": "Submission status=submitted_v1; event còn mở review; cán bộ có quyền lớp.",
+    "post": "Submission chuyển submitted_v2, needs_revision_v1 hoặc failed; review round=1 và timeline/notification được ghi.",
+    "main": [
+      [
+        "Mở hồ sơ và chọn quyết định.",
+        "Kiểm tra event type=student, trạng thái và quyền reviewer."
+      ],
+      [
+        "",
+        "Nếu chọn Duyệt, kiểm tra toàn bộ điều kiện hồ sơ đã được reviewer xác nhận."
+      ],
+      [
+        "",
+        "Xác định trạng thái tiếp theo theo quyết định."
+      ],
+      [
+        "",
+        "Ghi reviews round=1, cập nhật submission và timeline."
+      ],
+      [
+        "",
+        "Gửi notification cho sinh viên."
+      ]
+    ],
+    "alt": [
+      "Approve → submitted_v2; Revision → needs_revision_v1; Reject → failed."
+    ],
+    "exc": [
+      "Event đã khóa/hết hạn review.",
+      "Không đúng lớp.",
+      "Hồ sơ không ở submitted_v1.",
+      "Duyệt đạt khi còn tiêu chí/nhóm chưa đạt: từ chối."
+    ]
+  },
+  {
+    "id": "UC24",
+    "name": "Theo dõi lớp được phân công",
+    "actor": "Cán bộ khoa",
+    "secondary": "Không",
+    "desc": "Cho phép cán bộ khoa xem dữ liệu của các lớp được Admin phân công.",
+    "pre": "Đăng nhập faculty_officer context; có bản ghi faculty_class_assignments.",
+    "post": "Dữ liệu lớp thuộc phạm vi được hiển thị.",
+    "main": [
+      [
+        "Mở dashboard hoặc trang theo dõi lớp.",
+        "Truy vấn faculty_class_assignments của cán bộ."
+      ],
+      [
+        "",
+        "Tải thông tin các lớp, hoạt động/hồ sơ liên quan trong phạm vi."
+      ],
+      [
+        "",
+        "Hiển thị dữ liệu theo học kỳ và lớp."
+      ]
+    ],
+    "alt": [
+      "Một cán bộ khoa có thể được phân công nhiều lớp."
+    ],
+    "exc": [
+      "Chưa được phân công lớp: hiển thị trạng thái chưa có phạm vi quản lý."
+    ]
+  },
+  {
+    "id": "UC25",
+    "name": "Điểm danh QR/thủ công",
+    "actor": "Cán bộ khoa",
+    "secondary": "Sinh viên/người tham gia",
+    "desc": "Xác nhận người tham gia thực tế bằng QR động hoặc nhập MSSV.",
+    "pre": "Cán bộ có quyền điểm danh; hoạt động published; đang trong thời gian diễn ra; người tham gia đã đăng ký.",
+    "post": "Registration chuyển attended; attendance log được ghi; điểm ĐRL và notification có thể phát sinh.",
+    "main": [
+      [
+        "Chọn hoạt động và quét QR hoặc nhập MSSV.",
+        "Xác thực payload QR/MSSV."
+      ],
+      [
+        "",
+        "Kiểm tra hoạt động tồn tại, published và QR được bật nếu dùng QR."
+      ],
+      [
+        "",
+        "Kiểm tra thời gian hoạt động."
+      ],
+      [
+        "",
+        "Tìm user và xác minh QR khớp tài khoản."
+      ],
+      [
+        "",
+        "Kiểm tra registration tồn tại và chưa attended."
+      ],
+      [
+        "",
+        "Cập nhật status=attended, checked_in_at, checked_in_by."
+      ],
+      [
+        "",
+        "Ghi activity_attendance_logs result=success."
+      ],
+      [
+        "",
+        "Nếu có điểm rèn luyện, ghi conduct_scores; gửi notification cho người tham gia."
+      ]
+    ],
+    "alt": [
+      "Có thể dùng phương thức thủ công bằng MSSV thay vì QR."
+    ],
+    "exc": [
+      "QR/MSSV không hợp lệ → invalid.",
+      "Ngoài thời gian → out_of_window.",
+      "Chưa đăng ký → not_registered.",
+      "Đã điểm danh → duplicate.",
+      "QR không khớp user hoặc tài khoản không đúng đối tượng → invalid."
+    ]
+  },
+  {
+    "id": "UC26",
+    "name": "Xem hồ sơ chờ duyệt vòng 2",
+    "actor": "Cán bộ khoa",
+    "secondary": "Sinh viên",
+    "desc": "Xem các hồ sơ submitted_v2 thuộc lớp được phân công.",
+    "pre": "Đăng nhập faculty_officer context và có class assignment.",
+    "post": "Hàng đợi vòng 2 thuộc phạm vi được hiển thị.",
+    "main": [
+      [
+        "Mở mục Duyệt vòng 2.",
+        "Xác định các lớp được phân công."
+      ],
+      [
+        "",
+        "Truy vấn submission status=submitted_v2 thuộc các lớp đó."
+      ],
+      [
+        "",
+        "Hiển thị hàng đợi và cho phép mở chi tiết."
+      ]
+    ],
+    "alt": [
+      "Có thể theo dõi hồ sơ theo đợt xét/học kỳ."
+    ],
+    "exc": [
+      "Không có lớp phân công hoặc không có hồ sơ chờ duyệt: hiển thị trạng thái rỗng."
+    ]
+  },
+  {
+    "id": "UC27",
+    "name": "Đánh giá tiêu chí vòng 2",
+    "actor": "Cán bộ khoa",
+    "secondary": "Sinh viên",
+    "desc": "Xác nhận đạt/chưa đạt từng tiêu chí thủ công ở vòng 2.",
+    "pre": "Submission status=submitted_v2; cán bộ được phân công lớp; tiêu chí có minh chứng và không auto-pass.",
+    "post": "submission_criteria_reviews round=2 được lưu.",
+    "main": [
+      [
+        "Mở tiêu chí trong hồ sơ vòng 2.",
+        "Kiểm tra round và dữ liệu minh chứng."
+      ],
+      [
+        "",
+        "Kiểm tra assignment giữa cán bộ khoa và class_id của submission."
+      ],
+      [
+        "Chọn Đạt hoặc Chưa đạt.",
+        "Ghi decision vào submission_criteria_reviews round=2."
+      ]
+    ],
+    "alt": [
+      "Reviewer có thể cập nhật lại quyết định tiêu chí trước khi chốt toàn hồ sơ."
+    ],
+    "exc": [
+      "Không được phân công lớp.",
+      "Tiêu chí auto-pass.",
+      "Không có minh chứng.",
+      "Hồ sơ không ở submitted_v2."
+    ]
+  },
+  {
+    "id": "UC28",
+    "name": "Duyệt hồ sơ vòng 2",
+    "actor": "Cán bộ khoa",
+    "secondary": "Sinh viên",
+    "desc": "Chốt kết quả cuối cho hồ sơ sinh viên sau vòng 2.",
+    "pre": "Submission status=submitted_v2; event còn mở review; reviewer được phân công lớp.",
+    "post": "Submission chuyển passed, failed hoặc trạng thái cần chỉnh sửa vòng 2; review/timeline/notification được ghi.",
+    "main": [
+      [
+        "Chọn quyết định vòng 2.",
+        "Kiểm tra quyền, event type và trạng thái."
+      ],
+      [
+        "",
+        "Nếu Duyệt đạt, kiểm tra toàn bộ điều kiện hồ sơ."
+      ],
+      [
+        "",
+        "Xác định trạng thái tiếp theo."
+      ],
+      [
+        "",
+        "Ghi review round=2, cập nhật submission và timeline."
+      ],
+      [
+        "",
+        "Gửi thông báo kết quả cho sinh viên."
+      ]
+    ],
+    "alt": [
+      "Approve → passed; Revision → needs_revision_v2; Reject → failed."
+    ],
+    "exc": [
+      "Không đúng lớp được phân công.",
+      "Event đã kết thúc/khóa.",
+      "Hồ sơ không ở submitted_v2.",
+      "Duyệt đạt khi điều kiện chưa thỏa: từ chối."
+    ]
+  },
+  {
+    "id": "UC29",
+    "name": "Xem hoạt động cán bộ",
+    "actor": "Cán bộ lớp, Cán bộ khoa",
+    "secondary": "Không",
+    "desc": "Xem các hoạt động dành cho đối tượng cán bộ.",
+    "pre": "Đăng nhập trong officer participant context.",
+    "post": "Danh sách hoạt động audience_type=officer phù hợp được hiển thị.",
+    "main": [
+      [
+        "Mở mục Hoạt động cán bộ.",
+        "Xác định user, lớp và học kỳ."
+      ],
+      [
+        "",
+        "Lọc activity audience_type=officer, published và scope phù hợp."
+      ],
+      [
+        "",
+        "Hiển thị thời gian, trạng thái đăng ký và nguồn tham gia."
+      ]
+    ],
+    "alt": [
+      "Hoạt động external được xem nhưng đăng ký ngoài MeritTrack."
+    ],
+    "exc": [
+      "Không có hoạt động phù hợp: hiển thị trạng thái rỗng."
+    ]
+  },
+  {
+    "id": "UC30",
+    "name": "Đăng ký hoạt động cán bộ",
+    "actor": "Cán bộ lớp, Cán bộ khoa",
+    "secondary": "Không",
+    "desc": "Đăng ký hoạt động nội bộ dành cho cán bộ.",
+    "pre": "Officer participant context; activity published, audience_type=officer, trong thời gian đăng ký, internal; user có lớp và thuộc scope nếu có.",
+    "post": "activity_registrations status=registered.",
+    "main": [
+      [
+        "Chọn Đăng ký hoạt động cán bộ.",
+        "Kiểm tra audience, status và thời gian."
+      ],
+      [
+        "",
+        "Kiểm tra participation_source, lớp hiện tại và scope."
+      ],
+      [
+        "",
+        "Tạo registration status=registered nếu chưa có."
+      ],
+      [
+        "",
+        "Làm mới danh sách/chi tiết."
+      ]
+    ],
+    "alt": [
+      "Không có."
+    ],
+    "exc": [
+      "Hoạt động không dành cho cán bộ.",
+      "Chưa/hết thời gian đăng ký.",
+      "Hoạt động external.",
+      "Chưa được gán lớp.",
+      "Không thuộc scope.",
+      "Đã đăng ký."
+    ]
+  },
+  {
+    "id": "UC31",
+    "name": "Xem đợt xét cán bộ",
+    "actor": "Cán bộ lớp, Cán bộ khoa",
+    "secondary": "Không",
+    "desc": "Xem các đợt xét type=officer và điều kiện tương ứng.",
+    "pre": "Officer participant context.",
+    "post": "Danh sách/chi tiết đợt xét cán bộ được hiển thị.",
+    "main": [
+      [
+        "Mở Đợt xét cán bộ.",
+        "Lọc events type=officer theo học kỳ."
+      ],
+      [
+        "",
+        "Tính phase nhận hồ sơ và trạng thái submission cá nhân."
+      ],
+      [
+        "",
+        "Hiển thị tiêu chuẩn/tiêu chí snapshot và khả năng tham gia."
+      ]
+    ],
+    "alt": [
+      "Có thể xem lịch sử học kỳ cũ."
+    ],
+    "exc": [
+      "Không có đợt xét phù hợp: hiển thị trạng thái rỗng."
+    ]
+  },
+  {
+    "id": "UC32",
+    "name": "Khởi tạo hồ sơ cán bộ",
+    "actor": "Cán bộ lớp, Cán bộ khoa",
+    "secondary": "Không",
+    "desc": "Tạo submission nháp cho đợt xét cán bộ.",
+    "pre": "Event type=officer, published và đang nhận hồ sơ; user ở officer participant context.",
+    "post": "Submission draft được tạo, auto-evaluate và tính điểm ban đầu.",
+    "main": [
+      [
+        "Chọn tham gia đợt xét cán bộ.",
+        "Kiểm tra event và phase."
+      ],
+      [
+        "",
+        "Kiểm tra submission đã tồn tại."
+      ],
+      [
+        "",
+        "Nếu chưa có, tạo submission status=draft."
+      ],
+      [
+        "",
+        "Chạy evaluateSubmissionAuto và evaluateSubmission."
+      ],
+      [
+        "",
+        "Điều hướng tới chi tiết hồ sơ cán bộ."
+      ]
+    ],
+    "alt": [
+      "Nếu đã có submission, điều hướng trực tiếp tới hồ sơ hiện có."
+    ],
+    "exc": [
+      "Đợt xét không tồn tại/chưa công khai/hết hạn nhận hồ sơ."
+    ]
+  },
+  {
+    "id": "UC33",
+    "name": "Bổ sung minh chứng cán bộ",
+    "actor": "Cán bộ lớp, Cán bộ khoa",
+    "secondary": "Không",
+    "desc": "Lưu ghi chú/tệp minh chứng cho tiêu chí cán bộ và cập nhật điểm.",
+    "pre": "Submission thuộc user; status draft hoặc needs_revision_v1; chưa quá hạn chỉnh sửa.",
+    "post": "Evidence được lưu; auto evaluation và score_total được tính lại.",
+    "main": [
+      [
+        "Nhập note và/hoặc chọn file cho tiêu chí.",
+        "Kiểm tra quyền sở hữu, trạng thái và thời hạn."
+      ],
+      [
+        "",
+        "Lưu submission_items và submission_files."
+      ],
+      [
+        "",
+        "Cập nhật updated_at."
+      ],
+      [
+        "",
+        "Chạy evaluateSubmissionAuto và evaluateSubmission."
+      ],
+      [
+        "",
+        "Làm mới chi tiết hồ sơ."
+      ]
+    ],
+    "alt": [
+      "Có thể lưu note mà không tải tệp nếu tiêu chí cho phép dữ liệu dạng nội dung."
+    ],
+    "exc": [
+      "Hồ sơ không thuộc user.",
+      "Hồ sơ không còn chỉnh sửa được.",
+      "Đợt xét đã hết hạn."
+    ]
+  },
+  {
+    "id": "UC34",
+    "name": "Nộp hồ sơ cán bộ",
+    "actor": "Cán bộ lớp, Cán bộ khoa",
+    "secondary": "Admin",
+    "desc": "Gửi hồ sơ cán bộ vào hàng đợi Admin duyệt.",
+    "pre": "Submission thuộc user; status draft hoặc needs_revision_v1; event đang nhận hồ sơ.",
+    "post": "Submission status=submitted_v1; submitted_at được cập nhật và score_total được chốt lại.",
+    "main": [
+      [
+        "Chọn Nộp hồ sơ.",
+        "Kiểm tra quyền, trạng thái và phase của event."
+      ],
+      [
+        "",
+        "Chạy evaluateSubmissionAuto."
+      ],
+      [
+        "",
+        "Kiểm tra các yêu cầu bắt buộc/min_required."
+      ],
+      [
+        "",
+        "Chạy evaluateSubmission để cập nhật score_total."
+      ],
+      [
+        "",
+        "Cập nhật status=submitted_v1 và submitted_at."
+      ],
+      [
+        "",
+        "Làm mới hàng đợi Admin."
+      ]
+    ],
+    "alt": [
+      "Sau needs_revision_v1, cán bộ có thể nộp lại khi đã chỉnh sửa."
+    ],
+    "exc": [
+      "Thiếu điều kiện hồ sơ.",
+      "Đợt xét không còn nhận hồ sơ.",
+      "Submission không thuộc user hoặc sai trạng thái."
+    ]
+  },
+  {
+    "id": "UC35",
+    "name": "Theo dõi hồ sơ cán bộ",
+    "actor": "Cán bộ lớp, Cán bộ khoa",
+    "secondary": "Admin",
+    "desc": "Theo dõi trạng thái, điểm, minh chứng và phản hồi Admin đối với hồ sơ cán bộ.",
+    "pre": "Người dùng đã có submission type=officer.",
+    "post": "Thông tin hồ sơ được hiển thị.",
+    "main": [
+      [
+        "Mở danh sách hoặc chi tiết hồ sơ cán bộ.",
+        "Truy vấn submission, event, tiêu chí, auto results, evidence và review."
+      ],
+      [
+        "",
+        "Hiển thị score_total, trạng thái và phản hồi Admin."
+      ],
+      [
+        "",
+        "Nếu cần chỉnh sửa và còn hạn, hiển thị thao tác bổ sung/nộp lại."
+      ]
+    ],
+    "alt": [
+      "passed/failed chỉ cho xem kết quả; needs_revision_v1 cho phép chỉnh sửa."
+    ],
+    "exc": [
+      "Không tìm thấy hoặc hồ sơ không thuộc user: từ chối."
+    ]
+  },
+  {
+    "id": "UC36",
+    "name": "Quản lý học kỳ",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Tạo học kỳ và thiết lập học kỳ hiện hành dùng làm phạm vi thao tác hệ thống.",
+    "pre": "Đăng nhập admin context.",
+    "post": "Academic term mới được tạo hoặc đúng một học kỳ được đánh dấu is_active=1.",
+    "main": [
+      [
+        "Mở trang Học kỳ.",
+        "Hiển thị danh sách academic_terms."
+      ],
+      [
+        "Nhập năm học, học kỳ, tên và thời gian rồi chọn Tạo.",
+        "Kiểm tra dữ liệu và thời gian kết thúc sau thời gian bắt đầu."
+      ],
+      [
+        "",
+        "Tạo academic_term is_active=0."
+      ],
+      [
+        "Chọn Đặt hiện hành cho một kỳ.",
+        "Đưa tất cả kỳ về inactive rồi đặt kỳ được chọn is_active=1."
+      ]
+    ],
+    "alt": [
+      "Có thể chỉ xem học kỳ lịch sử mà không đặt hiện hành."
+    ],
+    "exc": [
+      "Thiếu năm học/học kỳ/tên/thời gian.",
+      "Khoảng thời gian không hợp lệ.",
+      "Term ID không tồn tại khi đặt hiện hành."
+    ]
+  },
+  {
+    "id": "UC37",
+    "name": "Quản lý người dùng",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Theo dõi và cập nhật role/trạng thái hoạt động của tài khoản không phải admin mặc định.",
+    "pre": "Admin context.",
+    "post": "Role/is_active và các phân công liên quan được cập nhật; audit/notification phát sinh khi cần.",
+    "main": [
+      [
+        "Mở danh sách/chi tiết người dùng.",
+        "Truy vấn users và thông tin lớp/phân công."
+      ],
+      [
+        "Chọn role và trạng thái hoạt động, nhập lý do thay đổi.",
+        "Kiểm tra role hợp lệ và các quy tắc nghiệp vụ."
+      ],
+      [
+        "",
+        "Cập nhật users; thu hồi faculty assignments nếu mất role faculty_officer."
+      ],
+      [
+        "",
+        "Ghi audit log và thông báo tình trạng lớp nếu phát sinh."
+      ]
+    ],
+    "alt": [
+      "Cấp role class_officer yêu cầu user có lớp hiện tại và lớp chưa vượt giới hạn cán bộ."
+    ],
+    "exc": [
+      "Không cho sửa admin mặc định.",
+      "Role không hợp lệ.",
+      "Cấp class_officer khi chưa có lớp.",
+      "Lớp đã có tối đa 4 cán bộ lớp."
+    ]
+  },
+  {
+    "id": "UC38",
+    "name": "Quản lý lớp của người dùng",
+    "actor": "Quản trị viên",
+    "secondary": "Người dùng",
+    "desc": "Chuyển lớp sinh hoạt hiện tại của người dùng và duy trì lịch sử membership.",
+    "pre": "Admin context; lớp đích đang hoạt động; target không phải admin.",
+    "post": "Membership cũ đóng bằng left_at, membership mới được mở; role có thể thay đổi theo quy tắc.",
+    "main": [
+      [
+        "Mở chi tiết người dùng và chọn lớp mới, nhập lý do.",
+        "Kiểm tra lớp đích và người dùng."
+      ],
+      [
+        "",
+        "Đóng các class_members hiện tại."
+      ],
+      [
+        "",
+        "Tạo/kích hoạt membership lớp mới."
+      ],
+      [
+        "",
+        "Nếu cán bộ lớp chuyển sang lớp khác, đưa role về student."
+      ],
+      [
+        "",
+        "Ghi audit log và gửi notification nếu lớp cũ khuyết cán bộ."
+      ]
+    ],
+    "alt": [
+      "Nếu không làm mất vai trò cán bộ lớp, chỉ cập nhật membership."
+    ],
+    "exc": [
+      "Lớp không hợp lệ/không hoạt động.",
+      "Không tìm thấy người dùng."
+    ]
+  },
+  {
+    "id": "UC39",
+    "name": "Import danh sách sinh viên",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Nhập hàng loạt sinh viên vào lớp từ file dữ liệu có bước preview và xử lý trùng.",
+    "pre": "Admin context; file import có dữ liệu hợp lệ; đã chọn lớp hiện có hoặc thông tin lớp mới.",
+    "post": "User/class membership được tạo hoặc cập nhật theo lựa chọn xác nhận.",
+    "main": [
+      [
+        "Chọn lớp hiện có hoặc khai báo lớp mới và tải file.",
+        "Parse dữ liệu sinh viên."
+      ],
+      [
+        "",
+        "Preview từng dòng; đối chiếu MSSV, lớp hiện tại, dữ liệu trùng và lỗi."
+      ],
+      [
+        "Xem kết quả preview và chọn policy cập nhật/chuyển lớp nếu cần.",
+        "Kiểm tra các lựa chọn xác nhận."
+      ],
+      [
+        "Chọn Import.",
+        "Tạo lớp nếu cần; tạo/cập nhật user và class_members theo rule."
+      ],
+      [
+        "",
+        "Trả thống kê kết quả."
+      ]
+    ],
+    "alt": [
+      "Có thể cho phép cập nhật thông tin user đã tồn tại hoặc cho phép chuyển lớp."
+    ],
+    "exc": [
+      "File không có dữ liệu.",
+      "Lớp đích không hợp lệ.",
+      "MSSV trùng trong file/dòng không hợp lệ.",
+      "Trường hợp chuyển lớp nhưng Admin chưa cho phép."
+    ]
+  },
+  {
+    "id": "UC40",
+    "name": "Phân công cán bộ khoa quản lý lớp",
+    "actor": "Quản trị viên",
+    "secondary": "Cán bộ khoa",
+    "desc": "Gán một hoặc nhiều lớp cho cán bộ khoa phục vụ theo dõi và duyệt vòng 2.",
+    "pre": "Admin context; target role=faculty_officer; lớp được chọn đang hoạt động.",
+    "post": "faculty_class_assignments phản ánh tập lớp mới.",
+    "main": [
+      [
+        "Mở chi tiết cán bộ khoa và chọn các lớp phụ trách.",
+        "Kiểm tra target là faculty_officer."
+      ],
+      [
+        "",
+        "Kiểm tra toàn bộ classId đều hợp lệ và active."
+      ],
+      [
+        "",
+        "So sánh với tập phân công hiện tại."
+      ],
+      [
+        "Chọn Lưu.",
+        "Xóa tập cũ và ghi tập class assignment mới trong transaction."
+      ],
+      [
+        "",
+        "Làm mới dashboard/quản trị."
+      ]
+    ],
+    "alt": [
+      "Có thể bỏ toàn bộ lớp để cán bộ chưa phụ trách lớp nào."
+    ],
+    "exc": [
+      "Target không phải faculty_officer.",
+      "Có lớp không hợp lệ/ngừng hoạt động.",
+      "Không thay đổi gì: thông báo chưa có thay đổi."
+    ]
+  },
+  {
+    "id": "UC41",
+    "name": "Quản lý hoạt động",
+    "actor": "Quản trị viên",
+    "secondary": "Sinh viên/Cán bộ",
+    "desc": "Tạo, chỉnh sửa, công bố và xóa hoạt động trong học kỳ hiện hành.",
+    "pre": "Admin context; đã có học kỳ hiện hành.",
+    "post": "Activity được tạo/cập nhật đúng phạm vi học kỳ và các ràng buộc nghiệp vụ.",
+    "main": [
+      [
+        "Mở quản lý Hoạt động.",
+        "Hiển thị hoạt động theo học kỳ."
+      ],
+      [
+        "Chọn Tạo mới và nhập thông tin.",
+        "Kiểm tra tiêu đề, mô tả, audience, cấp tổ chức, khung ĐRL và thời gian."
+      ],
+      [
+        "",
+        "Bảo đảm thời gian đăng ký/diễn ra nằm trong học kỳ hiện hành và không trùng tên trong cùng kỳ."
+      ],
+      [
+        "",
+        "Tạo activity; nếu cấp lớp thì tạo activity_scope."
+      ],
+      [
+        "Chỉnh sửa/công bố/xóa khi cần.",
+        "Áp dụng edit mode, kiểm tra registration/attendance và trạng thái học kỳ trước khi thay đổi."
+      ]
+    ],
+    "alt": [
+      "Activity cấp lớp → internal và gắn đúng một lớp; cấp khoa → external theo implementation hiện tại.",
+      "Hoạt động draft/published có mức quyền chỉnh sửa khác nhau tùy đã có người đăng ký/bắt đầu."
+    ],
+    "exc": [
+      "Không có học kỳ hiện hành.",
+      "Thời gian không hợp lệ/ngoài kỳ.",
+      "Tên trùng trong học kỳ.",
+      "Điểm vượt score_max mục ĐRL.",
+      "Không thể xóa nếu đã có registration.",
+      "Không thể sửa hoạt động học kỳ cũ."
+    ]
+  },
+  {
+    "id": "UC42",
+    "name": "Khóa/mở đăng ký hoạt động",
+    "actor": "Quản trị viên",
+    "secondary": "Sinh viên/Cán bộ",
+    "desc": "Tạm khóa hoặc mở lại khả năng đăng ký của một hoạt động published.",
+    "pre": "Admin context; activity thuộc học kỳ hiện hành và status=published.",
+    "post": "activities.registration_locked được cập nhật.",
+    "main": [
+      [
+        "Chọn Khóa hoặc Mở đăng ký tại hoạt động.",
+        "Kiểm tra activity tồn tại và học kỳ hiện hành."
+      ],
+      [
+        "",
+        "Kiểm tra activity đang published."
+      ],
+      [
+        "",
+        "Cập nhật registration_locked."
+      ],
+      [
+        "",
+        "Làm mới các trang admin và người dùng."
+      ]
+    ],
+    "alt": [
+      "Mở lại đăng ký chỉ khôi phục cờ khóa; các ràng buộc thời gian vẫn được áp dụng."
+    ],
+    "exc": [
+      "Activity học kỳ cũ.",
+      "Activity chưa published.",
+      "Activity không tồn tại."
+    ]
+  },
+  {
+    "id": "UC43",
+    "name": "Quản lý danh sách điểm danh",
+    "actor": "Quản trị viên, Cán bộ khoa",
+    "secondary": "Người tham gia",
+    "desc": "Theo dõi và cập nhật trạng thái tham gia/điểm danh của hoạt động theo quyền.",
+    "pre": "Đăng nhập đúng context; activity tồn tại.",
+    "post": "Registration/attendance được cập nhật và các trang liên quan được làm mới.",
+    "main": [
+      [
+        "Mở chi tiết hoạt động hoặc công cụ điểm danh.",
+        "Tải danh sách activity_registrations."
+      ],
+      [
+        "Chọn thao tác điểm danh/điều chỉnh theo quyền.",
+        "Kiểm tra role/context, activity và registration."
+      ],
+      [
+        "",
+        "Cập nhật trạng thái/thông tin điểm danh và ghi dữ liệu liên quan."
+      ],
+      [
+        "",
+        "Làm mới danh sách."
+      ]
+    ],
+    "alt": [
+      "Cán bộ khoa thực hiện QR/thủ công; Admin có thể quản lý/import danh sách chính thức."
+    ],
+    "exc": [
+      "Không đủ quyền.",
+      "Activity/registration không tồn tại.",
+      "Trạng thái không phù hợp với thao tác."
+    ]
+  },
+  {
+    "id": "UC44",
+    "name": "Import kết quả hoạt động",
+    "actor": "Quản trị viên",
+    "secondary": "Sinh viên/Cán bộ",
+    "desc": "Nhập danh sách tham gia chính thức sau khi hoạt động kết thúc bằng XLSX/XLS/CSV.",
+    "pre": "Admin context; activity tồn tại và đã kết thúc; file đúng định dạng; nhập lý do thay đổi.",
+    "post": "Attendance, conduct_scores, batch/row import và audit log được cập nhật; hồ sơ liên quan được đánh giá lại.",
+    "main": [
+      [
+        "Chọn activity, mode append/replace, lý do và file import.",
+        "Kiểm tra activity, thời gian kết thúc và định dạng file."
+      ],
+      [
+        "",
+        "Đọc file, nhận diện cột MSSV/họ tên và đối chiếu user/lớp/scope."
+      ],
+      [
+        "",
+        "Nếu có người chưa đăng ký trong activity cấp lớp, yêu cầu xác nhận."
+      ],
+      [
+        "Xác nhận tiếp tục nếu cần.",
+        "Tạo activity_import_batch và xử lý từng dòng."
+      ],
+      [
+        "",
+        "Upsert activity_registrations attended và conduct_scores."
+      ],
+      [
+        "",
+        "Ghi activity_import_rows và audit log."
+      ],
+      [
+        "",
+        "Đánh giá lại auto criteria/score cho các submission bị ảnh hưởng."
+      ]
+    ],
+    "alt": [
+      "Mode append bổ sung dữ liệu; replace xóa dữ liệu import/điểm của activity trước khi nạp lại."
+    ],
+    "exc": [
+      "File sai định dạng/không có dữ liệu/MSSV.",
+      "Activity chưa kết thúc.",
+      "User không tồn tại/chưa có lớp/không thuộc scope.",
+      "Thiếu lý do thay đổi."
+    ]
+  },
+  {
+    "id": "UC45",
+    "name": "Quản lý khung điểm rèn luyện",
+    "actor": "Quản trị viên",
+    "secondary": "Sinh viên",
+    "desc": "Xây dựng cấu trúc phân cấp các mục điểm rèn luyện cho từng học kỳ.",
+    "pre": "Admin context; học kỳ tồn tại.",
+    "post": "conduct_score_categories được tạo/cập nhật/xóa theo cấu trúc và score_max.",
+    "main": [
+      [
+        "Mở Khung tiêu chuẩn ĐRL của học kỳ.",
+        "Tải cây category theo parent_id."
+      ],
+      [
+        "Chọn thêm mục và nhập mã, tên, điểm tối đa, mục cha.",
+        "Kiểm tra tên không trùng cùng cấp và mã đúng thứ tự dự kiến."
+      ],
+      [
+        "",
+        "Tạo category."
+      ],
+      [
+        "Chỉnh sửa/xóa khi cần.",
+        "Kiểm tra parent, mã vị trí mới và các ràng buộc trước khi cập nhật."
+      ]
+    ],
+    "alt": [
+      "Có thể tạo nhiều cấp parent-child; điểm sinh viên được tính từ các node con lên node cha và bị cap bởi score_max."
+    ],
+    "exc": [
+      "Mã/tên/điểm tối đa không hợp lệ.",
+      "Trùng tên cùng cấp.",
+      "Mã không đúng thứ tự.",
+      "Parent không hợp lệ hoặc tự làm cha chính mình."
+    ]
+  },
+  {
+    "id": "UC46",
+    "name": "Quản lý bộ tiêu chuẩn",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Tạo, sao chép, cập nhật hoặc xóa bộ tiêu chuẩn cho sinh viên/cán bộ.",
+    "pre": "Admin context.",
+    "post": "criteria_templates và cấu trúc liên quan được cập nhật; template đã dùng được bảo vệ khỏi sửa/xóa.",
+    "main": [
+      [
+        "Mở danh sách Bộ tiêu chuẩn.",
+        "Hiển thị criteria_templates."
+      ],
+      [
+        "Chọn Tạo mới và nhập tên, mô tả, đối tượng.",
+        "Kiểm tra for_type student/officer và tạo template."
+      ],
+      [
+        "Chọn sao chép khi cần phiên bản mới.",
+        "Sao chép groups/items/activity rules/conduct rules sang template mới."
+      ],
+      [
+        "Chọn xóa template chưa dùng.",
+        "Kiểm tra không có event tham chiếu rồi xóa cấu trúc liên quan."
+      ]
+    ],
+    "alt": [
+      "Template đang được sử dụng phải clone thành bản mới trước khi cấu hình tiếp."
+    ],
+    "exc": [
+      "Không cho sửa cấu trúc template đã được event sử dụng.",
+      "Không cho xóa template đã được event tham chiếu.",
+      "for_type không hợp lệ."
+    ]
+  },
+  {
+    "id": "UC47",
+    "name": "Cấu hình tiêu chuẩn và tiêu chí",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Tạo/cập nhật nhóm tiêu chuẩn và tiêu chí trong một bộ tiêu chuẩn.",
+    "pre": "Admin context; template tồn tại và chưa được event sử dụng.",
+    "post": "criteria_template_groups/items được cập nhật.",
+    "main": [
+      [
+        "Mở Cấu hình của template.",
+        "Kiểm tra template mutable."
+      ],
+      [
+        "Thêm tiêu chuẩn với tên, mô tả, min_required.",
+        "Sinh code nhóm và sort_order, lưu group."
+      ],
+      [
+        "Thêm tiêu chí vào nhóm, nhập tiêu đề, mô tả, bắt buộc và score_max.",
+        "Kiểm tra group và dữ liệu."
+      ],
+      [
+        "",
+        "Sinh code tiêu chí theo group, xác định evidence_type và lưu item."
+      ]
+    ],
+    "alt": [
+      "Nếu khi tạo tiêu chí đã chọn activityIds thì evidence_type được đặt thành both."
+    ],
+    "exc": [
+      "Template đã được sử dụng.",
+      "Group không tồn tại.",
+      "Tên/score/min_required không hợp lệ."
+    ]
+  },
+  {
+    "id": "UC48",
+    "name": "Gắn hoạt động vào tiêu chí",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Thiết lập activity rule để một hoạt động attended có thể tự động đáp ứng và/hoặc đóng góp điểm cho tiêu chí.",
+    "pre": "Admin context; template mutable; tiêu chí tồn tại và evidence_type auto/both; activity tồn tại.",
+    "post": "criteria_activity_rules được upsert với score_value.",
+    "main": [
+      [
+        "Trong cấu hình tiêu chí, chọn hoạt động và nhập điểm hoạt động.",
+        "Kiểm tra template mutable, criteriaCode và scoreValue."
+      ],
+      [
+        "",
+        "Kiểm tra tiêu chí có evidence_type auto/both."
+      ],
+      [
+        "",
+        "Kiểm tra activity tồn tại."
+      ],
+      [
+        "",
+        "Insert hoặc update criteria_activity_rules."
+      ]
+    ],
+    "alt": [
+      "Một tiêu chí có thể gắn nhiều hoạt động; score_value được cộng và cap bởi score_max khi tính điểm cán bộ."
+    ],
+    "exc": [
+      "Tiêu chí manual.",
+      "Activity không tồn tại.",
+      "Điểm âm/không hợp lệ.",
+      "Template đã sử dụng."
+    ]
+  },
+  {
+    "id": "UC49",
+    "name": "Gắn điều kiện ĐRL vào tiêu chí",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Thiết lập ngưỡng điểm rèn luyện để tự động đáp ứng một tiêu chí.",
+    "pre": "Admin context; template mutable; criteriaCode hợp lệ.",
+    "post": "criteria_conduct_rules được insert/update.",
+    "main": [
+      [
+        "Nhập điểm rèn luyện tối thiểu và phạm vi kỳ.",
+        "Kiểm tra minScore >= 0."
+      ],
+      [
+        "",
+        "Kiểm tra period_scope=current hoặc any."
+      ],
+      [
+        "",
+        "Upsert criteria_conduct_rules cho template và criteriaCode."
+      ]
+    ],
+    "alt": [
+      "current: xét kỳ của event; any: xét kỳ bất kỳ theo cách triển khai hiện tại."
+    ],
+    "exc": [
+      "MinScore không hợp lệ.",
+      "Period scope không hợp lệ.",
+      "Template đã được sử dụng."
+    ]
+  },
+  {
+    "id": "UC50",
+    "name": "Quản lý đợt xét",
+    "actor": "Quản trị viên",
+    "secondary": "Sinh viên/Cán bộ",
+    "desc": "Tạo, cập nhật, công bố, đóng hoặc xóa đợt xét.",
+    "pre": "Admin context; có học kỳ hiện hành và template phù hợp.",
+    "post": "Event được lưu với term_id hiện hành và template đúng type; các hạn chế lịch sử được bảo toàn.",
+    "main": [
+      [
+        "Mở quản lý Đợt xét.",
+        "Hiển thị events theo học kỳ."
+      ],
+      [
+        "Chọn Tạo và nhập tiêu đề, type, template, thời gian, allow_late, trạng thái.",
+        "Kiểm tra dữ liệu, thời gian và template.for_type khớp type."
+      ],
+      [
+        "",
+        "Tạo event gắn term hiện hành."
+      ],
+      [
+        "Chỉnh sửa/công bố/đóng/xóa khi cần.",
+        "Kiểm tra trạng thái sử dụng, số submission và học kỳ trước khi thay đổi."
+      ]
+    ],
+    "alt": [
+      "Event đang sử dụng giữ nguyên type, template và start_at; chỉ cho kéo dài end_at và cập nhật allow_late theo rule.",
+      "Published có thể chuyển closed; không đưa về draft nếu đã có submission."
+    ],
+    "exc": [
+      "Template không tồn tại/không đúng type.",
+      "Thời gian không hợp lệ.",
+      "Event học kỳ cũ không được sửa/xóa/đổi status.",
+      "Đã có submission thì không xóa."
+    ]
+  },
+  {
+    "id": "UC51",
+    "name": "Đồng bộ snapshot tiêu chuẩn",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Sao chép cấu trúc tiêu chuẩn từ template vào event để cố định tiêu chí của đợt xét.",
+    "pre": "Admin context; event có criteria_template_id; chưa có submission.",
+    "post": "event_criteria_groups/items phản ánh template tại thời điểm đồng bộ.",
+    "main": [
+      [
+        "Chọn Đồng bộ tiêu chuẩn tại event.",
+        "Kiểm tra event và template."
+      ],
+      [
+        "",
+        "Đếm submission của event."
+      ],
+      [
+        "",
+        "Xóa snapshot cũ của event."
+      ],
+      [
+        "",
+        "Copy groups/items từ criteria template sang event_criteria_groups/items."
+      ],
+      [
+        "",
+        "Làm mới trang event."
+      ]
+    ],
+    "alt": [
+      "Cơ chế ensureDb có thể phục hồi snapshot thiếu cho event cũ, nhưng Use Case này là thao tác chủ động của Admin."
+    ],
+    "exc": [
+      "Event không có template.",
+      "Đã có submission: không cho đồng bộ để tránh thay đổi tiêu chí của hồ sơ hiện hữu."
+    ]
+  },
+  {
+    "id": "UC52",
+    "name": "Theo dõi hồ sơ sinh viên",
+    "actor": "Quản trị viên",
+    "secondary": "Sinh viên, Cán bộ lớp, Cán bộ khoa",
+    "desc": "Theo dõi danh sách và chi tiết hồ sơ sinh viên trên toàn hệ thống.",
+    "pre": "Admin context.",
+    "post": "Hồ sơ được hiển thị theo bộ lọc và trạng thái.",
+    "main": [
+      [
+        "Mở Hồ sơ sinh viên.",
+        "Truy vấn submissions gắn events type=student."
+      ],
+      [
+        "Chọn bộ lọc học kỳ/đợt/lớp/trạng thái nếu cần.",
+        "Áp dụng điều kiện và sắp xếp."
+      ],
+      [
+        "Chọn một hồ sơ.",
+        "Hiển thị user, event, evidence, auto results, reviews và timeline."
+      ]
+    ],
+    "alt": [
+      "Admin dùng dữ liệu này để giám sát tiến độ thay vì thay thế luồng reviewer thông thường."
+    ],
+    "exc": [
+      "Không có dữ liệu phù hợp: hiển thị trạng thái rỗng."
+    ]
+  },
+  {
+    "id": "UC53",
+    "name": "Theo dõi hồ sơ cán bộ",
+    "actor": "Quản trị viên",
+    "secondary": "Cán bộ lớp, Cán bộ khoa",
+    "desc": "Theo dõi toàn bộ hồ sơ cán bộ, điểm và kết quả.",
+    "pre": "Admin context.",
+    "post": "Danh sách/chi tiết officer submissions được hiển thị.",
+    "main": [
+      [
+        "Mở Hồ sơ cán bộ.",
+        "Truy vấn submissions của events type=officer."
+      ],
+      [
+        "Chọn học kỳ/đợt/trạng thái/từ khóa.",
+        "Lọc và sắp xếp dữ liệu."
+      ],
+      [
+        "Chọn chi tiết hồ sơ.",
+        "Hiển thị tiêu chí, evidence, matched activities, score_total và review."
+      ]
+    ],
+    "alt": [
+      "Hồ sơ đã passed/failed nằm ở trang theo dõi; hồ sơ chờ xử lý có thể mở từ queue Duyệt hồ sơ cán bộ."
+    ],
+    "exc": [
+      "Không có dữ liệu phù hợp: hiển thị trạng thái rỗng."
+    ]
+  },
+  {
+    "id": "UC54",
+    "name": "Duyệt hồ sơ cán bộ",
+    "actor": "Quản trị viên",
+    "secondary": "Cán bộ lớp, Cán bộ khoa",
+    "desc": "Admin thực hiện một vòng duyệt duy nhất cho hồ sơ cán bộ.",
+    "pre": "Admin context; submission thuộc event type=officer và status=submitted_v1.",
+    "post": "Submission chuyển passed, failed hoặc needs_revision_v1; review round=1, notification và điểm được cập nhật.",
+    "main": [
+      [
+        "Mở hồ sơ trong hàng đợi và nhập quyết định/ghi chú.",
+        "Kiểm tra submission officer và status=submitted_v1."
+      ],
+      [
+        "Nếu chọn Đạt.",
+        "Chạy auto evaluation và kiểm tra điều kiện có thể approve."
+      ],
+      [
+        "",
+        "Xác định nextStatus theo pass/fail/revise."
+      ],
+      [
+        "",
+        "Upsert reviews round=1 và cập nhật submission."
+      ],
+      [
+        "",
+        "Gửi notification cho chủ hồ sơ."
+      ],
+      [
+        "",
+        "Chạy evaluateSubmissionAuto và evaluateSubmission để chốt dữ liệu/điểm."
+      ]
+    ],
+    "alt": [
+      "pass→passed; fail→failed; revise→needs_revision_v1."
+    ],
+    "exc": [
+      "Hồ sơ không phải officer.",
+      "Không ở submitted_v1.",
+      "Duyệt đạt khi điều kiện hồ sơ chưa thỏa."
+    ]
+  },
+  {
+    "id": "UC55",
+    "name": "Xem dashboard và báo cáo",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Theo dõi thống kê hoạt động, hồ sơ sinh viên, hồ sơ cán bộ và các báo cáo theo học kỳ.",
+    "pre": "Admin context; chọn được academic term.",
+    "post": "Các chỉ số, biểu đồ và bảng báo cáo được hiển thị.",
+    "main": [
+      [
+        "Mở Dashboard/Báo cáo.",
+        "Xác định học kỳ được chọn."
+      ],
+      [
+        "",
+        "Tổng hợp số hoạt động, attendance, hồ sơ sinh viên/cán bộ và trạng thái."
+      ],
+      [
+        "Chọn loại báo cáo và bộ lọc.",
+        "Truy vấn dữ liệu theo đợt/lớp/từ khóa."
+      ],
+      [
+        "",
+        "Tính tỷ lệ, bảng phân tích, xếp hạng và biểu đồ."
+      ],
+      [
+        "",
+        "Hiển thị kết quả."
+      ]
+    ],
+    "alt": [
+      "Báo cáo có thể xem học kỳ cũ; việc chọn kỳ trong report là phạm vi thống kê, không phải thao tác dữ liệu."
+    ],
+    "exc": [
+      "Không có dữ liệu: tỷ lệ trả về 0 và biểu đồ/bảng ở trạng thái rỗng."
+    ]
+  },
+  {
+    "id": "UC56",
+    "name": "Xuất báo cáo",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Xuất dữ liệu báo cáo xét thưởng sinh viên/cán bộ theo bộ lọc hiện tại.",
+    "pre": "Admin context; dữ liệu báo cáo hoặc tham số lọc hợp lệ.",
+    "post": "Tệp báo cáo được tạo và trả về cho người dùng.",
+    "main": [
+      [
+        "Tại báo cáo, chọn Xuất.",
+        "Thu thập termId, eventId, classId/top tùy loại báo cáo."
+      ],
+      [
+        "",
+        "Truy vấn cùng phạm vi dữ liệu như báo cáo màn hình."
+      ],
+      [
+        "",
+        "Tạo nội dung tệp xuất."
+      ],
+      [
+        "",
+        "Trả tệp cho trình duyệt."
+      ]
+    ],
+    "alt": [
+      "Có thể xuất báo cáo cán bộ tiêu biểu hoặc báo cáo xét thưởng sinh viên tùy trang."
+    ],
+    "exc": [
+      "Không có dữ liệu phù hợp: tệp có thể chỉ chứa tiêu đề/không có dòng dữ liệu hoặc hệ thống thông báo."
+    ]
+  },
+  {
+    "id": "UC57",
+    "name": "Xem nhật ký hệ thống",
+    "actor": "Quản trị viên",
+    "secondary": "Không",
+    "desc": "Theo dõi các thay đổi quản trị quan trọng đã được ghi audit.",
+    "pre": "Admin context.",
+    "post": "Danh sách audit_logs được hiển thị để truy vết.",
+    "main": [
+      [
+        "Mở Nhật ký hệ thống.",
+        "Truy vấn audit_logs cùng actor và entity."
+      ],
+      [
+        "",
+        "Hiển thị action, entity, thời gian, lý do và dữ liệu trước/sau nếu có."
+      ],
+      [
+        "Chọn bộ lọc/chi tiết khi cần.",
+        "Hiển thị bản ghi phù hợp."
+      ]
+    ],
+    "alt": [
+      "Các thao tác xóa activity/event/template, chuyển lớp, cập nhật quyền và import attendance là những nguồn audit quan trọng trong source hiện tại."
+    ],
+    "exc": [
+      "Không có audit log: hiển thị trạng thái rỗng."
+    ]
+  }
+]
