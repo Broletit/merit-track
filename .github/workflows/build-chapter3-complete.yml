@@ -45,4 +45,14 @@ jobs:
           compression-level: 6
           if-no-files-found: error
 
-# rebuild marker: 2026-09-28-final-eight-sections
+      - name: Upload editable diagram package
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeritTrack-Editable-Diagrams
+          path: thesis/generated_chapter3/editable-diagrams/**
+          include-hidden-files: true
+          compression-level: 6
+          if-no-files-found: error
+
+
+# rebuild marker: 2026-09-28-user-facing-diagrams-v2
