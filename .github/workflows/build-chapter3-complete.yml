@@ -35,3 +35,12 @@ jobs:
           include-hidden-files: true
           compression-level: 6
           if-no-files-found: error
+
+      - name: Upload Visual Paradigm XMI package
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeritTrack-VisualParadigm-XMI
+          path: thesis/generated_chapter3/visual-paradigm/**
+          include-hidden-files: true
+          compression-level: 6
+          if-no-files-found: error
