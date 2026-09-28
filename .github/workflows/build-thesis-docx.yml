@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: thesis-analysis-design
 
       - name: Build DOCX package
         shell: python
