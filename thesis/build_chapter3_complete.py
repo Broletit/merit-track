@@ -512,11 +512,11 @@ def overall_usecase_image():
     actor_pos={"Sinh viên":(1.1,8.4),"Cán bộ lớp":(1.1,6.2),"Cán bộ khoa":(1.1,4.0),"Quản trị viên":(1.1,1.8)}
     for a,(x,y) in actor_pos.items(): draw_actor(ax,x,y,a)
     labels=[
-      ("Xác thực & tài khoản",5.0,8.8),("Tham gia hoạt động",8.0,8.8),("Điểm rèn luyện",11.0,8.8),
-      ("Hồ sơ xét sinh viên",5.0,7.1),("Duyệt vòng 1",8.0,7.1),("Duyệt vòng 2",11.0,7.1),
-      ("Nghiệp vụ cán bộ",5.0,5.4),("Quản lý học kỳ",8.0,5.4),("Người dùng & lớp",11.0,5.4),
-      ("Hoạt động & điểm danh",5.0,3.7),("Khung điểm ĐRL",8.0,3.7),("Bộ tiêu chuẩn",11.0,3.7),
-      ("Đợt xét",5.0,2.0),("Duyệt hồ sơ cán bộ",8.0,2.0),("Báo cáo & nhật ký",11.0,2.0)
+      ("Đăng nhập và quản lý tài khoản",5.0,8.8),("Tham gia hoạt động",8.0,8.8),("Theo dõi điểm rèn luyện",11.0,8.8),
+      ("Quản lý hồ sơ xét sinh viên",5.0,7.1),("Duyệt hồ sơ vòng 1",8.0,7.1),("Duyệt hồ sơ vòng 2",11.0,7.1),
+      ("Tham gia nghiệp vụ cán bộ",5.0,5.4),("Quản lý học kỳ",8.0,5.4),("Quản lý người dùng và lớp",11.0,5.4),
+      ("Quản lý hoạt động và điểm danh",5.0,3.7),("Quản lý khung điểm rèn luyện",8.0,3.7),("Quản lý bộ tiêu chuẩn",11.0,3.7),
+      ("Quản lý đợt xét",5.0,2.0),("Duyệt hồ sơ cán bộ",8.0,2.0),("Xem báo cáo và nhật ký",11.0,2.0)
     ]
     ucpos={}
     for label,x,y in labels:
@@ -524,10 +524,10 @@ def overall_usecase_image():
         ax.add_patch(Ellipse((x,y),2.45,0.72,fill=False,lw=0.9))
         ax.text(x,y,"\n".join(textwrap.wrap(label,20)),ha="center",va="center",fontsize=7)
     links={
-      "Sinh viên":["Xác thực & tài khoản","Tham gia hoạt động","Điểm rèn luyện","Hồ sơ xét sinh viên"],
-      "Cán bộ lớp":["Xác thực & tài khoản","Duyệt vòng 1","Nghiệp vụ cán bộ"],
-      "Cán bộ khoa":["Xác thực & tài khoản","Duyệt vòng 2","Nghiệp vụ cán bộ","Hoạt động & điểm danh"],
-      "Quản trị viên":["Quản lý học kỳ","Người dùng & lớp","Hoạt động & điểm danh","Khung điểm ĐRL","Bộ tiêu chuẩn","Đợt xét","Duyệt hồ sơ cán bộ","Báo cáo & nhật ký"]
+      "Sinh viên":["Đăng nhập và quản lý tài khoản","Tham gia hoạt động","Theo dõi điểm rèn luyện","Quản lý hồ sơ xét sinh viên"],
+      "Cán bộ lớp":["Đăng nhập và quản lý tài khoản","Duyệt hồ sơ vòng 1","Tham gia nghiệp vụ cán bộ"],
+      "Cán bộ khoa":["Đăng nhập và quản lý tài khoản","Duyệt hồ sơ vòng 2","Tham gia nghiệp vụ cán bộ","Quản lý hoạt động và điểm danh"],
+      "Quản trị viên":["Quản lý học kỳ","Quản lý người dùng và lớp","Quản lý hoạt động và điểm danh","Quản lý khung điểm rèn luyện","Quản lý bộ tiêu chuẩn","Quản lý đợt xét","Duyệt hồ sơ cán bộ","Xem báo cáo và nhật ký"]
     }
     for a,ucs in links.items():
         x1,y1=actor_pos[a]
@@ -578,35 +578,35 @@ UC_FACULTY=usecase_image("uc_faculty_officer.png","Phân hệ Cán bộ khoa","C
 UC_ADMIN=usecase_image("uc_admin.png","Phân hệ Quản trị viên","Quản trị viên",admin_labels)
 
 BUSINESS_DIAGRAMS = [
-    ("BP01", swimlane("bp01_auth.png","BP01 – Đăng nhập và chuyển ngữ cảnh",
-        ["Người dùng","MeritTrack"],
-        [(0,"Bắt đầu","start"),(0,"Nhập MSSV/email và mật khẩu","task"),(1,"Kiểm tra tài khoản và mật khẩu","decision"),
-         (1,"Tạo session, đặt context mặc định","task"),(0,"Chọn chuyển context (nếu cần)","task"),(1,"Kiểm tra role-context","decision"),
-         (1,"Cập nhật session và dashboard","task"),(0,"Kết thúc","end")])),
+    ("BP01", swimlane("bp01_auth.png","BP01 – Đăng nhập và chuyển giao diện theo vai trò",
+        ["Người dùng","Hệ thống"],
+        [(0,"Bắt đầu","start"),(0,"Nhập thông tin đăng nhập","task"),(1,"Kiểm tra tài khoản","decision"),
+         (1,"Tạo phiên đăng nhập","task"),(0,"Chọn giao diện theo vai trò (nếu cần)","task"),(1,"Kiểm tra quyền chuyển giao diện","decision"),
+         (1,"Hiển thị trang phù hợp","task"),(0,"Kết thúc","end")])),
     ("BP02", swimlane("bp02_activity.png","BP02 – Đăng ký và điểm danh hoạt động",
-        ["Người tham gia","MeritTrack","Cán bộ khoa/Admin"],
-        [(0,"Xem hoạt động","start"),(1,"Hiển thị activity phù hợp","task"),(0,"Chọn Đăng ký","task"),(1,"Kiểm tra điều kiện đăng ký","decision"),
-         (1,"Ghi registration=registered","task"),(0,"Tham gia hoạt động","task"),(2,"Quét QR / nhập MSSV","task"),
-         (1,"Kiểm tra thời gian & registration","decision"),(1,"Cập nhật attended + log + ĐRL","task"),(0,"Nhận thông báo","end")])),
+        ["Người tham gia","Hệ thống","Cán bộ khoa/Quản trị viên"],
+        [(0,"Xem hoạt động","start"),(1,"Hiển thị hoạt động phù hợp","task"),(0,"Chọn đăng ký","task"),(1,"Kiểm tra điều kiện đăng ký","decision"),
+         (1,"Ghi nhận đăng ký","task"),(0,"Tham gia hoạt động","task"),(2,"Quét QR hoặc nhập MSSV","task"),
+         (1,"Kiểm tra điều kiện điểm danh","decision"),(1,"Ghi nhận đã tham gia và điểm rèn luyện","task"),(0,"Nhận thông báo","end")])),
     ("BP03", swimlane("bp03_student_submission.png","BP03 – Xét hồ sơ sinh viên hai vòng",
-        ["Sinh viên","MeritTrack","Cán bộ lớp","Cán bộ khoa"],
-        [(0,"Tạo/tiếp tục hồ sơ","start"),(1,"Auto-evaluate","task"),(0,"Bổ sung minh chứng","task"),(0,"Nộp hồ sơ","task"),
-         (1,"Kiểm tra requirements → submitted_v1","decision"),(2,"Đánh giá tiêu chí và duyệt vòng 1","task"),(1,"submitted_v2 / revise / failed","decision"),
-         (3,"Đánh giá tiêu chí và duyệt vòng 2","task"),(1,"passed / revise / failed","decision"),(0,"Theo dõi kết quả","end")])),
+        ["Sinh viên","Hệ thống","Cán bộ lớp","Cán bộ khoa"],
+        [(0,"Tạo hồ sơ","start"),(1,"Tự động kiểm tra tiêu chí","task"),(0,"Bổ sung minh chứng","task"),(0,"Nộp hồ sơ","task"),
+         (1,"Kiểm tra điều kiện nộp","decision"),(2,"Duyệt vòng 1","task"),(1,"Chuyển trạng thái hồ sơ","decision"),
+         (3,"Duyệt vòng 2","task"),(1,"Ghi nhận kết quả cuối","decision"),(0,"Theo dõi kết quả","end")])),
     ("BP04", swimlane("bp04_officer_submission.png","BP04 – Xét hồ sơ cán bộ",
-        ["Cán bộ","MeritTrack","Admin"],
-        [(0,"Tạo hồ sơ officer","start"),(1,"Auto-evaluate và tính điểm","task"),(0,"Bổ sung minh chứng","task"),(0,"Nộp hồ sơ","task"),
-         (1,"Kiểm tra requirements → submitted_v1","decision"),(2,"Đánh giá hồ sơ","task"),(1,"passed / failed / needs_revision_v1","decision"),(0,"Theo dõi kết quả","end")])),
+        ["Cán bộ","Hệ thống","Quản trị viên"],
+        [(0,"Tạo hồ sơ","start"),(1,"Tự động kiểm tra tiêu chí và tính điểm","task"),(0,"Bổ sung minh chứng","task"),(0,"Nộp hồ sơ","task"),
+         (1,"Kiểm tra điều kiện nộp","decision"),(2,"Duyệt hồ sơ","task"),(1,"Ghi nhận kết quả","decision"),(0,"Theo dõi kết quả","end")])),
     ("BP05", swimlane("bp05_criteria_event.png","BP05 – Cấu hình bộ tiêu chuẩn và đợt xét",
-        ["Admin","MeritTrack"],
-        [(0,"Tạo/clone bộ tiêu chuẩn","start"),(1,"Kiểm tra template mutable","decision"),(0,"Cấu hình nhóm/tiêu chí/rule","task"),
-         (1,"Lưu template","task"),(0,"Tạo đợt xét","task"),(1,"Kiểm tra type/template/term","decision"),
-         (0,"Đồng bộ snapshot","task"),(1,"Copy event_criteria groups/items","task"),(0,"Công bố đợt xét","end")])),
-    ("BP06", swimlane("bp06_import_report.png","BP06 – Import kết quả hoạt động và đồng bộ hồ sơ",
-        ["Admin","MeritTrack","Hồ sơ liên quan"],
-        [(0,"Chọn activity + file + mode + reason","start"),(1,"Parse và đối chiếu MSSV/lớp/scope","decision"),
-         (0,"Xác nhận các trường hợp đặc biệt","task"),(1,"Ghi import batch/rows + attended + ĐRL","task"),
-         (2,"Re-evaluate auto criteria và score","task"),(1,"Ghi audit và cập nhật báo cáo","task"),(0,"Kết thúc","end")]))
+        ["Quản trị viên","Hệ thống"],
+        [(0,"Tạo hoặc sao chép bộ tiêu chuẩn","start"),(1,"Kiểm tra khả năng chỉnh sửa","decision"),(0,"Cấu hình nhóm, tiêu chí và điều kiện","task"),
+         (1,"Lưu bộ tiêu chuẩn","task"),(0,"Tạo đợt xét","task"),(1,"Kiểm tra loại, thời gian và học kỳ","decision"),
+         (0,"Đồng bộ tiêu chuẩn cho đợt xét","task"),(1,"Tạo bản tiêu chuẩn áp dụng","task"),(0,"Công bố đợt xét","end")])),
+    ("BP06", swimlane("bp06_import_report.png","BP06 – Nhập kết quả hoạt động và đồng bộ hồ sơ",
+        ["Quản trị viên","Hệ thống","Hồ sơ liên quan"],
+        [(0,"Chọn hoạt động và tệp kết quả","start"),(1,"Đọc dữ liệu và đối chiếu người tham gia","decision"),
+         (0,"Xác nhận dữ liệu cần nhập","task"),(1,"Ghi nhận kết quả tham gia và điểm rèn luyện","task"),
+         (2,"Cập nhật lại tiêu chí và điểm hồ sơ","task"),(1,"Ghi nhật ký và cập nhật báo cáo","task"),(0,"Kết thúc","end")]))
 ]
 
 # ------------------------------------------------------------
@@ -910,17 +910,23 @@ add_text("Chương này mô tả các tác nhân, yêu cầu, quy tắc và quy 
 
 # 1
 doc.add_heading("3.1. Xác định Actor của hệ thống",level=1)
-add_text("MeritTrack có bốn actor nghiệp vụ chính. Role tài khoản và login context được tách biệt, vì vậy cán bộ lớp/cán bộ khoa có thể sử dụng ngữ cảnh người dùng và ngữ cảnh cán bộ trên cùng một tài khoản.")
+add_text("Hệ thống có bốn nhóm người sử dụng chính. Mỗi nhóm được cung cấp các chức năng phù hợp với nhiệm vụ thực tế. Cán bộ lớp và cán bộ khoa vẫn có thể sử dụng các chức năng dành cho người tham gia hoạt động, đồng thời có thêm khu vực làm việc riêng để thực hiện nhiệm vụ xét duyệt.")
 t=doc.add_table(rows=1,cols=3); t.style="Table Grid"; t.alignment=WD_TABLE_ALIGNMENT.CENTER
 for i,h in enumerate(["STT","Actor","Mô tả"]):
     set_cell(t.rows[0].cells[i],h,True,10.5,WD_ALIGN_PARAGRAPH.CENTER); shade(t.rows[0].cells[i],"E7E6E6")
 set_repeat_table_header(t.rows[0])
-for i,(a,d) in enumerate(ACTORS,1):
-    c=t.add_row().cells; set_cell(c[0],i,False,10,WD_ALIGN_PARAGRAPH.CENTER); set_cell(c[1],a,True,10); set_cell(c[2],d,False,10)
+actor_descriptions=[
+("Sinh viên","Đăng ký và tham gia hoạt động, theo dõi điểm rèn luyện, tham gia các đợt xét dành cho sinh viên, chuẩn bị minh chứng và theo dõi kết quả hồ sơ."),
+("Cán bộ lớp","Thực hiện các chức năng của người tham gia; đồng thời tiếp nhận và xét duyệt vòng 1 đối với hồ sơ sinh viên thuộc lớp mình phụ trách."),
+("Cán bộ khoa","Thực hiện các chức năng của người tham gia; theo dõi các lớp được phân công, hỗ trợ điểm danh hoạt động và xét duyệt vòng 2 đối với hồ sơ sinh viên."),
+("Quản trị viên","Thiết lập học kỳ, quản lý người dùng và lớp, tổ chức hoạt động, cấu hình khung điểm và bộ tiêu chuẩn, tạo đợt xét, duyệt hồ sơ cán bộ, theo dõi báo cáo và nhật ký hệ thống.")
+]
+for i,(a,d) in enumerate(actor_descriptions,1):
+    row=t.add_row().cells; set_cell(row[0],i,False,10,WD_ALIGN_PARAGRAPH.CENTER); set_cell(row[1],a,True,10); set_cell(row[2],d,False,10)
 
 # 2
 doc.add_heading("3.2. Sơ đồ Use Case",level=1)
-add_text("Sơ đồ tổng quát được tách thêm theo từng actor để tránh mật độ liên kết quá lớn. Bộ XMI 2.1 đính kèm có thể nhập vào Visual Paradigm và tiếp tục chỉnh sửa.")
+add_text("Các Use Case được đặt tên bằng động từ hoặc cụm động từ để thể hiện rõ hành động mà người dùng thực hiện. Ngoài quan hệ giữa Actor và Use Case, các sơ đồ chi tiết còn thể hiện quan hệ «include» đối với chức năng bắt buộc được sử dụng lại và «extend» đối với chức năng chỉ phát sinh trong một tình huống cụ thể. Bộ XMI đi kèm có thể nhập vào Visual Paradigm để tiếp tục chỉnh sửa.")
 for img,cap in [(OVERALL,"Hình 3.1. Sơ đồ Use Case tổng quát"),
                 (UC_STUDENT,"Hình 3.2. Sơ đồ Use Case – Sinh viên"),
                 (UC_CLASS,"Hình 3.3. Sơ đồ Use Case – Cán bộ lớp"),
@@ -930,85 +936,90 @@ for img,cap in [(OVERALL,"Hình 3.1. Sơ đồ Use Case tổng quát"),
 
 # 3
 doc.add_heading("3.3. Yêu cầu chức năng",level=1)
-add_text("Yêu cầu chức năng được liệt kê theo role nhằm làm rõ phạm vi sử dụng và trách nhiệm nghiệp vụ của từng actor.")
+add_text("Yêu cầu chức năng được trình bày theo từng nhóm người sử dụng, bằng ngôn ngữ nghiệp vụ để người đọc có thể hiểu hệ thống cho phép họ thực hiện những công việc gì mà không cần biết cấu trúc mã nguồn.")
 for role in ["Sinh viên","Cán bộ lớp","Cán bộ khoa","Quản trị viên"]:
     doc.add_heading(f"3.3.{['Sinh viên','Cán bộ lớp','Cán bộ khoa','Quản trị viên'].index(role)+1}. {role}",level=2)
     rows=[u for u in USECASES if role in uc_role(u)]
-    # Avoid listing admin common profile/QR use cases not intended for admin.
     if role=="Quản trị viên":
         rows=[u for u in rows if u["id"] in ["UC01","UC02","UC04","UC07","UC08"] or int(u["id"][2:])>=36]
-    if role=="Sinh viên":
-        rows=[u for u in rows if int(u["id"][2:])<=20]
-    if role=="Cán bộ lớp":
-        rows=[u for u in rows if int(u["id"][2:])<=8 or 21<=int(u["id"][2:])<=23 or 29<=int(u["id"][2:])<=35]
-    if role=="Cán bộ khoa":
-        rows=[u for u in rows if int(u["id"][2:])<=8 or 24<=int(u["id"][2:])<=35]
+    if role=="Sinh viên": rows=[u for u in rows if int(u["id"][2:])<=20]
+    if role=="Cán bộ lớp": rows=[u for u in rows if int(u["id"][2:])<=8 or 21<=int(u["id"][2:])<=23 or 29<=int(u["id"][2:])<=35]
+    if role=="Cán bộ khoa": rows=[u for u in rows if int(u["id"][2:])<=8 or 24<=int(u["id"][2:])<=35]
     tb=doc.add_table(rows=1,cols=4); tb.style="Table Grid"; tb.alignment=WD_TABLE_ALIGNMENT.CENTER
     for i,h in enumerate(["STT","Mã","Chức năng","Mô tả"]):
         set_cell(tb.rows[0].cells[i],h,True,10,WD_ALIGN_PARAGRAPH.CENTER); shade(tb.rows[0].cells[i],"E7E6E6")
     set_repeat_table_header(tb.rows[0])
     for j,u in enumerate(rows,1):
-        c=tb.add_row().cells
-        set_cell(c[0],j,False,9.5,WD_ALIGN_PARAGRAPH.CENTER); set_cell(c[1],u["id"],False,9.5,WD_ALIGN_PARAGRAPH.CENTER)
-        set_cell(c[2],u["name"],False,9.5); set_cell(c[3],u["desc"],False,9.5)
+        row=tb.add_row().cells
+        set_cell(row[0],j,False,9.5,WD_ALIGN_PARAGRAPH.CENTER)
+        set_cell(row[1],u["id"],False,9.5,WD_ALIGN_PARAGRAPH.CENTER)
+        set_cell(row[2],humanize(u["name"]),False,9.5)
+        set_cell(row[3],humanize(u["desc"]),False,9.5)
 
 # 4
 doc.add_heading("3.4. Yêu cầu phi chức năng",level=1)
 nfr=[
-("NFR01","Bảo mật và phân quyền","Kiểm tra quyền ở server; không tin cậy role/context từ client."),
-("NFR02","Toàn vẹn dữ liệu","Dùng transaction cho các thao tác cập nhật nhiều bảng quan trọng; duy trì trạng thái nhất quán."),
-("NFR03","Bảo toàn lịch sử","Dữ liệu học kỳ cũ, event snapshot, review và timeline phải phục vụ truy vết lịch sử."),
-("NFR04","Khả năng truy vết","Ghi audit log cho các thay đổi quản trị nhạy cảm và attendance log cho điểm danh."),
-("NFR05","Hiệu năng","Trang danh sách/báo cáo cần lọc theo học kỳ, trạng thái và từ khóa; truy vấn chỉ lấy dữ liệu thuộc phạm vi cần thiết."),
-("NFR06","Khả dụng","Giao diện theo role/context nhất quán; thông báo lỗi/thành công rõ ràng; hỗ trợ xem dữ liệu lịch sử."),
-("NFR07","An toàn tệp","Minh chứng phải kiểm tra MIME, đuôi tệp, dung lượng và quyền sở hữu submission."),
-("NFR08","Khả năng bảo trì","Tách App Router, component, server action, domain service và persistence để giảm coupling."),
+("NFR01","Bảo mật và phân quyền","Mỗi người dùng chỉ được xem và thực hiện các chức năng phù hợp với quyền được cấp. Những thao tác quan trọng phải được kiểm tra quyền trước khi thực hiện."),
+("NFR02","An toàn tài khoản","Mật khẩu phải được lưu ở dạng bảo mật. Phiên đăng nhập phải được quản lý để hạn chế việc người khác sử dụng trái phép tài khoản."),
+("NFR03","Tính chính xác của dữ liệu","Các thao tác như điểm danh, xét duyệt, nhập danh sách hoặc cập nhật điểm phải giữ dữ liệu nhất quán, tránh tình trạng cập nhật một phần hoặc ghi nhận trùng."),
+("NFR04","Khả năng truy vết","Những thay đổi quan trọng cần lưu lại người thực hiện, thời điểm và nội dung thay đổi để có thể kiểm tra khi cần."),
+("NFR05","Khả năng sử dụng","Giao diện phải thống nhất, dễ nhận biết trạng thái, có thông báo rõ ràng khi thao tác thành công hoặc không hợp lệ và sử dụng tốt trên các kích thước màn hình phổ biến."),
+("NFR06","Khả năng tra cứu","Người dùng có thể chọn học kỳ để xem lại dữ liệu cũ; dữ liệu của học kỳ đã qua được giữ lại phục vụ tra cứu và đối chiếu."),
+("NFR07","Hiệu năng","Danh sách và báo cáo cần phản hồi trong thời gian hợp lý khi lọc theo học kỳ, trạng thái, lớp, đợt xét hoặc từ khóa."),
+("NFR08","An toàn minh chứng","Tệp minh chứng phải được kiểm tra loại tệp, dung lượng và quyền truy cập trước khi lưu hoặc hiển thị."),
+("NFR09","Khả năng bảo trì và mở rộng","Các chức năng được tổ chức theo từng nhóm nghiệp vụ để có thể sửa đổi hoặc bổ sung tính năng mà hạn chế ảnh hưởng đến phần còn lại của hệ thống.")
 ]
 tb=doc.add_table(rows=1,cols=3); tb.style="Table Grid"; tb.alignment=WD_TABLE_ALIGNMENT.CENTER
 for i,h in enumerate(["Mã","Nhóm yêu cầu","Nội dung"]):
     set_cell(tb.rows[0].cells[i],h,True,10.5,WD_ALIGN_PARAGRAPH.CENTER); shade(tb.rows[0].cells[i],"E7E6E6")
 for row in nfr:
-    c=tb.add_row().cells
-    for i,v in enumerate(row): set_cell(c[i],v,False,10)
+    cells=tb.add_row().cells
+    for i,v in enumerate(row): set_cell(cells[i],v,False,10)
 
 # 5
 doc.add_heading("3.5. Quy tắc nghiệp vụ",level=1)
-tb=doc.add_table(rows=1,cols=2); tb.style="Table Grid"; tb.alignment=WD_TABLE_ALIGNMENT.CENTER
-set_cell(tb.rows[0].cells[0],"Mã",True,10.5,WD_ALIGN_PARAGRAPH.CENTER); set_cell(tb.rows[0].cells[1],"Quy tắc nghiệp vụ",True,10.5,WD_ALIGN_PARAGRAPH.CENTER)
-shade(tb.rows[0].cells[0],"E7E6E6"); shade(tb.rows[0].cells[1],"E7E6E6")
-for code,rule in BUSINESS_RULES:
-    c=tb.add_row().cells; set_cell(c[0],code,True,10); set_cell(c[1],rule,False,10)
+add_text("Hệ thống làm việc theo học kỳ. Tại một thời điểm chỉ có một học kỳ được xác định là học kỳ hiện hành để tạo mới và thực hiện các nghiệp vụ đang diễn ra. Dữ liệu của những học kỳ trước vẫn được giữ lại để tra cứu, so sánh và lập báo cáo nhưng bị hạn chế chỉnh sửa để bảo toàn lịch sử.")
+add_text("Mỗi hoạt động phải thuộc đúng học kỳ và có thời gian đăng ký, thời gian diễn ra rõ ràng. Người tham gia chỉ được đăng ký khi hoạt động đã được công bố, còn thời gian đăng ký, đúng đối tượng và đúng phạm vi áp dụng. Việc hủy đăng ký chỉ được thực hiện trước khi hoạt động bắt đầu và khi danh sách chưa bị khóa. Điểm rèn luyện chỉ được ghi nhận sau khi người tham gia được xác nhận đã tham gia hoạt động.")
+add_text("Mỗi đợt xét sử dụng một bộ tiêu chuẩn phù hợp với đối tượng xét. Khi đợt xét bắt đầu được sử dụng, cấu trúc tiêu chuẩn của đợt xét phải được giữ ổn định để kết quả ở các thời điểm khác nhau có thể đối chiếu được. Bộ tiêu chuẩn đã được sử dụng không nên chỉnh trực tiếp; khi cần thay đổi, quản trị viên tạo một bản sao mới để cấu hình.")
+add_text("Tiêu chí có thể được ghi nhận tự động từ hoạt động đã tham gia, từ mức điểm rèn luyện hoặc từ minh chứng do người dùng cung cấp. Tiêu chí bắt buộc phải được đáp ứng trước khi hồ sơ được công nhận. Với hồ sơ cán bộ, điểm của từng tiêu chí không vượt quá điểm tối đa đã quy định.")
+add_text("Hồ sơ sinh viên được xét qua hai vòng. Cán bộ lớp xét vòng 1 đối với sinh viên thuộc lớp mình phụ trách; hồ sơ được chấp thuận mới chuyển sang cán bộ khoa xét vòng 2. Cán bộ khoa chỉ được xử lý hồ sơ của các lớp đã được phân công. Hồ sơ cán bộ được quản trị viên xét trong một vòng.")
+add_text("Các thao tác có ảnh hưởng lớn đến dữ liệu, như thay đổi quyền, chuyển lớp, nhập kết quả hoạt động hoặc điều chỉnh thông tin quản trị, cần được ghi lại để có thể truy vết. Những dữ liệu đã tạo ra kết quả xét duyệt hoặc kết quả lịch sử phải được ưu tiên bảo toàn.")
 
 # 6
 doc.add_heading("3.6. Quy trình nghiệp vụ",level=1)
-processes=[
-("BP01","Đăng nhập và chuyển ngữ cảnh","Người dùng, MeritTrack","Xác thực tài khoản, tạo session và chuyển context theo role.","Session hợp lệ và dashboard đúng context."),
-("BP02","Đăng ký và điểm danh hoạt động","Sinh viên/Cán bộ, Cán bộ khoa/Admin, MeritTrack","Đăng ký activity, tham gia, quét QR/MSSV, xác nhận attended và ghi điểm ĐRL.","Attendance và nguồn điểm được ghi nhận."),
-("BP03","Xét hồ sơ sinh viên","Sinh viên, Cán bộ lớp, Cán bộ khoa, MeritTrack","Tạo hồ sơ, auto-evaluate, nộp, duyệt vòng 1, duyệt vòng 2.","Submission kết thúc passed/failed hoặc quay lại trạng thái cần chỉnh sửa."),
-("BP04","Xét hồ sơ cán bộ","Cán bộ lớp/Cán bộ khoa, Admin, MeritTrack","Tạo hồ sơ, auto-evaluate, tính điểm, nộp và Admin duyệt một vòng.","Officer submission passed/failed/revise."),
-("BP05","Cấu hình bộ tiêu chuẩn và đợt xét","Admin, MeritTrack","Tạo/clone template, cấu hình nhóm/tiêu chí/rules, tạo event và snapshot.","Event có bộ snapshot tiêu chuẩn cố định."),
-("BP06","Import kết quả hoạt động và đồng bộ hồ sơ","Admin, MeritTrack","Import attendance, cập nhật ĐRL, audit và re-evaluate hồ sơ liên quan.","Attendance/score/auto results đồng bộ."),
-]
-tb=doc.add_table(rows=1,cols=5); tb.style="Table Grid"; tb.alignment=WD_TABLE_ALIGNMENT.CENTER
-for i,h in enumerate(["Mã","Quy trình","Thành phần tham gia","Tóm tắt","Kết quả"]):
-    set_cell(tb.rows[0].cells[i],h,True,9.5,WD_ALIGN_PARAGRAPH.CENTER); shade(tb.rows[0].cells[i],"E7E6E6")
-for row in processes:
-    c=tb.add_row().cells
-    for i,v in enumerate(row): set_cell(c[i],v,False,9)
+doc.add_heading("3.6.1. Đăng nhập và chuyển giao diện theo vai trò",level=2)
+add_text("Người dùng nhập thông tin đăng nhập. Hệ thống kiểm tra tài khoản và tạo phiên làm việc nếu thông tin hợp lệ. Với cán bộ lớp và cán bộ khoa, sau khi đăng nhập người dùng có thể chuyển sang khu vực làm việc dành cho nhiệm vụ cán bộ. Hệ thống chỉ cho phép chuyển sang những khu vực phù hợp với quyền của tài khoản.")
+doc.add_heading("3.6.2. Đăng ký và điểm danh hoạt động",level=2)
+add_text("Người tham gia xem danh sách hoạt động trong học kỳ và chọn hoạt động phù hợp. Khi đăng ký, hệ thống kiểm tra thời gian, đối tượng và phạm vi áp dụng trước khi ghi nhận. Đến thời gian diễn ra, cán bộ khoa hoặc quản trị viên quét mã QR hay nhập mã số người tham gia để điểm danh. Khi điểm danh hợp lệ, hệ thống ghi nhận đã tham gia, cập nhật điểm rèn luyện nếu hoạt động có điểm và gửi thông báo cho người tham gia.")
+doc.add_heading("3.6.3. Xét hồ sơ sinh viên",level=2)
+add_text("Sinh viên tạo hồ sơ trong thời gian đợt xét đang nhận đăng ký, xem các tiêu chí và bổ sung minh chứng khi cần. Trước khi nộp, hệ thống tự động kiểm tra những tiêu chí có thể xác định từ dữ liệu đã có và kiểm tra các điều kiện bắt buộc. Hồ sơ hợp lệ được chuyển đến cán bộ lớp để xét vòng 1. Nếu được chấp thuận, hồ sơ tiếp tục chuyển đến cán bộ khoa xét vòng 2. Mỗi vòng có thể chấp thuận, yêu cầu chỉnh sửa hoặc không chấp thuận; sinh viên theo dõi toàn bộ tiến trình trên hồ sơ.")
+doc.add_heading("3.6.4. Xét hồ sơ cán bộ",level=2)
+add_text("Cán bộ tham gia đợt xét dành cho cán bộ, tạo hồ sơ và bổ sung minh chứng. Hệ thống tự động ghi nhận các hoạt động phù hợp và tính điểm theo tiêu chí đã cấu hình. Sau khi hồ sơ được nộp, quản trị viên kiểm tra và đưa ra kết quả đạt, không đạt hoặc yêu cầu chỉnh sửa. Khi cần chỉnh sửa, cán bộ cập nhật hồ sơ và nộp lại trong thời gian cho phép.")
+doc.add_heading("3.6.5. Cấu hình bộ tiêu chuẩn và đợt xét",level=2)
+add_text("Quản trị viên tạo mới hoặc sao chép một bộ tiêu chuẩn, sau đó xây dựng các nhóm tiêu chuẩn, tiêu chí, điều kiện bắt buộc và cách ghi nhận từ hoạt động hoặc điểm rèn luyện. Khi tạo đợt xét, quản trị viên chọn đúng bộ tiêu chuẩn cho đối tượng xét và thiết lập thời gian áp dụng. Trước khi có hồ sơ tham gia, hệ thống tạo một bản tiêu chuẩn áp dụng cho đợt xét để giữ ổn định nội dung trong suốt quá trình xét.")
+doc.add_heading("3.6.6. Nhập kết quả hoạt động và đồng bộ hồ sơ",level=2)
+add_text("Sau khi hoạt động kết thúc, quản trị viên có thể nhập tệp kết quả tham gia. Hệ thống đọc danh sách, đối chiếu người tham gia và cảnh báo các trường hợp không hợp lệ trước khi ghi nhận. Khi dữ liệu được xác nhận, hệ thống cập nhật kết quả tham gia, điểm rèn luyện và đồng thời kiểm tra lại các hồ sơ xét có tiêu chí liên quan để bảo đảm kết quả mới được phản ánh chính xác.")
 
 # 7
 doc.add_heading("3.7. Sơ đồ nghiệp vụ",level=1)
+add_text("Các sơ đồ nghiệp vụ dưới đây được trình bày dạng swimlane để phân biệt rõ thao tác của người dùng và phần xử lý của hệ thống. Ngoài hình minh họa trong báo cáo, bộ tệp .drawio đi kèm cho phép chỉnh sửa từng khối, đường nối và nội dung của sơ đồ.")
+process_titles={
+"BP01":"Đăng nhập và chuyển giao diện theo vai trò",
+"BP02":"Đăng ký và điểm danh hoạt động",
+"BP03":"Xét hồ sơ sinh viên hai vòng",
+"BP04":"Xét hồ sơ cán bộ",
+"BP05":"Cấu hình bộ tiêu chuẩn và đợt xét",
+"BP06":"Nhập kết quả hoạt động và đồng bộ hồ sơ",
+}
 for idx,(code,img) in enumerate(BUSINESS_DIAGRAMS,1):
     add_picture(img,15.5)
-    title=next(x[1] for x in processes if x[0]==code)
-    add_caption(f"Hình 3.{5+idx}. Sơ đồ nghiệp vụ {code} – {title}")
+    add_caption(f"Hình 3.{5+idx}. Sơ đồ nghiệp vụ {code} – {process_titles[code]}")
 
 # 8
 doc.add_heading("3.8. Đặc tả Use Case",level=1)
-add_text("Biểu mẫu đặc tả tuân theo cấu trúc Actor/Hệ thống. Cột Actor chỉ chứa thao tác do người dùng thực hiện; cột Hệ thống chỉ chứa phản ứng/xử lý của MeritTrack. Chỉ số bước chạy liên tục trong Main Flow. Alternative/Exception Flow dùng chỉ số dạng n.x để chỉ rõ nhánh phát sinh từ bước n của luồng chính và ghi rõ điểm quay lại hoặc kết thúc.")
+add_text("Đặc tả Use Case được trình bày theo hai cột Actor và Hệ thống. Cột Actor chỉ ghi hành động do người dùng thực hiện; cột Hệ thống chỉ ghi phản hồi hoặc xử lý của hệ thống. Mỗi bước bắt đầu bằng động từ. Luồng chính được đánh số liên tục; luồng thay thế và luồng ngoại lệ dùng dạng n.x để thể hiện rõ nhánh phát sinh từ bước n của luồng chính và ghi điểm quay lại hoặc kết thúc.")
 for u in USECASES:
     add_uc_table(u)
-
 
 # End of Chapter 3 after section 3.8 as requested.
 out=ROOT/"Chuong_3_Phan_tich_Thiet_ke_MeritTrack_HoanChinh.docx"
