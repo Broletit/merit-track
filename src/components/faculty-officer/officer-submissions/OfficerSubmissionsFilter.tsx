@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 export default function OfficerSubmissionsFilter() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function OfficerSubmissionsFilter() {
 
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("cohort");
 
     if (value) params.set(key, value);
     else params.delete(key);
@@ -30,7 +32,7 @@ export default function OfficerSubmissionsFilter() {
   }, [keyword]);
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(320px,2fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(320px,2fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
       <div className="relative">
         <Search
           size={16}
@@ -44,22 +46,18 @@ export default function OfficerSubmissionsFilter() {
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
       <select
         defaultValue={searchParams.get("status") ?? ""}
         onChange={(event) => updateParam("status", event.target.value)}
         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
       >
         <option value="">Tất cả trạng thái</option>
-        <option value="draft">Nháp</option>
         <option value="submitted_v1">Chờ duyệt vòng 1</option>
         <option value="needs_revision_v1">Cần chỉnh sửa</option>
         <option value="submitted_v2">Chờ duyệt vòng 2</option>
         <option value="passed">Đạt</option>
         <option value="failed">Không đạt</option>
-        <option value="closed">Đã đóng</option>
       </select>
-
       <select
         defaultValue={searchParams.get("sort") ?? "latest"}
         onChange={(event) => updateParam("sort", event.target.value)}
@@ -68,6 +66,6 @@ export default function OfficerSubmissionsFilter() {
         <option value="latest">Mới cập nhật</option>
         <option value="oldest">Cũ nhất</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

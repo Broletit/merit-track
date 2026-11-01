@@ -13,7 +13,7 @@ export default function FacultyOfficerReviewHistory({
   if (items.length === 0) return null;
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <h2 className="text-xl font-semibold text-slate-900">
         Lịch sử duyệt
       </h2>
@@ -22,7 +22,7 @@ export default function FacultyOfficerReviewHistory({
         {items.map((review, index) => (
           <div
             key={index}
-            className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"
+            className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 shadow-md shadow-slate-200/60"
           >
             <div className="text-sm font-semibold text-slate-900">
               Vòng {review.round} -{" "}

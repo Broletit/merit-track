@@ -26,7 +26,7 @@ export default function ClassFilter({
         <option value="">Tất cả lớp</option>
         {classes.map((item) => (
           <option key={item.id} value={item.id}>
-            {item.code} - {item.name}
+            {item.code}
           </option>
         ))}
       </select>

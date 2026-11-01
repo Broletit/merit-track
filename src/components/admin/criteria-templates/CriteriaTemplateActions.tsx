@@ -1,4 +1,5 @@
 "use client";
+import useConfirmation from "@/components/shared/useConfirmation";
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -17,13 +18,12 @@ export default function CriteriaTemplateActions({
   onDeleted?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const { confirm, modal } = useConfirmation();
   const [feedback, setFeedback] = useState({ message: "", ok: false });
 
-  function handleDelete() {
-    const confirmed = window.confirm(`Xóa bộ tiêu chuẩn "${item.name}"?`);
-    if (!confirmed) return;
-    const reason=window.prompt("Nhập lý do xóa (tối thiểu 10 ký tự):")?.trim()??"";
-    if(reason.length<10){setFeedback({message:"Vui lòng nhập lý do xóa cụ thể, tối thiểu 10 ký tự.",ok:false});return;}
+  async function handleDelete() {
+    const reason = await confirm({ title: 'Xác nhận xóa', message: `Xóa bộ tiêu chuẩn "${item.name}"?`, confirmLabel: 'Xác nhận xóa', requireReason: true });
+    if (reason === null) return;
     const formData=new FormData();formData.set("reason",reason);
 
     startTransition(async () => {
@@ -39,6 +39,7 @@ export default function CriteriaTemplateActions({
 
   return (
     <div className="flex flex-nowrap items-center justify-center gap-2">
+      {modal}
       <ActionFeedback pending={pending} message={feedback.message} ok={feedback.ok} />
       <Link
         href={`/dashboard/admin/criteria-templates/${item.id}/configure`}

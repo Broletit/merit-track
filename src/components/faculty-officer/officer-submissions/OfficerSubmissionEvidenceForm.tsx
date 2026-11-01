@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { saveOfficerSubmissionEvidence } from "@/server/actions/officer-submissions/saveOfficerSubmissionEvidence";
 import { submitOfficerSubmission } from "@/server/actions/officer-submissions/submitOfficerSubmission";
 import ActionFeedback from "@/components/shared/ActionFeedback";
-import { AutoCriteriaMessage } from "@/components/shared/criteria/AutoCriteriaAchievement";
+import { AutoCriteriaBadge, AutoCriteriaMessage } from "@/components/shared/criteria/AutoCriteriaAchievement";
 import { getUserFacingActionError } from "@/lib/errors/getUserFacingActionError";
 
 type Item = {
@@ -58,7 +58,7 @@ export default function OfficerSubmissionEvidenceForm({
       ])
     ).values()
   );
-  const evidenceNotNeeded=(item:Item)=>Number(item.is_required)!==1&&items.filter(candidate=>candidate.group_code===item.group_code&&Number(candidate.auto_passed)===1).length>=Number(item.min_required);
+  const evidenceNotNeeded=(item:Item)=>Number(item.is_required)!==1&&items.filter(candidate=>candidate.group_code===item.group_code&&Number(candidate.auto_passed)===1).length>=Math.max(Number(item.min_required),items.filter(candidate=>candidate.group_code===item.group_code&&Number(candidate.is_required)===1).length);
 
   function handleFileChange(criteriaCode: string, event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
@@ -85,6 +85,7 @@ export default function OfficerSubmissionEvidenceForm({
     }
 
     setFileStates((current) => ({ ...current, [criteriaCode]: { name: file.name, error: "" } }));
+    toast.success(`Tệp “${file.name}” hợp lệ và sẵn sàng tải lên.`, { id: `officer-evidence-file-${criteriaCode}` });
   }
 
   function handleSave(formData: FormData) {
@@ -123,7 +124,7 @@ export default function OfficerSubmissionEvidenceForm({
   }
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <ActionFeedback pending={pending} message={message} ok={ok} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-slate-900">Minh chứng hồ sơ</h2>
@@ -140,12 +141,12 @@ export default function OfficerSubmissionEvidenceForm({
           const groupItems = items.filter((item) => item.group_code === group.code);
 
           return (
-            <div key={group.code} className="overflow-hidden rounded-2xl border border-slate-200">
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 px-5 py-4">
+            <div key={group.code} className="overflow-hidden rounded-none border border-slate-200">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-l-4 border-blue-700 bg-blue-50 px-5 py-4">
                 <h3 className="text-base font-semibold text-slate-900">
                   {group.code}. {group.title}
                 </h3>
-                <div className="flex flex-wrap items-center gap-3"><span className="text-xs font-semibold text-blue-700">Cần đạt tối thiểu {group.minRequired}/{groupItems.length} tiêu chí</span><span className="text-sm font-bold text-emerald-700">
+                <div className="flex flex-wrap items-center gap-3"><span className="text-xs font-semibold text-blue-700">Yêu cầu: Đạt tối thiểu {Math.max(group.minRequired,groupItems.filter(item=>Number(item.is_required)===1).length)}/{groupItems.length} tiêu chí</span><span className="text-sm font-bold text-emerald-700">
                   Đã đạt {groupItems.reduce((total, item) => {
                     const passed = Number(item.auto_passed ?? 0) === 1 || Boolean(item.content_text?.trim()) || Number(item.file_count) > 0;
                     const awarded = Number(item.auto_passed ?? 0) === 1
@@ -160,9 +161,6 @@ export default function OfficerSubmissionEvidenceForm({
                 {groupItems.map((item) => {
                   const autoPassed = Number(item.auto_passed ?? 0) === 1;
                   const hasEvidence = Boolean(item.content_text?.trim()) || Number(item.file_count) > 0;
-                  const awardedScore = autoPassed
-                    ? Math.min(Number(item.score_max), Number(item.auto_score) || Number(item.score_max))
-                    : Number(item.score_max);
                   return (
                     <div key={item.code} className="p-5">
                       <input type="hidden" name="criteriaCode" value={item.code} />
@@ -187,9 +185,7 @@ export default function OfficerSubmissionEvidenceForm({
                               Tối đa {Number(item.score_max ?? 0)} điểm
                             </span>
                             {autoPassed ? (
-                              <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
-                                +{awardedScore} điểm
-                              </span>
+                              <AutoCriteriaBadge/>
                             ) : item.review_decision === "pass" ? (
                               <span className="rounded bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">Đạt</span>
                             ) : item.review_decision === "fail" ? (
@@ -224,7 +220,7 @@ export default function OfficerSubmissionEvidenceForm({
                             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50"
                           />
 
-                          <div className={`rounded-xl border p-3 ${fileStates[item.code]?.error ? "border-red-500 bg-red-50" : fileStates[item.code]?.name ? "border-emerald-500 bg-emerald-50" : item.file_name ? "border-blue-300 bg-blue-50/50" : "border-slate-200 bg-slate-50"}`}>
+                          <div className={`rounded-none border p-3 ${fileStates[item.code]?.error ? "border-red-500 bg-red-50" : fileStates[item.code]?.name ? "border-emerald-500 bg-emerald-50" : item.file_name ? "border-blue-300 bg-blue-50/50" : "border-slate-200 bg-slate-50"}`}>
                             <div className="flex flex-wrap items-center gap-3">
                             <label className={`flex cursor-pointer items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold ${canEdit ? "bg-blue-700 text-white" : "bg-slate-200 text-slate-400"}`}>
                               <Upload size={14} />
@@ -275,7 +271,7 @@ export default function OfficerSubmissionEvidenceForm({
       </form>
 
       {canEdit ? (
-        <div className="mt-5 flex justify-end rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+        <div className="mt-5 flex justify-end rounded-none border border-amber-200 bg-amber-50/60 p-4 shadow-md shadow-slate-200/60">
           <button
             type="button"
             disabled={pending}

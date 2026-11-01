@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireOfficerParticipantContext } from "@/server/auth/requireOfficerParticipantContext";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { evaluateSubmissionAuto } from "@/server/events/evaluateSubmissionAuto";
 import { evaluateSubmission } from "@/server/submissions/evaluateSubmission";
 import { assertEventAcceptsSubmissions } from "@/lib/events/eventSubmissionPhase";
@@ -10,11 +10,9 @@ import { assertSubmissionRequirements } from "@/server/submissions/evaluateSubmi
 
 export async function submitOfficerSubmission(submissionId: number) {
   const user = await requireOfficerParticipantContext();
-  const db = getDb();
+  const db = getDatabase();
 
-  const submission = db
-    .prepare(
-      `
+  const submission = (await db.first(`
       SELECT
         s.id,
         s.user_id,
@@ -28,9 +26,7 @@ export async function submitOfficerSubmission(submissionId: number) {
       WHERE s.id = ?
         AND e.type = 'officer'
       LIMIT 1
-      `
-    )
-    .get(submissionId) as
+      `, [submissionId])) as
     | {
         id: number;
         user_id: number;
@@ -59,20 +55,18 @@ export async function submitOfficerSubmission(submissionId: number) {
     allowLate: Number(submission.allow_late ?? 0) === 1,
   });
 
-  evaluateSubmissionAuto(submissionId);
-  assertSubmissionRequirements(db, submissionId);
-  evaluateSubmission(submissionId);
+  (await evaluateSubmissionAuto(submissionId));
+  (await assertSubmissionRequirements(db, submissionId));
+  (await evaluateSubmission(submissionId));
 
-  db.prepare(
-    `
+  (await db.execute(`
     UPDATE submissions
     SET
       status = 'submitted_v1',
-      submitted_at = datetime('now'),
-      updated_at = datetime('now')
+      submitted_at = CURRENT_TIMESTAMP(3),
+      updated_at = CURRENT_TIMESTAMP(3)
     WHERE id = ?
-    `
-  ).run(submissionId);
+    `, [submissionId]));
 
   revalidatePath(`/dashboard/faculty-officer/officer-submissions/detail/${submissionId}`);
   revalidatePath("/dashboard/faculty-officer/officer-submissions");

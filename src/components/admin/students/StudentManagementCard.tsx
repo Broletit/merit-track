@@ -77,13 +77,13 @@ export default function StudentManagementCard({
   );
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <ActionFeedback pending={transferPending} message={transferState.message} ok={transferState.ok} />
       <ActionFeedback pending={resetPending} message={resetState.message} ok={resetState.ok} />
       <h2 className="text-xl font-semibold text-slate-900">Quản lý sinh viên</h2>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <form action={transferFormAction} className="rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200">
+        <form action={transferFormAction} className="rounded-none bg-slate-50 p-5 ring-1 ring-slate-200">
           <h3 className="text-base font-semibold text-slate-900">Chuyển lớp thủ công</h3>
           <p className="mt-2 text-sm text-slate-500">
             Dùng khi sinh viên chuyển lớp hoặc chuyển ngành chính thức.
@@ -102,7 +102,7 @@ export default function StudentManagementCard({
             >
               {classes.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.code} - {item.name}
+                  {item.code}
                 </option>
               ))}
             </select>
@@ -111,7 +111,7 @@ export default function StudentManagementCard({
           <div className="mt-4">
             <button
               type="submit"
-              disabled={transferPending}
+              disabled={transferPending || classes.length===0}
               className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60"
             >
               {transferPending ? "Đang chuyển..." : "Chuyển lớp"}
@@ -120,7 +120,7 @@ export default function StudentManagementCard({
 
         </form>
 
-        <form action={resetFormAction} className="rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200">
+        <form action={resetFormAction} className="rounded-none bg-slate-50 p-5 ring-1 ring-slate-200">
           <h3 className="text-base font-semibold text-slate-900">Đặt lại mật khẩu</h3>
           <p className="mt-2 text-sm text-slate-500">
             Sau khi reset, sinh viên sẽ dùng mật khẩu mặc định <span className="font-semibold">1111</span> và phải đổi lại khi đăng nhập.

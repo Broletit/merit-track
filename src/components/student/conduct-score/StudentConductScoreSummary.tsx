@@ -1,3 +1,4 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
 import type { StudentConductScoreSummaryData } from "./types";
 
 export default function StudentConductScoreSummary({
@@ -6,19 +7,21 @@ export default function StudentConductScoreSummary({
   summary: StudentConductScoreSummaryData;
 }) {
   return (
-    <section className="grid gap-4 md:grid-cols-3">
-      <Card label="Tổng điểm đã cộng" value={summary.totalScore} />
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Card label="Điểm rèn luyện hiện có" value={summary.totalScore} />
+      <Card label="Điểm đã cộng" value={summary.addedScore} tone="green" prefix="+" />
+      <Card label="Điểm đã trừ" value={summary.deductedScore} tone="red" prefix="−" />
       <Card label="Hoạt động đã tham gia" value={summary.activityCount} />
-      <Card label="Chờ cộng điểm" value={summary.pendingActivityCount} />
     </section>
   );
 }
 
-function Card({ label, value }: { label: string; value: number }) {
+function Card({ label, value, tone = "default", prefix = "" }: { label: string; value: number; tone?: "default" | "green" | "red"; prefix?: string }) {
+  const valueTone = tone === "green" ? "text-emerald-700" : tone === "red" ? "text-rose-700" : "text-slate-900";
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-2 text-3xl font-semibold text-slate-900">{value}</div>
+    <div className={[statCardStyles.card, "min-w-0"].join(" ")}>
+      <div className={statCardStyles.label}>{label}</div>
+      <div className={[statCardStyles.value, `mt-2 text-3xl font-semibold ${valueTone}`].join(" ")}>{prefix}{value}</div>
     </div>
   );
 }

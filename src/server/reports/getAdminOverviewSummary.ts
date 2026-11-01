@@ -1,4 +1,5 @@
-import { getDb } from "@/server/db/sqlite";
+import { cohortClause, activityCohortClause } from "@/server/cohorts/sql";
+import { getDatabase } from "@/server/db/mysql";
 
 export type AdminOverviewSummary = {
   active_students: number;
@@ -21,22 +22,21 @@ export type AdminOverviewSummary = {
   officer_revision: number;
 };
 
-export function getAdminOverviewSummary(termId: number) {
-  const db = getDb();
+export async function getAdminOverviewSummary(termId: number, cohortValue?: unknown) {
+  const db = getDatabase();
 
-  return db
-    .prepare(
-      `
+  return (await db.first(`
       SELECT
-        (SELECT COUNT(*) FROM users WHERE role IN ('student', 'class_officer') AND is_active = 1)
+        (SELECT COUNT(*) FROM users WHERE role IN ('student', 'class_officer') AND is_active = 1 AND ${cohortClause(cohortValue,"users.cohort")})
           AS active_students,
-        (SELECT COUNT(*) FROM classes WHERE is_active = 1)
+        (SELECT COUNT(*) FROM classes WHERE is_active = 1 AND ${cohortClause(cohortValue,"classes.cohort")})
           AS active_classes,
 
         (
           SELECT COUNT(*)
           FROM activities a
           WHERE a.term_id = ?
+            AND ${activityCohortClause(cohortValue)}
             AND a.status IN ('published', 'closed')
         ) AS term_activities,
 
@@ -44,7 +44,8 @@ export function getAdminOverviewSummary(termId: number) {
           SELECT COUNT(*)
           FROM activities a
           WHERE a.term_id = ?
-            AND datetime(a.end_at) < datetime('now')
+            AND ${activityCohortClause(cohortValue)}
+            AND CAST(a.end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)
             AND a.status IN ('published', 'closed')
         ) AS completed_activities,
         (
@@ -52,7 +53,8 @@ export function getAdminOverviewSummary(termId: number) {
           FROM activity_registrations ar
           INNER JOIN activities a ON a.id = ar.activity_id
           WHERE a.term_id = ?
-            AND datetime(a.end_at) < datetime('now')
+            AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=ar.user_id)")}
+            AND CAST(a.end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)
             AND ar.status IN ('attended', 'absent')
         ) AS valid_attendance_records,
         (
@@ -60,7 +62,8 @@ export function getAdminOverviewSummary(termId: number) {
           FROM activity_registrations ar
           INNER JOIN activities a ON a.id = ar.activity_id
           WHERE a.term_id = ?
-            AND datetime(a.end_at) < datetime('now')
+            AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=ar.user_id)")}
+            AND CAST(a.end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)
             AND ar.status = 'attended'
         ) AS attended,
         (
@@ -68,7 +71,8 @@ export function getAdminOverviewSummary(termId: number) {
           FROM activity_registrations ar
           INNER JOIN activities a ON a.id = ar.activity_id
           WHERE a.term_id = ?
-            AND datetime(a.end_at) < datetime('now')
+            AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=ar.user_id)")}
+            AND CAST(a.end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)
             AND ar.status = 'registered'
         ) AS unresolved_attendance,
         (
@@ -77,6 +81,7 @@ export function getAdminOverviewSummary(termId: number) {
           INNER JOIN activities a ON a.id = ar.activity_id
           INNER JOIN users u ON u.id = ar.user_id
           WHERE a.term_id = ?
+            AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=ar.user_id)")}
             AND ar.status = 'attended'
             AND u.role IN ('student', 'class_officer')
             AND u.is_active = 1
@@ -84,81 +89,62 @@ export function getAdminOverviewSummary(termId: number) {
 
         (
           SELECT COUNT(*) FROM submissions s
-          INNER JOIN events e ON e.id = s.event_id
+          INNER JOIN events e ON e.id = s.event_id AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=s.user_id)")}
           WHERE e.type = 'student' AND e.term_id = ?
             AND s.status <> 'draft' AND s.submitted_at IS NOT NULL
         ) AS student_submitted,
         (
           SELECT COUNT(*) FROM submissions s
-          INNER JOIN events e ON e.id = s.event_id
-          WHERE e.type = 'student' AND e.term_id = ? AND s.status = 'passed'
+          INNER JOIN events e ON e.id = s.event_id AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=s.user_id)")}
+          WHERE e.type = 'student' AND e.term_id = ? AND s.status = 'passed' AND s.submitted_at IS NOT NULL
         ) AS student_passed,
         (
           SELECT COUNT(*) FROM submissions s
-          INNER JOIN events e ON e.id = s.event_id
-          WHERE e.type = 'student' AND e.term_id = ? AND s.status = 'failed'
+          INNER JOIN events e ON e.id = s.event_id AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=s.user_id)")}
+          WHERE e.type = 'student' AND e.term_id = ? AND s.status = 'failed' AND s.submitted_at IS NOT NULL
         ) AS student_failed,
         (
           SELECT COUNT(*) FROM submissions s
-          INNER JOIN events e ON e.id = s.event_id
-          WHERE e.type = 'student' AND e.term_id = ?
+          INNER JOIN events e ON e.id = s.event_id AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=s.user_id)")}
+          WHERE e.type = 'student' AND e.term_id = ? AND s.submitted_at IS NOT NULL
             AND s.status IN ('submitted_v1', 'submitted_v2')
         ) AS student_pending,
         (
           SELECT COUNT(*) FROM submissions s
-          INNER JOIN events e ON e.id = s.event_id
-          WHERE e.type = 'student' AND e.term_id = ?
+          INNER JOIN events e ON e.id = s.event_id AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=s.user_id)")}
+          WHERE e.type = 'student' AND e.term_id = ? AND s.submitted_at IS NOT NULL
             AND s.status IN ('needs_revision_v1', 'needs_revision_v2')
         ) AS student_revision,
 
         (
           SELECT COUNT(*) FROM submissions s
-          INNER JOIN events e ON e.id = s.event_id
+          INNER JOIN events e ON e.id = s.event_id AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=s.user_id)")}
           WHERE e.type = 'officer' AND e.term_id = ?
             AND s.status <> 'draft' AND s.submitted_at IS NOT NULL
         ) AS officer_submitted,
         (
           SELECT COUNT(*) FROM submissions s
-          INNER JOIN events e ON e.id = s.event_id
-          WHERE e.type = 'officer' AND e.term_id = ? AND s.status = 'passed'
+          INNER JOIN events e ON e.id = s.event_id AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=s.user_id)")}
+          WHERE e.type = 'officer' AND e.term_id = ? AND s.status = 'passed' AND s.submitted_at IS NOT NULL
         ) AS officer_passed,
         (
           SELECT COUNT(*) FROM submissions s
-          INNER JOIN events e ON e.id = s.event_id
-          WHERE e.type = 'officer' AND e.term_id = ? AND s.status = 'failed'
+          INNER JOIN events e ON e.id = s.event_id AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=s.user_id)")}
+          WHERE e.type = 'officer' AND e.term_id = ? AND s.status = 'failed' AND s.submitted_at IS NOT NULL
         ) AS officer_failed,
         (
           SELECT COUNT(*) FROM submissions s
-          INNER JOIN events e ON e.id = s.event_id
-          WHERE e.type = 'officer' AND e.term_id = ?
+          INNER JOIN events e ON e.id = s.event_id AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=s.user_id)")}
+          WHERE e.type = 'officer' AND e.term_id = ? AND s.submitted_at IS NOT NULL
             AND s.status IN ('submitted_v1', 'submitted_v2')
         ) AS officer_pending,
         (
           SELECT COUNT(*) FROM submissions s
-          INNER JOIN events e ON e.id = s.event_id
-          WHERE e.type = 'officer' AND e.term_id = ?
+          INNER JOIN events e ON e.id = s.event_id AND ${cohortClause(cohortValue,"(SELECT cohort FROM users WHERE id=s.user_id)")}
+          WHERE e.type = 'officer' AND e.term_id = ? AND s.submitted_at IS NOT NULL
             AND s.status IN ('needs_revision_v1', 'needs_revision_v2')
         ) AS officer_revision
-      `
-    )
-    .get(
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId,
-      termId
-    ) as AdminOverviewSummary;
+      `, [termId, termId, termId, termId, termId, termId, termId, termId, termId, termId, termId, termId, termId, termId, termId, termId])) as AdminOverviewSummary;
 }
 
 export function calculateOverviewRates(summary: AdminOverviewSummary) {

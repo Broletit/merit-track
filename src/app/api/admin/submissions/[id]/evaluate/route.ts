@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/server/auth/guards";
+import { requireAdminContext } from "@/server/auth/guards";
 import { evaluateSubmissionAuto } from "@/server/events/evaluateSubmissionAuto";
 
 function parseId(value: string) {
@@ -11,7 +11,7 @@ export async function POST(
   _: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  await requireAdmin();
+  await requireAdminContext();
 
   const { id: rawId } = await context.params;
   const submissionId = parseId(rawId);
@@ -21,7 +21,7 @@ export async function POST(
   }
 
   try {
-    const result = evaluateSubmissionAuto(submissionId);
+    const result = (await evaluateSubmissionAuto(submissionId));
     return NextResponse.json(result);
   } catch (error) {
     console.error("POST /api/admin/submissions/[id]/evaluate error:", error);

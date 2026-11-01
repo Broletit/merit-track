@@ -1,13 +1,14 @@
+import { assertImportCohort } from "@/lib/cohorts/cohorts";
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import bcrypt from "bcryptjs";
-import { getDb } from "@/server/db/sqlite";
-import { requireAdmin } from "@/server/auth/guards";
+import { getDatabase } from "@/server/db/mysql";
+import { requireAdminContext } from "@/server/auth/guards";
 import crypto from "crypto";
 
 export async function POST(req: Request) {
   try {
-    await requireAdmin();
+    await requireAdminContext();
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
@@ -22,12 +23,14 @@ export async function POST(req: Request) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
 
-    const db = getDb();
+    const cohort = assertImportCohort(formData.get("cohort"),data.map(row=>({mssv:String(row["MSSV"] ?? "").trim()})));
+    const db = getDatabase();
 
     const passwordHash = await bcrypt.hash("1111", 10);
 
     let inserted = 0;
 
+    (await (async () => (await db.withTransaction(async () => {
     for (const row of data) {
       const mssv = String(row["MSSV"] || "").trim();
       const full_name = String(row["Họ tên"] || "").trim();
@@ -37,44 +40,33 @@ export async function POST(req: Request) {
       if (!mssv || !full_name || !classCode) continue;
 
       // tìm lớp
-      const cls = db
-        .prepare(`SELECT id FROM classes WHERE code = ?`)
-        .get(classCode) as { id: number } | undefined;
+      const cls = (await db.first(`SELECT id,cohort FROM classes WHERE code = ?`, [classCode])) as { id: number;cohort:number|null } | undefined;
 
       if (!cls) continue;
+      if(cls.cohort!==cohort) throw new Error("Lớp trong file thuộc khóa khác.");
 
-      const exists = db
-        .prepare(`SELECT id FROM users WHERE mssv = ?`)
-        .get(mssv);
+      const exists = (await db.first(`SELECT id FROM users WHERE mssv = ?`, [mssv]));
 
       if (exists) continue;
 
-      const result = db.prepare(
-        `
+      const result = (await db.execute(`
         INSERT INTO users (
           mssv, full_name, email,
           password_hash, role,
-          qr_secret
+          qr_secret, cohort
         )
-        VALUES (?, ?, ?, ?, 'student', ?)
-        `
-      ).run(
-        mssv,
-        full_name,
-        email,
-        passwordHash,
-        crypto.randomUUID()
-      );
+        VALUES (?, ?, ?, ?, 'student', ?, ?)
+        `, [mssv, full_name, email, passwordHash, crypto.randomUUID(), cohort]));
 
-      db.prepare(
-        `
+      (await db.execute(`
         INSERT INTO class_members (class_id, user_id, joined_at)
-        VALUES (?, ?, datetime('now'))
-        `
-      ).run(cls.id, Number(result.lastInsertRowid));
+        VALUES (?, ?, CURRENT_TIMESTAMP(3))
+        `, [cls.id, Number(result.insertId)]));
 
       inserted++;
     }
+
+    })))());
 
     return NextResponse.json({
       ok: true,

@@ -8,12 +8,12 @@ type ClassPoint = {
 
 export default function ClassSubmissionRateLineChart({ items }: { items: ClassPoint[] }) {
   if (items.length === 0) {
-    return <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ring-1 ring-slate-100">Chưa có dữ liệu phù hợp.</div>;
+    return <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ring-1 ring-slate-100 shadow-md shadow-slate-200/60">Chưa có dữ liệu phù hợp.</div>;
   }
 
   const width = Math.max(760, items.length * 105);
-  const height = 290;
-  const padding = { top: 22, right: 72, bottom: 68, left: 72 };
+  const height = 326;
+  const padding = { top: 28, right: 72, bottom: 104, left: 72 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
   const x = (index: number) => padding.left + (items.length === 1 ? plotWidth / 2 : (index / (items.length - 1)) * plotWidth);
@@ -22,7 +22,7 @@ export default function ClassSubmissionRateLineChart({ items }: { items: ClassPo
 
   return (
     <div className="overflow-x-auto pb-2">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-[290px] min-w-[760px]" role="img" aria-label="Tỷ lệ sinh viên đã nộp hồ sơ theo lớp">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-[326px] min-w-[760px]" role="img" aria-label="Tỷ lệ sinh viên đã nộp hồ sơ theo lớp">
         <text transform={`translate(17 ${padding.top + plotHeight / 2}) rotate(-90)`} textAnchor="middle" className="fill-slate-500 text-[11px] font-semibold">Sinh viên đã nộp (%)</text>
         {[0, 25, 50, 75, 100].map((value) => (
           <g key={value}>

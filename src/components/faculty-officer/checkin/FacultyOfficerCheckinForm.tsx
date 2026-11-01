@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import FacultyOfficerCameraScanner from "./FacultyOfficerCameraScanner";
 import FacultyOfficerManualScanForm from "./FacultyOfficerManualScanForm";
@@ -19,6 +20,8 @@ export default function FacultyOfficerCheckinForm({
   activities: CheckinActivityOption[];
   defaultActivityId?: number | null;
 }) {
+  const router=useRouter();
+  useEffect(()=>{const timer=setInterval(()=>router.refresh(),30000);return ()=>clearInterval(timer);},[router]);
   const defaultSelectedActivity = activities.find(
     (item) => Number(item.id) === Number(defaultActivityId)
   );
@@ -33,10 +36,10 @@ export default function FacultyOfficerCheckinForm({
   const [keyword, setKeyword] = useState("");
   const [audienceType, setAudienceType] = useState("");
   const [checkinType, setCheckinType] = useState("");
-  const [timeFilter, setTimeFilter] = useState("");
+  const [now,setNow] = useState(()=>Date.now());
+  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return ()=>clearInterval(timer);},[]);
 
   const filteredActivities = useMemo(() => {
-    const now = new Date();
 
     return activities.filter((item) => {
       const keywordMatched = keyword.trim()
@@ -54,18 +57,12 @@ export default function FacultyOfficerCheckinForm({
             ? !item.qrCheckinEnabled
             : true;
 
-      const start = item.startAt ? new Date(item.startAt) : null;
-      const end = item.endAt ? new Date(item.endAt) : null;
-
-      let timeMatched = true;
-
-      if (timeFilter === "upcoming") timeMatched = start ? start > now : false;
-      if (timeFilter === "ongoing") timeMatched = start && end ? start <= now && end >= now : false;
-      if (timeFilter === "ended") timeMatched = end ? end < now : false;
+      const timestamp=(value:string)=>Date.parse(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)?value.replace(" ","T")+"Z":value);
+      const timeMatched=timestamp(item.startAt)<=now&&timestamp(item.endAt)>now;
 
       return keywordMatched && audienceMatched && typeMatched && timeMatched;
     });
-  }, [activities, keyword, audienceType, checkinType, timeFilter]);
+  }, [activities, keyword, audienceType, checkinType, now]);
 
   const selectedActivityId = Number(activityId || 0);
   const selectedStillVisible = filteredActivities.some(
@@ -80,10 +77,10 @@ export default function FacultyOfficerCheckinForm({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+      <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
         <h2 className="text-xl font-semibold text-slate-900">Chọn hoạt động</h2>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-4">
+        <div className="filter-row mt-5 grid gap-4 md:grid-cols-3">
           <div className="relative">
             <Search
               size={16}
@@ -117,16 +114,6 @@ export default function FacultyOfficerCheckinForm({
             <option value="manual">Xác nhận thủ công</option>
           </select>
 
-          <select
-            value={timeFilter}
-            onChange={(event) => setTimeFilter(event.target.value)}
-            className="h-11 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-blue-500"
-          >
-            <option value="">Tất cả thời gian</option>
-            <option value="upcoming">Sắp diễn ra</option>
-            <option value="ongoing">Đang diễn ra</option>
-            <option value="ended">Đã kết thúc</option>
-          </select>
         </div>
 
         <select
@@ -151,10 +138,10 @@ export default function FacultyOfficerCheckinForm({
       {finalActivityId > 0 ? (
         <>
           {finalActivity?.qrCheckinEnabled ? (
-            <FacultyOfficerCameraScanner activityId={finalActivityId} />
+            <FacultyOfficerCameraScanner key={`camera-${finalActivityId}`} activityId={finalActivityId} />
           ) : null}
 
-          <FacultyOfficerManualScanForm activityId={finalActivityId} />
+          <FacultyOfficerManualScanForm key={`manual-${finalActivityId}`} activityId={finalActivityId} />
         </>
       ) : null}
     </div>

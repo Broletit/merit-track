@@ -1,17 +1,10 @@
+import PaginatedTable from "@/components/common/PaginatedTable";
 import Link from "next/link";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import type { StudentEventItem } from "./types";
 import StudentEventsFilter from "./StudentEventsFilter";
 import EventSubmissionPhaseBadge from "@/components/shared/EventSubmissionPhaseBadge";
-
-function mapStatus(status: string | null) {
-  if (!status) return "Chưa nộp";
-  if (status === "submitted_v1") return "Chờ duyệt vòng 1";
-  if (status === "submitted_v2") return "Chờ duyệt vòng 2";
-  if (status === "approved") return "Đã duyệt";
-  if (status.startsWith("rejected")) return "Bị từ chối";
-  return status;
-}
+import SubmissionStatusBadge from "@/components/shared/submissions/SubmissionStatusBadge";
 
 export default function StudentEventsTable({
   items,
@@ -19,17 +12,17 @@ export default function StudentEventsTable({
   items: StudentEventItem[];
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <h2 className="text-xl font-semibold text-slate-900">
-        Danh sách đợt xét
-      </h2>
-      
-    <div className="mt-5">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <div>
       <StudentEventsFilter />
     </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-        <table className="min-w-full table-fixed divide-y divide-slate-200">
+      <h2 className="mt-5 text-xl font-semibold text-slate-900">
+        Danh sách đợt xét
+      </h2>
+
+      <div data-table-frame className="mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<PaginatedTable className="min-w-full table-fixed divide-y divide-slate-200" containerClassName="overflow-hidden rounded-none border border-slate-200" resultLabel="bản ghi">
           <thead className="bg-slate-50">
             <tr>
               <th className="w-[26%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -39,7 +32,7 @@ export default function StudentEventsTable({
                 Trạng thái hồ sơ
               </th>
               <th className="w-[17%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                Nhận hồ sơ
+                Trạng thái tiếp nhận
               </th>
               <th className="w-[23%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Thời gian
@@ -64,7 +57,7 @@ export default function StudentEventsTable({
                   </td>
 
                   <td className="px-4 py-4 align-top text-sm text-slate-700">
-                    {mapStatus(item.submissionStatus)}
+                    <SubmissionStatusBadge status={item.submissionStatus || "none"}/>
                   </td>
 
                   <td className="px-4 py-4 align-top">
@@ -100,8 +93,9 @@ export default function StudentEventsTable({
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+        </PaginatedTable>
+
+</div>
     </section>
   );
 }

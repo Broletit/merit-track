@@ -1,3 +1,4 @@
+import PaginatedTable from "@/components/common/PaginatedTable";
 import FacultyOfficerAttendanceLogsFilter from "./FacultyOfficerAttendanceLogsFilter";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import type { AttendanceLogItem, CheckinLogActivityOption } from "./types";
@@ -26,20 +27,20 @@ export default function FacultyOfficerAttendanceLogsTable({
   activities: CheckinLogActivityOption[];
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <div className="flex flex-col gap-1">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <div>
+        <FacultyOfficerAttendanceLogsFilter activities={activities} />
+      </div>
+
+      <div className="mt-5 flex flex-col gap-1">
         <h2 className="text-xl font-semibold text-slate-900">
           Lịch sử điểm danh gần đây
         </h2>
       
       </div>
 
-      <div className="mt-5">
-        <FacultyOfficerAttendanceLogsFilter activities={activities} />
-      </div>
-
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-        <table className="min-w-full divide-y divide-slate-200">
+      <div data-table-frame className="mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<PaginatedTable className="min-w-full divide-y divide-slate-200" containerClassName="overflow-hidden rounded-none border border-slate-200" resultLabel="bản ghi">
           <thead className="bg-slate-50">
             <tr>
               <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -107,8 +108,9 @@ export default function FacultyOfficerAttendanceLogsTable({
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+        </PaginatedTable>
+
+</div>
     </section>
   );
 }

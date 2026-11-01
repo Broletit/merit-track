@@ -1,6 +1,11 @@
-"use client";
 
-import { useState, useTransition } from "react";
+"use client";
+import CriteriaTable from "@/components/shared/criteria/CriteriaTable";
+import CriteriaGroupsPagination from "@/components/shared/criteria/CriteriaGroupsPagination";
+
+import useConfirmation from "@/components/shared/useConfirmation";
+
+import { useState, useTransition, type ReactNode } from "react";
 import { deleteCriteriaGroup } from "@/server/actions/criteria-templates/deleteCriteriaGroup";
 import { deleteCriteriaItem } from "@/server/actions/criteria-templates/deleteCriteriaItem";
 import ActionFeedback from "@/components/shared/ActionFeedback";
@@ -22,6 +27,8 @@ export default function CriteriaTemplateStructureTable({
   editingGroupCode,
   onEditGroup,
   onCancelGroupEdit,
+  onAddGroup,
+  groupForm,
 }: {
   templateId: number;
   templateForType: string;
@@ -31,21 +38,20 @@ export default function CriteriaTemplateStructureTable({
   editingGroupCode?: string | null;
   onEditGroup?: (group: CriteriaTemplateGroupItem) => void;
   onCancelGroupEdit?: () => void;
+  onAddGroup?: () => void;
+  groupForm?: ReactNode;
 }) {
   const isOfficer = templateForType === "officer";
   const [editingItem, setEditingItem] =
     useState<CriteriaTemplateCriteriaItem | null>(null);
+  const [addingGroupCode, setAddingGroupCode] = useState<string | null>(null);
   const [deletePending, startDeleteTransition] = useTransition();
+  const { confirm, modal } = useConfirmation();
   const [feedback, setFeedback] = useState({ message: "", ok: false });
 
   async function handleDeleteGroup(group: CriteriaTemplateGroupItem) {
-    const confirmed = window.confirm(
-      `Xóa tiêu chuẩn ${group.code}? Các tiêu chí con cũng sẽ bị xóa.`
-    );
-
-    if (!confirmed) return;
-    const reason=window.prompt("Nhập lý do xóa (tối thiểu 10 ký tự):")?.trim()??"";
-    if(reason.length<10){setFeedback({message:"Vui lòng nhập lý do xóa cụ thể, tối thiểu 10 ký tự.",ok:false});return;}
+    const reason = await confirm({ title: 'Xác nhận xóa', message: `Xóa tiêu chuẩn ${group.code}? Các tiêu chí con cũng sẽ bị xóa.`, confirmLabel: 'Xác nhận xóa', requireReason: true });
+    if (reason === null) return;
     const formData=new FormData();formData.set("reason",reason);
 
     startDeleteTransition(async () => {
@@ -60,10 +66,8 @@ export default function CriteriaTemplateStructureTable({
   }
 
   async function handleDeleteItem(item: CriteriaTemplateCriteriaItem) {
-    const confirmed = window.confirm(`Xóa tiêu chí ${item.code}?`);
-    if (!confirmed) return;
-    const reason=window.prompt("Nhập lý do xóa (tối thiểu 10 ký tự):")?.trim()??"";
-    if(reason.length<10){setFeedback({message:"Vui lòng nhập lý do xóa cụ thể, tối thiểu 10 ký tự.",ok:false});return;}
+    const reason = await confirm({ title: 'Xác nhận xóa', message: `Xóa tiêu chí ${item.code}?`, confirmLabel: 'Xác nhận xóa', requireReason: true });
+    if (reason === null) return;
     const formData=new FormData();formData.set("reason",reason);
 
     startDeleteTransition(async () => {
@@ -78,13 +82,18 @@ export default function CriteriaTemplateStructureTable({
   }
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      {modal}
       <ActionFeedback pending={deletePending} message={feedback.message} ok={feedback.ok} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-xl font-semibold text-slate-900">
         Cấu trúc tiêu chuẩn / tiêu chí
       </h2>
+      <button type="button" onClick={onAddGroup} className="shrink-0 rounded-xl bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800">Thêm tiêu chuẩn</button>
+      </div>
+      {groupForm ? <div className="mt-5">{groupForm}</div> : null}
 
-      <div className="mt-5 space-y-5">
+      <CriteriaGroupsPagination totalGroups={groups.length} className="mt-5">
         {groups.length > 0 ? (
           groups.map((group) => {
             const groupCriteria = criteria.filter(
@@ -99,13 +108,9 @@ export default function CriteriaTemplateStructureTable({
             return (
               <div
                 key={group.id}
-                className={`overflow-hidden rounded-2xl border ${
-                  isEditingGroup
-                    ? "border-amber-300 bg-amber-50/40"
-                    : "border-slate-200"
-                }`}
+                className="min-w-0 space-y-3"
               >
-                <div className="bg-slate-50 px-5 py-4">
+                <div className={isEditingGroup ? "border-l-4 border-amber-500 bg-amber-50 px-4 py-3" : "border-l-4 border-blue-700 bg-blue-50 px-4 py-3"}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="text-base font-semibold text-slate-900">
@@ -118,9 +123,15 @@ export default function CriteriaTemplateStructureTable({
 
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-                        Tối thiểu {group.minRequired}/{groupCriteria.length} tiêu chí
+                        Yêu cầu: Đạt tối thiểu {Math.max(group.minRequired,groupCriteria.filter(item=>item.isRequired).length)}/{groupCriteria.length} tiêu chí
                       </span>
+                      {isOfficer ? (
+                        <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-100">
+                          Tối đa {group.scoreMax} điểm
+                        </span>
+                      ) : null}
 
+                      <button type="button" aria-expanded={addingGroupCode === group.code && !groupEditingItem} onClick={() => { setEditingItem(null); setAddingGroupCode(group.code); }} className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50">Thêm tiêu chí</button>
                       <button
                         type="button"
                         onClick={() => onEditGroup?.(group)}
@@ -140,37 +151,44 @@ export default function CriteriaTemplateStructureTable({
                   </div>
                 </div>
 
-                <div className="p-5">
-                  <CriteriaInlineItemCreateForm
+                <div className="min-w-0 w-full">
+                  {addingGroupCode === group.code || groupEditingItem ? <CriteriaInlineItemCreateForm
                     key={`${group.code}:${groupEditingItem?.code ?? "create"}`}
                     templateId={templateId}
                     templateForType={templateForType}
                     groupCode={group.code}
                     activities={activities}
                     editingItem={groupEditingItem}
-                    onCancelEdit={() => setEditingItem(null)}
-                    onSaved={() => setEditingItem(null)}
-                  />
+                    onCancelEdit={() => { setEditingItem(null); setAddingGroupCode(null); }}
+                    onSaved={() => { setEditingItem(null); setAddingGroupCode(null); setFeedback({message: "Đã lưu tiêu chí.", ok: true}); }}
+                  /> : null}
 
-                  <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-                    <table className="min-w-full table-fixed divide-y divide-slate-200">
+                  <CriteriaTable className="min-w-full table-fixed divide-y divide-slate-200" containerClassName={`${addingGroupCode === group.code || groupEditingItem ? "mt-5 " : ""}overflow-hidden rounded-none! border border-slate-200`}>
+                      <colgroup>
+                        <col style={{ width: "8%" }} />
+                        <col style={{ width: isOfficer ? "24%" : "30%" }} />
+                        <col style={{ width: isOfficer ? "12%" : "14%" }} />
+                        {isOfficer ? <col style={{ width: "12%" }} /> : null}
+                        <col style={{ width: isOfficer ? "32%" : "36%" }} />
+                        <col style={{ width: "12%" }} />
+                      </colgroup>
                       <thead className="bg-slate-50">
                         <tr>
-                          <th className="w-[9%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+                          <th className="w-[8%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                             Mã
                           </th>
-                          <th className="w-[28%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+                          <th className={`${isOfficer ? "w-[24%]" : "w-[30%]"} px-4 py-3 text-left text-sm font-semibold text-slate-700`}>
                             Tiêu chí
                           </th>
                           <th className="w-[12%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                             Bắt buộc
                           </th>
                           {isOfficer ? (
-                            <th className="w-[8%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+                            <th className="w-[12%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                               Điểm
                             </th>
                           ) : null}
-                          <th className="w-[31%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+                          <th className={`${isOfficer ? "w-[32%]" : "w-[36%]"} px-4 py-3 text-left text-sm font-semibold text-slate-700`}>
                             Hoạt động đáp ứng
                           </th>
                           <th className="w-[12%] px-4 py-3 text-center text-sm font-semibold text-slate-700">
@@ -234,7 +252,7 @@ export default function CriteriaTemplateStructureTable({
                                 <div className="flex justify-center gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => setEditingItem(item)}
+                                    onClick={() => { setAddingGroupCode(null); setEditingItem(item); }}
                                     className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                                   >
                                     Sửa
@@ -262,18 +280,17 @@ export default function CriteriaTemplateStructureTable({
                           </tr>
                         )}
                       </tbody>
-                    </table>
-                  </div>
+                    </CriteriaTable>
                 </div>
               </div>
             );
           })
         ) : (
-          <div className="rounded-xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
+          <div className="rounded-2xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-500 shadow-md shadow-slate-200/60">
             Chưa có tiêu chuẩn nào. Hãy thêm tiêu chuẩn trước.
           </div>
         )}
-      </div>
+      </CriteriaGroupsPagination>
     </section>
   );
 }

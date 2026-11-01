@@ -1,4 +1,6 @@
 "use client";
+import RequiredMark from "@/components/common/RequiredMark";
+
 
 import { useActionState } from "react";
 import { scanActivityQr } from "@/server/actions/activities/scanActivityQr";
@@ -31,7 +33,7 @@ async function scanAction(
     const result = await scanActivityQr(activityId, mssv, "manual");
 
     return {
-      ok: true,
+      ok: result.ok,
       message: result.message,
       nonce: Date.now(),
     };
@@ -52,11 +54,11 @@ export default function FacultyOfficerManualScanForm({
   const [state, formAction, pending] = useActionState(scanAction, initialState);
 
   return (
-    <form action={formAction} className="space-y-6">
-      <ActionFeedback pending={pending} message={state.message} ok={state.ok} />
+    <form action={formAction} className="w-full space-y-6">
+      <ActionFeedback colored pending={pending} message={state.message} ok={state.ok} />
       <input type="hidden" name="activityId" value={activityId} />
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+      <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
         <div className="flex items-center gap-3">
           <div>
             <h2 className="text-xl font-semibold text-slate-900">
@@ -69,17 +71,17 @@ export default function FacultyOfficerManualScanForm({
         </div>
 
         <div className="mt-5 flex flex-col gap-4 md:flex-row">
-          <input
+          <label className="required-field-control min-w-0 flex-1"><span className="mb-2 block text-sm font-medium text-slate-600">Thông tin bắt buộc<RequiredMark required={true}/></span><input
             name="mssv"
             placeholder="Nhập MSSV, ví dụ: 21110003"
             className="h-11 flex-1 rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-blue-500"
             required
-          />
+          /></label>
 
           <button
             type="submit"
             disabled={pending}
-            className="h-11 whitespace-nowrap rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60"
+            className="min-h-11 h-auto whitespace-normal rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60 py-2 max-w-full break-words"
           >
             {pending ? "Đang điểm danh..." : "Điểm danh"}
           </button>

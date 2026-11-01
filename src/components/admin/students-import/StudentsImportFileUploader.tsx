@@ -1,335 +1,95 @@
 "use client";
+import RequiredMark from "@/components/common/RequiredMark";
 
-import { useRef, useState } from "react";
-import Link from "next/link";
-import * as XLSX from "xlsx";
-import ActionFeedback from "@/components/shared/ActionFeedback";
-import {
-  AlertCircle,
-  CheckCircle2,
-  Download,
-  FileUp,
-} from "lucide-react";
-
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { AlertCircle, CheckCircle2, Download, FileUp, LoaderCircle } from "lucide-react";
 import StudentsImportPreviewTable from "./StudentsImportPreviewTable";
-import type { ParsedImportStudentRow } from "./types";
+import ActionFeedback from "@/components/shared/ActionFeedback";
+import StudentsImportValidationSummary from "./StudentsImportValidationSummary";
+import StudentsImportValidationTable from "./StudentsImportValidationTable";
+import { parseStudentsUpload } from "./parseStudentsUpload";
+import type { ImportPreviewResult, ParsedImportStudentRow } from "./types";
 
-type PreviewRow = Record<string, string>;
-
-const SUPPORTED_HEADERS = [
-  "mssv",
-  "full_name",
-  "last_name",
-  "first_name",
-  "email",
-  "phone",
-  "gender",
-  "date_of_birth",
-  "class_code",
-];
-
-type BuildPreviewResult = {
-  headers: string[];
-  rows: PreviewRow[];
-  parsedRows: ParsedImportStudentRow[];
-};
-
-function normalizeHeader(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, "_");
-}
-
-function detectDelimiter(text: string) {
-  const firstLine = text.split(/\r?\n/).find((line) => line.trim()) ?? "";
-  const delimiters = [",", ";", "\t"];
-
-  return delimiters
-    .map((delimiter) => ({
-      delimiter,
-      score: firstLine.split(delimiter).length,
-    }))
-    .sort((a, b) => b.score - a.score)[0].delimiter;
-}
-
-function getValue(row: Record<string, unknown>, key: string) {
-  const normalizedKey = normalizeHeader(key);
-
-  const foundKey = Object.keys(row).find(
-    (item) => normalizeHeader(item) === normalizedKey
-  );
-
-  if (!foundKey) return "";
-
-  return String(row[foundKey] ?? "").trim();
-}
-
-function buildPreview(rows: Record<string, unknown>[]): BuildPreviewResult {
-  if (rows.length === 0) {
-    return {
-      headers: [],
-      rows: [],
-      parsedRows: [],
-    };
-  }
-
-  const headers = Object.keys(rows[0]).map(String);
-
-  const previewRows: PreviewRow[] = rows.slice(0, 5).map((row) => {
-    const item: PreviewRow = {};
-
-    headers.forEach((header) => {
-      item[header] = String(row[header] ?? "").trim();
-    });
-
-    return item;
-  });
-
-  const parsedRows: ParsedImportStudentRow[] = rows.map(
-    (row, index): ParsedImportStudentRow => {
-      const fullName =
-        getValue(row, "full_name") ||
-        [getValue(row, "last_name"), getValue(row, "first_name")]
-          .filter(Boolean)
-          .join(" ")
-          .trim();
-
-      return {
-        rowNumber: index + 2,
-        mssv: getValue(row, "mssv"),
-        full_name: fullName,
-        email: getValue(row, "email") || null,
-        phone: getValue(row, "phone") || null,
-        gender: getValue(row, "gender") || null,
-        date_of_birth: getValue(row, "date_of_birth") || null,
-      };
-    }
-  );
-
-  return {
-    headers,
-    rows: previewRows,
-    parsedRows,
-  };
-}
-
-async function parseSpreadsheet(file: File): Promise<BuildPreviewResult> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const fileName = file.name.toLowerCase();
-
-  let workbook: XLSX.WorkBook;
-
-  if (fileName.endsWith(".csv")) {
-    const text = buffer.toString("utf8").replace(/^\uFEFF/, "");
-
-    workbook = XLSX.read(text, {
-      type: "string",
-      raw: false,
-      FS: detectDelimiter(text),
-    });
-  } else if (fileName.endsWith(".xls") || fileName.endsWith(".xlsx")) {
-    workbook = XLSX.read(buffer, {
-      type: "buffer",
-      raw: false,
-    });
-  } else {
-    throw new Error("Chỉ hỗ trợ file CSV, XLS hoặc XLSX.");
-  }
-
-  const sheetName = workbook.SheetNames[0];
-
-  if (!sheetName) {
-    throw new Error("File không có sheet dữ liệu.");
-  }
-
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-    workbook.Sheets[sheetName],
-    {
-      defval: "",
-      raw: false,
-    }
-  );
-
-  return buildPreview(rows);
-}
-
-export default function StudentsImportFileUploader({
-  onParsedRowsChange,
-}: {
+export default function StudentsImportFileUploader({ onParsedRowsChange, validationPreview, checking, disabled, actions, warningMessage }: {
   onParsedRowsChange: (rows: ParsedImportStudentRow[]) => void;
+  validationPreview: ImportPreviewResult | null;
+  checking: boolean;
+  disabled: boolean;
+  actions: ReactNode;
+  warningMessage: string;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-
+  const resultsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!validationPreview || checking) return;
+    const frame = requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    return () => cancelAnimationFrame(frame);
+  }, [validationPreview, checking]);
+  const selectionRef = useRef(0);
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<PreviewRow[]>([]);
+  const [rows, setRows] = useState<string[][]>([]);
   const [error, setError] = useState("");
-  const [supportedHeaders, setSupportedHeaders] = useState<string[]>([]);
-  const [extraHeaders, setExtraHeaders] = useState<string[]>([]);
   const [parsing, setParsing] = useState(false);
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    setParsing(true);
     const file = event.target.files?.[0];
-
+    const selection = ++selectionRef.current;
     setFileName(file?.name ?? "");
-    setError("");
-    setHeaders([]);
-    setRows([]);
-    setSupportedHeaders([]);
-    setExtraHeaders([]);
+    setError(""); setHeaders([]); setRows([]);
     onParsedRowsChange([]);
-
-    if (!file) {
-      setParsing(false);
-      return;
-    }
-
+    setParsing(Boolean(file));
+    if (!file) return;
     try {
-      const preview = await parseSpreadsheet(file);
-
-      if (!preview.headers.length) {
-        setError("File không có dữ liệu hợp lệ.");
-        return;
-      }
-
-      const normalizedHeaders = preview.headers.map(normalizeHeader);
-
-      const hasMssv = normalizedHeaders.includes("mssv");
-      const hasFullName = normalizedHeaders.includes("full_name");
-      const hasSplitName =
-        normalizedHeaders.includes("last_name") &&
-        normalizedHeaders.includes("first_name");
-
-      const supported = normalizedHeaders.filter((header) =>
-        SUPPORTED_HEADERS.includes(header)
-      );
-
-      const extra = normalizedHeaders.filter(
-        (header) => !SUPPORTED_HEADERS.includes(header)
-      );
-
-      setHeaders(preview.headers);
-      setRows(preview.rows);
-      setSupportedHeaders(supported);
-      setExtraHeaders(extra);
-
-      if (!hasMssv || (!hasFullName && !hasSplitName)) {
-        setError(
-          "File cần có mssv và full_name hoặc mssv và last_name + first_name."
-        );
-        return;
-      }
-
-      const invalidNameRows = preview.parsedRows.filter(
-        (item) => !item.mssv || !item.full_name
-      );
-
-      if (invalidNameRows.length > 0) {
-        setError(
-          `Có ${invalidNameRows.length} dòng thiếu MSSV hoặc họ tên. Vui lòng kiểm tra lại file.`
-        );
-        return;
-      }
-
-      onParsedRowsChange(preview.parsedRows);
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Không thể đọc file."
-      );
+      const preview = await parseStudentsUpload(file);
+      if (selection !== selectionRef.current) return;
+      setHeaders(preview.headers); setRows(preview.rows); setError(preview.error);
+      if (!preview.error) onParsedRowsChange(preview.parsedRows);
+    } catch (caught) {
+      if (selection !== selectionRef.current) return;
+      setError(caught instanceof Error ? caught.message : "Không thể đọc file.");
     } finally {
-      setParsing(false);
+      if (selection === selectionRef.current) setParsing(false);
     }
   }
 
-  const isValid = Boolean(fileName && !error);
+  const isValid = Boolean(fileName && !parsing && !error && rows.length);
 
   return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <ActionFeedback pending={parsing} message={error} ok={false} />
+    <section className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <ActionFeedback pending={parsing} message={error} />
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">
-            Upload file sinh viên
-          </h2>
-
-        </div>
-
-        <Link
-          href="/templates/mau-import-sinh-vien.csv"
-          className="inline-flex items-center gap-2 rounded-xl bg-amber-300 px-4 py-2 text-sm font-medium text-amber-950 transition hover:bg-amber-200"
-        >
-          <Download size={16} />
-          Tải file mẫu
-        </Link>
+        <h2 className="text-lg font-semibold text-slate-900">Upload file sinh viên<RequiredMark/></h2>
+        <a href="/templates/mau-import-sinh-vien.xlsx?v=20261017-ddmmyyyy" download="mau-import-sinh-vien.xlsx" className="inline-flex items-center gap-2 rounded-xl bg-amber-300 px-4 py-2 text-sm font-medium text-amber-950 transition hover:bg-amber-200">
+          <Download size={16} />Tải file mẫu
+        </a>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
-        >
-          <FileUp size={16} />
-          Chọn file
+        <button type="button" disabled={disabled} onClick={() => inputRef.current?.click()} className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">
+          <FileUp size={16} />Chọn file
         </button>
-
-        <div className="min-w-65 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 shadow-md shadow-slate-200/60">
+          <span className="min-w-0 truncate font-medium">{fileName || "Chưa chọn file"}</span>
           {fileName ? (
-            <span className="block truncate font-medium">{fileName}</span>
-          ) : (
-            <span className="text-slate-400">Chưa chọn file</span>
-          )}
+            <span role="status" className={`inline-flex items-center gap-1.5 text-xs font-semibold ${parsing ? "text-slate-500" : isValid ? "text-emerald-700" : "text-rose-700"}`}>
+              {parsing ? <LoaderCircle size={16} className="animate-spin" /> : isValid ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              {parsing ? "Đang đọc file..." : isValid ? "File hợp lệ để kiểm tra" : "File chưa hợp lệ"}
+            </span>
+          ) : null}
         </div>
       </div>
+      <input ref={inputRef} type="file" name="file" accept=".csv,.xls,.xlsx" disabled={disabled} className="hidden" onChange={handleFileChange} />
 
-      <input
-        ref={inputRef}
-        type="file"
-        name="file"
-        accept=".csv,.xls,.xlsx"
-        className="hidden"
-        onChange={handleFileChange}
-      />
-
-      <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-blue-800 ring-1 ring-slate-200">
-        Mật khẩu mặc định cho tài khoản mới là{" "}
-        <span className="font-semibold">1111</span>.
+      <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-blue-800 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
+        Mật khẩu mặc định cho tài khoản mới là <span className="font-semibold">1111</span>.
       </div>
 
-      {fileName ? (
-        <div
-          className={`mt-4 rounded-xl px-4 py-3 text-sm ring-1 ${
-            isValid
-              ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-              : "bg-rose-50 text-rose-700 ring-rose-100"
-          }`}
-        >
-          <div className="flex items-start gap-2">
-            {isValid ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-
-            <div>
-              <div className="font-semibold">
-                {isValid ? "File hợp lệ để kiểm tra" : "File chưa hợp lệ"}
-              </div>
-
-              {error ? <div className="mt-1">{error}</div> : null}
-
-              {!error && supportedHeaders.length > 0 ? (
-                <div className="mt-1">
-                  Cột nhận diện được: {supportedHeaders.join(", ")}
-                </div>
-              ) : null}
-
-              {!error && extraHeaders.length > 0 ? (
-                <div className="mt-1">
-                  Cột dư sẽ bị bỏ qua: {extraHeaders.join(", ")}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <StudentsImportPreviewTable headers={headers} rows={rows} />
+      {validationPreview && !checking ? <div ref={resultsRef} className="mt-5 scroll-mt-4"><StudentsImportValidationSummary preview={validationPreview} warningMessage={warningMessage} /></div> : null}
+      {checking ? <div role="status" className="mt-5 flex items-center gap-2 text-sm text-slate-500"><LoaderCircle size={16} className="animate-spin" />Đang kiểm tra dữ liệu...</div> : validationPreview ? (
+        <StudentsImportValidationTable preview={validationPreview} />
+      ) : <StudentsImportPreviewTable headers={headers} rows={rows} />}
+      <div className="mt-5">{actions}</div>
     </section>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
+import RequiredMark from "@/components/common/RequiredMark";
 
-import { useActionState, useEffect, useRef } from "react";
+
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import ActionFeedback from "@/components/shared/ActionFeedback";
@@ -11,7 +13,7 @@ type State = {
   ok: boolean;
   message: string;
   revision: number;
-  field?: "title" | "type" | "startAt" | "endAt" | "templateId" | "status";
+  field?: "title" | "type" | "startAt" | "endAt" | "templateId" | "status" | "scoreMax";
   values?: Record<string, string | boolean>;
 };
 
@@ -27,6 +29,7 @@ export default function EventCreateForm({
   templates: AdminCriteriaTemplateOption[];
 }) {
   const router = useRouter();
+  const [selectedType, setSelectedType] = useState("student");
   const nowForInput = new Date().toISOString().slice(0, 16);
 
   async function action(prev: State, formData: FormData): Promise<State> {
@@ -38,7 +41,7 @@ export default function EventCreateForm({
       endAt: String(formData.get("endAt") ?? ""),
       templateId: String(formData.get("templateId") ?? ""),
       status: String(formData.get("status") ?? "draft"),
-      allowLate: formData.get("allowLate") === "on",
+      scoreMax: String(formData.get("scoreMax") ?? ""),
     };
 
     try {
@@ -84,14 +87,14 @@ export default function EventCreateForm({
   }, [router, state.message, state.ok]);
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <form key={state.revision} ref={formRef} action={formAction} className="space-y-5">
         <ActionFeedback pending={pending} message={state.ok ? "" : state.message} ok={false} />
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Tên đợt xét
-            </label>
+            <RequiredMark required={true}/></label>
             <input
               name="title"
               required
@@ -105,18 +108,26 @@ export default function EventCreateForm({
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Đối tượng
-            </label>
-            <select
+            <RequiredMark/></label>
+            <select required
               name="type"
               defaultValue={String(state.values?.type ?? "student")}
+              onChange={(event) => setSelectedType(event.target.value)}
               aria-invalid={state.field === "type"}
               className={`h-11 w-full rounded-xl border bg-white px-4 text-sm outline-none transition focus:border-blue-500 ${state.field === "type" ? "border-rose-500 ring-3 ring-rose-100" : "border-slate-200"}`}
             >
               <option value="student">Sinh viên</option>
-              <option value="officer">Cán bộ đoàn</option>
+              <option value="officer">Cán bộ</option>
             </select>
           </div>
         </div>
+
+        {selectedType === "officer" ? (
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-600">Điểm tối đa<RequiredMark required={true}/></label>
+            <input name="scoreMax" type="number" min="0.5" step="0.5" required defaultValue={String(state.values?.scoreMax ?? "100")} aria-invalid={state.field === "scoreMax"} className={`h-11 w-full rounded-xl border bg-white px-4 text-sm outline-none transition focus:border-blue-500 ${state.field === "scoreMax" ? "border-rose-500 ring-3 ring-rose-100" : "border-slate-200"}`} />
+          </div>
+        ) : <input type="hidden" name="scoreMax" value="0" />}
 
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600">
@@ -135,7 +146,7 @@ export default function EventCreateForm({
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Thời gian mở nộp
-            </label>
+            <RequiredMark required={true}/></label>
             <input
               type="datetime-local"
               name="startAt"
@@ -150,7 +161,7 @@ export default function EventCreateForm({
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Thời gian đóng nộp
-            </label>
+            <RequiredMark required={true}/></label>
             <input
               type="datetime-local"
               name="endAt"
@@ -167,7 +178,7 @@ export default function EventCreateForm({
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Mẫu tiêu chuẩn
-            </label>
+            <RequiredMark required={true}/></label>
             <select
               name="templateId"
               required
@@ -178,7 +189,7 @@ export default function EventCreateForm({
               <option value="">Chọn mẫu tiêu chuẩn</option>
               {templates.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name} - {item.forType}
+                  {item.name} - {item.forType === "student" ? "SV" : "CB"}
                 </option>
               ))}
             </select>
@@ -187,8 +198,8 @@ export default function EventCreateForm({
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Trạng thái
-            </label>
-            <select
+            <RequiredMark/></label>
+            <select required
               name="status"
               defaultValue={String(state.values?.status ?? "draft")}
               aria-invalid={state.field === "status"}
@@ -199,21 +210,6 @@ export default function EventCreateForm({
             </select>
           </div>
         </div>
-
-        <label className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 ring-1 ring-slate-100">
-          <input
-            type="checkbox"
-            name="allowLate"
-            defaultChecked={Boolean(state.values?.allowLate)}
-            className="mt-1 h-4 w-4 rounded border-slate-300"
-          />
-          <span>
-            <span className="font-semibold">Cho phép nộp trễ</span>
-            <span className="mt-1 block text-slate-500">
-              Người dùng vẫn có thể tạo/hoàn thiện hồ sơ sau thời gian đóng nộp.
-            </span>
-          </span>
-        </label>
 
         <div className="flex justify-end">
           <button
@@ -234,6 +230,7 @@ function getErrorField(error: unknown): State["field"] {
   if (message.includes("đối tượng")) return "type";
   if (message.includes("mẫu tiêu chuẩn")) return "templateId";
   if (message.includes("trạng thái")) return "status";
+  if (message.includes("điểm tối đa")) return "scoreMax";
   if (message.includes("thời gian mở")) return "startAt";
   if (message.includes("thời gian đóng") || message.includes("sau thời gian mở")) return "endAt";
   if (message.includes("thời gian")) return "startAt";

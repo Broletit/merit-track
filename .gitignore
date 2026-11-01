@@ -1,4 +1,3 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
 /node_modules
@@ -15,6 +14,7 @@
 
 # next.js
 /.next/
+/.next-build/
 /out/
 
 # production
@@ -43,3 +43,14 @@ next-env.d.ts
 *.db
 *.sqlite
 *.sqlite3
+/uploads/
+/public/uploads/
+
+# Local scratch files and SQLite journals
+/tmp/
+*.db-*
+*.sqlite-*
+*.sqlite3-*
+
+/storage/
+!.env.example

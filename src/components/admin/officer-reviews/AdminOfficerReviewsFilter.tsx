@@ -1,4 +1,5 @@
 "use client";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
@@ -21,6 +22,7 @@ export default function AdminOfficerReviewsFilter({
 
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("cohort");
 
     if (value) params.set(key, value);
     else params.delete(key);
@@ -39,7 +41,7 @@ export default function AdminOfficerReviewsFilter({
   }, [keyword]);
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
       <div className="relative min-w-0">
         <Search
           size={16}
@@ -53,7 +55,6 @@ export default function AdminOfficerReviewsFilter({
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
       <select
         value={searchParams.get("eventId") ?? ""}
         onChange={(event) => updateParam("eventId", event.target.value)}
@@ -66,7 +67,6 @@ export default function AdminOfficerReviewsFilter({
           </option>
         ))}
       </select>
-
       <select
         value={searchParams.get("queue") ?? ""}
         onChange={(event) => updateParam("queue", event.target.value)}
@@ -77,7 +77,6 @@ export default function AdminOfficerReviewsFilter({
         <option value="waiting_update">Chờ cập nhật</option>
         <option value="overdue">Quá hạn duyệt</option>
       </select>
-
       <select
         value={searchParams.get("sort") ?? "priority"}
         onChange={(event) => updateParam("sort", event.target.value)}
@@ -87,7 +86,7 @@ export default function AdminOfficerReviewsFilter({
         <option value="latest">Mới cập nhật</option>
         <option value="oldest">Chờ lâu nhất</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }
 

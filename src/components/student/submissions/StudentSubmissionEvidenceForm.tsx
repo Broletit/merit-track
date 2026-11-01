@@ -1,4 +1,6 @@
 "use client";
+import RequiredMark from "@/components/common/RequiredMark";
+
 
 import { useActionState, useState, type ChangeEvent } from "react";
 import { Upload } from "lucide-react";
@@ -47,6 +49,8 @@ export default function StudentSubmissionEvidenceForm({
 }) {
   const router = useRouter();
   const [fileStates, setFileStates] = useState<FileState>({});
+  const [missingEvidence, setMissingEvidence] = useState<string[]>([]);
+  const [groupErrors, setGroupErrors] = useState<Record<string, string>>({});
 
   function handleFileChange(criteriaCode: string, event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
@@ -73,6 +77,7 @@ export default function StudentSubmissionEvidenceForm({
     }
 
     setFileStates((current) => ({ ...current, [criteriaCode]: { name: file.name, error: "" } }));
+    toast.success(`Tệp “${file.name}” hợp lệ và sẵn sàng tải lên.`, { id: `evidence-file-${criteriaCode}` });
   }
 
   async function saveAction(_prev: State, formData: FormData): Promise<State> {
@@ -81,6 +86,8 @@ export default function StudentSubmissionEvidenceForm({
     try {
       const result = await saveStudentSubmissionEvidence(submissionId, formData);
       setFileStates({});
+      setMissingEvidence([]);
+      setGroupErrors({});
       router.refresh();
       return { ok: true, message: result.message };
     } catch (error) {
@@ -94,6 +101,18 @@ export default function StudentSubmissionEvidenceForm({
   async function submitAction(): Promise<State> {
     try {
       const result = await submitStudentSubmission(submissionId);
+      if (!result.ok && "missingCriteria" in result) {
+        const missing = (result.missingCriteria ?? []).map(item => item.code);
+        const deficientGroups = result.deficientGroups ?? [];
+        setMissingEvidence(missing);
+        setGroupErrors(Object.fromEntries(deficientGroups.map(group => [group.code, `Cần có tệp minh chứng cho ít nhất ${group.required} tiêu chí; hiện có ${group.achieved}.`])));
+        const first = missing[0] || criteria.find(item => deficientGroups.some(group => group.code === item.groupCode) && !item.autoPassed && !item.fileName)?.code;
+        if (first) requestAnimationFrame(() => document.getElementById(`criterion-${first}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+        return { ok: false, message: "" };
+      }
+      setMissingEvidence([]);
+      setGroupErrors({});
+      router.refresh();
       return { ok: true, message: result.message };
     } catch (error) {
       return {
@@ -110,7 +129,6 @@ export default function StudentSubmissionEvidenceForm({
     try {
       const result = await requestSubmissionSupport(submissionId, formData);
       toast.success(result.message, { id: `submission-support-${submissionId}` });
-      router.push("/dashboard/student/events");
       router.refresh();
       return { ok: true, message: "" };
     } catch (error) {
@@ -140,10 +158,10 @@ export default function StudentSubmissionEvidenceForm({
     acc[key].push(item);
     return acc;
   }, {});
-  const evidenceNotNeeded=(item:CriteriaItem)=>!item.isRequired&&criteria.filter(candidate=>candidate.groupCode===item.groupCode&&candidate.autoPassed).length>=item.minRequired;
+  const evidenceNotNeeded=(item:CriteriaItem)=>!item.isRequired&&criteria.filter(candidate=>candidate.groupCode===item.groupCode&&candidate.autoPassed).length>=Math.max(item.minRequired,criteria.filter(candidate=>candidate.groupCode===item.groupCode&&candidate.isRequired).length);
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <ActionFeedback pending={saving} message={saveState.message} ok={saveState.ok} />
       <ActionFeedback pending={submitting} message={submitState.message} ok={submitState.ok} />
       <ActionFeedback pending={supporting} message={supportState.message} ok={supportState.ok} />
@@ -165,11 +183,12 @@ export default function StudentSubmissionEvidenceForm({
         {Object.entries(grouped).map(([groupTitle, items]) => (
             <div
               key={groupTitle}
-              className="overflow-hidden rounded-2xl border border-slate-200"
+              className="overflow-hidden rounded-none border border-slate-200"
             >            
-           <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-5 py-3 font-semibold text-slate-900">
+           {groupErrors[items[0]?.groupCode] && <p role="alert" className="bg-red-50 px-5 py-3 text-sm text-red-700">{groupErrors[items[0].groupCode]}</p>}
+           <div className="flex flex-wrap items-center justify-between gap-2 border-l-4 border-blue-700 bg-blue-50 px-5 py-3 font-semibold text-blue-950">
               <span>{groupTitle}</span>
-              <span className="text-xs font-semibold text-blue-700">Cần đạt tối thiểu {items[0]?.minRequired ?? 0}/{items.length} tiêu chí</span>
+              <span className="text-xs font-semibold text-blue-700">Yêu cầu: Đạt tối thiểu {Math.max(items[0]?.minRequired ?? 0,items.filter(item=>item.isRequired).length)}/{items.length} tiêu chí</span>
             </div>
 
             <div className="divide-y divide-slate-100">
@@ -178,7 +197,7 @@ export default function StudentSubmissionEvidenceForm({
                   <div className="flex justify-between items-start gap-3">
                     <div className="flex-1">
                       <div className="font-semibold text-sm">
-                        {item.code}. {item.title}
+                        {item.code}. {item.title}<RequiredMark required={item.isRequired && !item.autoPassed} />
                       </div>
                       <div className="text-sm text-slate-500 mt-1">
                         {item.description || "Chưa có mô tả"}
@@ -189,7 +208,7 @@ export default function StudentSubmissionEvidenceForm({
                       <AutoCriteriaBadge />
                     ) : evidenceNotNeeded(item) ? (
                       <span className="text-xs font-semibold text-slate-500">Không cần bổ sung</span>
-                    ) : item.fileName || item.contentText?.trim() ? (
+                    ) : item.fileName ? (
                       <span className="rounded bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
                         Đã nộp minh chứng
                       </span>
@@ -217,7 +236,7 @@ export default function StudentSubmissionEvidenceForm({
                       />
 
                       <div
-                        className={`rounded-xl border p-3 ${
+                        className={`rounded-none border p-3 ${
                           fileStates[item.code]?.error
                             ? "border-red-500 bg-red-50"
                             : fileStates[item.code]?.name
@@ -244,7 +263,8 @@ export default function StudentSubmissionEvidenceForm({
                             accept=".pdf,.png,application/pdf,image/png"
                             className="hidden"
                             disabled={!canEdit || evidenceNotNeeded(item)}
-                            aria-invalid={Boolean(fileStates[item.code]?.error)}
+                            aria-invalid={Boolean(fileStates[item.code]?.error) || missingEvidence.includes(item.code)}
+                            aria-describedby={missingEvidence.includes(item.code) ? `evidence-error-${item.code}` : undefined}
                             onChange={(event) => handleFileChange(item.code, event)}
                           />
                         </label>
@@ -256,6 +276,7 @@ export default function StudentSubmissionEvidenceForm({
                           </span>
                         </div>
                         </div>
+                        {missingEvidence.includes(item.code) && <p id={`evidence-error-${item.code}`} role="alert" className="mt-2 text-xs font-medium text-red-700">Vui lòng tải và lưu tệp minh chứng bắt buộc trước khi hoàn tất hồ sơ.</p>}
                         {fileStates[item.code]?.error ? (
                           <p className="mt-2 text-xs font-medium text-red-700">
                             {fileStates[item.code].error}
@@ -286,8 +307,8 @@ export default function StudentSubmissionEvidenceForm({
 
       </form>
 
-      <div className="mt-5 grid gap-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 lg:grid-cols-[1fr_auto]">
-      <form action={supportFormAction} className="flex flex-col gap-3 sm:flex-row"><textarea name="supportNote" required minLength={10} placeholder="Mô tả tiêu chí hoặc minh chứng bạn cần khoa hỗ trợ..." className="min-h-20 flex-1 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500"/><button disabled={!canEdit||supporting} className="self-end rounded-xl border border-amber-500 bg-white px-4 py-2.5 text-sm font-semibold text-amber-800 disabled:opacity-60">{supporting?"Đang gửi...":"Cần hỗ trợ"}</button></form>
+      <div className="mt-5 grid gap-4 rounded-none border border-amber-200 bg-amber-50/60 p-4 lg:grid-cols-[1fr_auto] shadow-md shadow-slate-200/60">
+      <form action={supportFormAction} className="flex flex-col items-start gap-3 sm:flex-row"><label className="required-field-control w-full min-w-0 flex-1"><span className="mb-2 block text-sm font-medium text-slate-600">Nội dung cần hỗ trợ<RequiredMark required={true}/></span><textarea name="supportNote" required minLength={10} placeholder="Mô tả tiêu chí hoặc minh chứng bạn cần khoa hỗ trợ..." className="min-h-20 flex-1 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500"/></label><button disabled={!canEdit||supporting} className="shrink-0 self-end sm:self-start sm:mt-7 rounded-xl border border-amber-500 bg-white px-4 py-2.5 text-sm font-semibold text-amber-800 disabled:opacity-60">{supporting?"Đang gửi...":"Cần hỗ trợ"}</button></form>
       <form action={submitFormAction} className="flex items-end justify-end">
         <button
           disabled={!canEdit || submitting}

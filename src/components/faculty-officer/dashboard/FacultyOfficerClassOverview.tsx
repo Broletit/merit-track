@@ -10,7 +10,7 @@ export default function FacultyOfficerClassOverview({
   classes: FacultyOfficerClassItem[];
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="min-w-0 rounded-3xl bg-linear-to-br from-white via-blue-50 to-sky-100 p-6 shadow-md ring-1 ring-blue-100 transition-all duration-200 motion-safe:hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-100/60">
       <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
         Phạm vi lớp phụ trách
       </h2>
@@ -20,7 +20,7 @@ export default function FacultyOfficerClassOverview({
           classes.map((item) => (
             <div
               key={item.id}
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-md shadow-slate-200/60"
             >
               <div className="text-sm font-medium text-slate-500">{item.code}</div>
               <div className="mt-2 text-lg font-semibold text-slate-900">
@@ -29,7 +29,7 @@ export default function FacultyOfficerClassOverview({
             </div>
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-500">
+          <div className="rounded-none border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-500">
             Chưa có lớp nào được phân công.
           </div>
         )}

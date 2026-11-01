@@ -1,6 +1,7 @@
+import NumberedTable from "@/components/common/NumberedTable";
 import Link from "next/link";
 import { requireClassOfficerContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import ReviewPagination from "@/components/shared/reviews/ReviewPagination";
 import ClassEventsFilter from "@/components/class-officer/events/ClassEventsFilter";
@@ -9,7 +10,7 @@ import { getEventSubmissionPhaseFilter } from "@/server/events/eventSubmissionPh
 import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
 import { getAcademicTermForView, getAcademicTermsForSelect } from "@/server/academic-terms/getAcademicTermForView";
 
-type SearchParams = Promise<{
+type SearchParams = Promise<{ cohort?: string;
   keyword?: string;
   status?: string;
   phase?: string;
@@ -41,20 +42,16 @@ export default async function ClassOfficerEventsPage({
 }) {
   const user = await requireClassOfficerContext();
   const params = await searchParams;
-  const db = getDb();
-  const terms = getAcademicTermsForSelect();
-  const selectedTerm = getAcademicTermForView(params.termId);
+  const db = getDatabase();
+  const terms = (await getAcademicTermsForSelect());
+  const selectedTerm = (await getAcademicTermForView(params.termId));
 
-  const officerClass = db
-    .prepare(
-      `
+  const officerClass = (await db.first(`
       SELECT class_id
       FROM class_members
       WHERE user_id = ?
       LIMIT 1
-      `
-    )
-    .get(user.id) as { class_id: number } | undefined;
+      `, [user.id])) as { class_id: number } | undefined;
 
   if (!officerClass) {
     throw new Error("Tài khoản cán bộ lớp chưa được gán lớp.");
@@ -76,8 +73,8 @@ export default async function ClassOfficerEventsPage({
   const values: unknown[] = [selectedTerm.id, officerClass.class_id];
 
   if (keyword) {
-    where.push("(e.title LIKE ? OR e.description LIKE ?)");
-    values.push(`%${keyword}%`, `%${keyword}%`);
+    where.push("e.title LIKE ?");
+    values.push(`%${keyword}%`);
   }
 
   if (status) {
@@ -98,19 +95,13 @@ export default async function ClassOfficerEventsPage({
 
   const whereSql = `WHERE ${where.join(" AND ")}`;
 
-  const total = db
-    .prepare(
-      `
+  const total = (await db.first(`
       SELECT COUNT(*) AS total
       FROM events e
       ${whereSql}
-      `
-    )
-    .get(...values) as { total: number };
+      `, [...values])) as { total: number };
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         e.id,
         e.title,
@@ -123,7 +114,7 @@ export default async function ClassOfficerEventsPage({
           FROM submissions s
           WHERE s.event_id = e.id
             AND s.class_id = ?
-            AND s.status <> 'draft'
+            AND s.submitted_at IS NOT NULL
         ) AS total_submissions,
         (
           SELECT COUNT(*)
@@ -162,48 +153,37 @@ export default async function ClassOfficerEventsPage({
         ) AS failed
       FROM events e
       ${whereSql}
-      ORDER BY datetime(e.start_at) DESC, e.id DESC
+      ORDER BY CAST(e.start_at AS DATETIME(3)) DESC, e.id DESC
       LIMIT ?
       OFFSET ?
-      `
-    )
-    .all(
-      officerClass.class_id,
-      officerClass.class_id,
-      officerClass.class_id,
-      officerClass.class_id,
-      officerClass.class_id,
-      officerClass.class_id,
-      ...values,
-      PAGE_SIZE,
-      offset
-    ) as Row[];
+      `, [officerClass.class_id, officerClass.class_id, officerClass.class_id, officerClass.class_id, officerClass.class_id, officerClass.class_id, ...values, PAGE_SIZE, offset])) as Row[];
 
   const totalPages = Math.max(1, Math.ceil(Number(total.total ?? 0) / PAGE_SIZE));
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold">Đợt xét</h1>
           <AcademicTermSelect variant="header" terms={terms} selectedTermId={selectedTerm.id} />
         </div>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <h2 className="text-xl font-semibold text-slate-900">Danh sách đợt xét</h2>
-
-        <div className="mt-5">
+      <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+        <div>
           <ClassEventsFilter />
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-          <table className="min-w-full table-fixed divide-y divide-slate-200">
+      <h2 className="mt-5 text-xl font-semibold text-slate-900">Danh sách đợt xét</h2>
+
+        <div data-table-frame className="mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<div className="overflow-hidden rounded-none border border-slate-200">
+          <NumberedTable page={page} className="min-w-full table-fixed divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
                 <th className="w-[22%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Đợt xét</th>
                 <th className="w-[15%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Thời gian</th>
-                <th className="w-[17%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Nhận hồ sơ</th>
+                <th className="w-[17%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Trạng thái tiếp nhận</th>
                 <th className="w-[10%] px-4 py-3 text-center text-sm font-semibold text-slate-700">Tổng</th>
                 <th className="w-[10%] px-4 py-3 text-center text-sm font-semibold text-slate-700">Vòng 1</th>
                 <th className="w-[10%] px-4 py-3 text-center text-sm font-semibold text-slate-700">Vòng 2</th>
@@ -252,17 +232,17 @@ export default async function ClassOfficerEventsPage({
                 </tr>
               )}
             </tbody>
-          </table>
+          </NumberedTable>
         </div>
-
-        <div className="mt-5">
-          <ReviewPagination
+<div className="mt-5">
+          <ReviewPagination totalResults={Number(total.total ?? 0)} resultLabel="đợt xét"
             page={page}
             totalPages={totalPages}
             basePath="/dashboard/class-officer/events"
             searchParams={{ keyword, status, phase, termId: String(selectedTerm.id) }}
           />
         </div>
+</div>
       </section>
     </main>
   );

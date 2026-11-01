@@ -1,8 +1,9 @@
 "use client";
 
+import MissingEmailBadge from "./MissingEmailBadge";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { SidebarGroup as SidebarGroupType } from "./getSidebarItems";
 
 function isActiveItem(pathname: string, href: string) {
@@ -22,17 +23,18 @@ export default function SidebarGroup({
   group,
   pathname,
   collapsed = false,
+  emailMissing = false,
 }: {
   group: SidebarGroupType;
   pathname: string;
   collapsed?: boolean;
+  emailMissing?: boolean;
 }) {
   const hasActiveChild = useMemo(
     () => group.items.some((item) => isActiveItem(pathname, item.href)),
     [group.items, pathname]
   );
 
-  const [open, setOpen] = useState(hasActiveChild || group.label === "Tổng quan");
   const GroupIcon = group.icon;
 
   if (collapsed) {
@@ -47,14 +49,16 @@ export default function SidebarGroup({
               key={item.href}
               href={item.href}
               title={item.label}
+              aria-label={emailMissing&&item.href.endsWith("/profile")?`${item.label}: Cần cập nhật email khôi phục`:item.label}
               className={[
-                "mx-auto flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 ease-out hover:-translate-y-0.5 hover:scale-105",
+                "relative mx-auto flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 ease-out hover:-translate-y-0.5 hover:scale-105",
                 active
                   ? "bg-amber-300 text-blue-950 shadow-md shadow-amber-950/20"
                   : "text-blue-100 hover:bg-white/10 hover:text-amber-200",
               ].join(" ")}
             >
               <Icon size={18} />
+              {emailMissing&&item.href.endsWith("/profile")&&<MissingEmailBadge className="absolute -right-1 -top-1"/>}
             </Link>
           );
         })}
@@ -63,14 +67,10 @@ export default function SidebarGroup({
   }
 
   return (
-    <section className="space-y-1">
-      <button
-        type="button"
-        data-no-loading
-        aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
+    <details key={`${pathname}:${group.label}`} open={hasActiveChild || group.label === "Tổng quan"} className="sidebar-navigation-group group space-y-1">
+      <summary
         className={[
-          "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-all duration-200",
+          "flex w-full cursor-pointer list-none items-center justify-between rounded-xl px-3 py-2 text-left transition-all duration-200",
           hasActiveChild
             ? "text-white"
             : "text-blue-100 hover:bg-white/5 hover:pl-4 hover:text-amber-200",
@@ -79,15 +79,15 @@ export default function SidebarGroup({
         <span className="flex items-center gap-3">
           <GroupIcon size={17} />
           <span className="text-sm font-semibold">{group.label}</span>
+          {emailMissing&&group.items.some(item=>item.href.endsWith("/profile"))&&<MissingEmailBadge className="group-open:hidden"/>}
         </span>
 
         <ChevronDown
           size={15}
-          className={open ? "rotate-180 transition" : "transition"}
+          className="transition group-open:rotate-180"
         />
-      </button>
+      </summary>
 
-      {open ? (
         <div className="ml-3 space-y-1 border-l border-white/10 pl-3">
           {group.items.map((item) => {
             const active = isActiveItem(pathname, item.href);
@@ -106,11 +106,11 @@ export default function SidebarGroup({
               >
                 <Icon size={16} />
                 <span className="font-medium">{item.label}</span>
+                {emailMissing&&item.href.endsWith("/profile")&&<MissingEmailBadge/>}
               </Link>
             );
           })}
         </div>
-      ) : null}
-    </section>
+    </details>
   );
 }

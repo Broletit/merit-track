@@ -15,7 +15,7 @@ export default function CriteriaTemplateConfigureHeader({
   template: AdminCriteriaTemplateDetail;
 }) {
   return (
-    <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+    <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
@@ -33,7 +33,7 @@ export default function CriteriaTemplateConfigureHeader({
         <Link
           href="/dashboard/admin/criteria-templates"
           className={appUi.secondaryButton}
-        >
+         data-back-link>
           <ArrowLeft size={16} />
           <span className="ml-2">Quay về</span>
         </Link>

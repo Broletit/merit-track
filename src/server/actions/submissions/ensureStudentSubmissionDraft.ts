@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireStudentContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { assertEventAcceptsSubmissions } from "@/lib/events/eventSubmissionPhase";
 import { evaluateSubmissionAuto } from "@/server/events/evaluateSubmissionAuto";
 import {
@@ -29,24 +29,24 @@ type SubmissionRow = {
 
 export async function ensureStudentSubmissionDraft(eventId: number) {
   const user = await requireStudentContext();
-  const db = getDb();
+  const db = getDatabase();
 
-  const event = db
-    .prepare(
-      `
+  const event = (await db.first(`
       SELECT id, status, start_at, end_at, allow_late
       FROM events
       WHERE id = ?
         AND type = 'student'
         AND status = 'published'
       LIMIT 1
-      `
-    )
-    .get(eventId) as EventRow | undefined;
+      `, [eventId])) as EventRow | undefined;
 
   if (!event) {
     throw new Error("Đợt xét không tồn tại hoặc chưa được công khai.");
   }
+  const inScope = (await db.first(`SELECT 1 WHERE NOT EXISTS(SELECT 1 FROM event_scopes WHERE event_id=?)
+    OR EXISTS(SELECT 1 FROM event_scopes es JOIN class_members cm ON cm.class_id=es.class_id
+      WHERE es.event_id=? AND cm.user_id=? AND cm.left_at IS NULL)`, [eventId, eventId, user.id]));
+  if (!inScope) throw new Error("Bạn không thuộc phạm vi tham gia đợt xét này.");
 
   assertEventAcceptsSubmissions({
     status: event.status,
@@ -55,17 +55,13 @@ export async function ensureStudentSubmissionDraft(eventId: number) {
     allowLate: Number(event.allow_late ?? 0) === 1,
   });
 
-  const existed = db
-    .prepare(
-      `
+  const existed = (await db.first(`
       SELECT id, status
       FROM submissions
       WHERE event_id = ?
         AND user_id = ?
       LIMIT 1
-      `
-    )
-    .get(eventId, user.id) as SubmissionRow | undefined;
+      `, [eventId, user.id])) as SubmissionRow | undefined;
 
   if (existed) {
     if (!canEditSubmission(existed.status)) {
@@ -74,7 +70,7 @@ export async function ensureStudentSubmissionDraft(eventId: number) {
       );
     }
 
-    evaluateSubmissionAuto(Number(existed.id));
+    (await evaluateSubmissionAuto(Number(existed.id)));
 
     return {
       id: Number(existed.id),
@@ -82,25 +78,20 @@ export async function ensureStudentSubmissionDraft(eventId: number) {
     };
   }
 
-  const classRow = db
-    .prepare(
-      `
+  const classRow = (await db.first(`
       SELECT class_id
       FROM class_members
       WHERE user_id = ?
+        AND left_at IS NULL
       ORDER BY joined_at DESC, id DESC
       LIMIT 1
-      `
-    )
-    .get(user.id) as ClassRow | undefined;
+      `, [user.id])) as ClassRow | undefined;
 
   if (!classRow) {
     throw new Error("Tài khoản chưa được gán lớp.");
   }
 
-  const result = db
-    .prepare(
-      `
+  const result = (await db.execute(`
       INSERT INTO submissions (
         event_id,
         user_id,
@@ -110,14 +101,12 @@ export async function ensureStudentSubmissionDraft(eventId: number) {
         submitted_at,
         updated_at
       )
-      VALUES (?, ?, ?, 'draft', 0, NULL, datetime('now'))
-      `
-    )
-    .run(eventId, user.id, classRow.class_id);
+      VALUES (?, ?, ?, 'draft', 0, NULL, CURRENT_TIMESTAMP(3))
+      `, [eventId, user.id, classRow.class_id]));
 
-  const submissionId = Number(result.lastInsertRowid);
+  const submissionId = Number(result.insertId);
 
-  evaluateSubmissionAuto(submissionId);
+  (await evaluateSubmissionAuto(submissionId));
 
   revalidatePath(`/dashboard/student/events/${eventId}`);
   revalidatePath("/dashboard/student/submissions");

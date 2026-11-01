@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 function toIso(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
@@ -13,7 +13,7 @@ function toIso(value: FormDataEntryValue | null) {
 export async function createAcademicTerm(formData: FormData) {
   await requireAdminContext();
 
-  const db = getDb();
+  const db = getDatabase();
 
   const academicYear = String(formData.get("academicYear") ?? "").trim();
   const semester = String(formData.get("semester") ?? "").trim();
@@ -37,8 +37,7 @@ export async function createAcademicTerm(formData: FormData) {
     throw new Error("Thời gian kết thúc phải sau thời gian bắt đầu.");
   }
 
-  db.prepare(
-    `
+  (await db.execute(`
     INSERT INTO academic_terms (
       academic_year,
       semester,
@@ -48,9 +47,8 @@ export async function createAcademicTerm(formData: FormData) {
       is_active,
       created_at
     )
-    VALUES (?, ?, ?, ?, ?, 0, datetime('now'))
-    `
-  ).run(academicYear, semester, name, startAt, endAt);
+    VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP(3))
+    `, [academicYear, semester, name, startAt, endAt]));
 
   revalidatePath("/dashboard/admin/academic-terms");
 

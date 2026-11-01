@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { isCriteriaTemplateInUse } from "@/server/criteria-templates/assertCriteriaTemplateMutable";
 
 export async function updateCriteriaTemplate(
@@ -11,7 +11,7 @@ export async function updateCriteriaTemplate(
 ) {
   await requireAdminContext();
 
-  const db = getDb();
+  const db = getDatabase();
 
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -22,18 +22,12 @@ export async function updateCriteriaTemplate(
     throw new Error("Đối tượng không hợp lệ.");
   }
 
-  const found = db
-    .prepare(`SELECT id FROM criteria_templates WHERE id = ? LIMIT 1`)
-    .get(templateId) as { id: number } | undefined;
+  const found = (await db.first(`SELECT id FROM criteria_templates WHERE id = ? LIMIT 1`, [templateId])) as { id: number } | undefined;
 
   if (!found) throw new Error("Bộ tiêu chuẩn không tồn tại.");
 
-  if (isCriteriaTemplateInUse(db, templateId)) {
-    db.prepare(`UPDATE criteria_templates SET name = ?, description = ? WHERE id = ?`).run(
-      name,
-      description || null,
-      templateId,
-    );
+  if ((await isCriteriaTemplateInUse(db, templateId))) {
+    (await db.execute(`UPDATE criteria_templates SET name = ?, description = ? WHERE id = ?`, [name, description || null, templateId]));
 
     revalidatePath("/dashboard/admin/criteria-templates");
     revalidatePath(`/dashboard/admin/criteria-templates/${templateId}/configure`);
@@ -41,13 +35,11 @@ export async function updateCriteriaTemplate(
     return { ok: true, message: "Đã cập nhật tên và mô tả bộ tiêu chuẩn." };
   }
 
-  db.prepare(
-    `
+  (await db.execute(`
     UPDATE criteria_templates
     SET name = ?, description = ?, for_type = ?
     WHERE id = ?
-    `
-  ).run(name, description || null, forType, templateId);
+    `, [name, description || null, forType, templateId]));
 
   revalidatePath("/dashboard/admin/criteria-templates");
   revalidatePath(`/dashboard/admin/criteria-templates/${templateId}/configure`);

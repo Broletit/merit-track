@@ -7,7 +7,7 @@ export default function AdminRecentActivities({
   items: ActivityItem[];
 }) {
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
+    <section className="rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.08)] shadow-slate-200/60">
       <div className="text-xl font-semibold text-slate-900">Hoạt động gần đây</div>
 
       <div className="mt-4 grid grid-cols-1 gap-4">
@@ -15,7 +15,7 @@ export default function AdminRecentActivities({
           items.map((item) => (
             <div
               key={item.id}
-              className="rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50 p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]"
+              className="rounded-none bg-gradient-to-br from-slate-50 to-blue-50 p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] shadow-slate-200/60"
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -43,7 +43,7 @@ export default function AdminRecentActivities({
             </div>
           ))
         ) : (
-          <div className="rounded-2xl bg-slate-50 p-8 text-center text-sm text-slate-500">
+          <div className="rounded-none bg-slate-50 p-8 text-center text-sm text-slate-500">
             Chưa có dữ liệu hoạt động.
           </div>
         )}

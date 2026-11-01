@@ -1,17 +1,13 @@
 import ActivityScheduleFields from "./ActivityScheduleFields";
+import type { ComponentProps } from "react";
 
-export default function ActivityScheduleForm({ defaultValues, errorField }: { defaultValues?: { registrationStartAt?: string; registrationEndAt?: string; startAt?: string; endAt?: string }; errorField?: string }) {
+export default function ActivityScheduleForm({ defaultValues, errorField, disabledFields, allowPastRegistrationStart, allowRegistrationDuringActivity }: { defaultValues?: { registrationStartAt?: string; registrationEndAt?: string; startAt?: string; endAt?: string }; errorField?: string } & Pick<ComponentProps<typeof ActivityScheduleFields>, "disabledFields" | "allowPastRegistrationStart" | "allowRegistrationDuringActivity">) {
   return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <h2 className="text-lg font-semibold text-slate-900">Thời gian</h2>
-
-      <p className="mt-2 text-sm text-slate-500">
-        Thời gian đăng ký phải trước thời gian diễn ra hoạt động. Điểm danh QR
-        chỉ được thực hiện trong lúc hoạt động diễn ra.
-      </p>
+    <section className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <h2 className="whitespace-nowrap text-lg font-semibold text-slate-900">Thời gian</h2>
 
       <div className="mt-5">
-        <ActivityScheduleFields defaultValues={defaultValues} serverErrorField={errorField} />
+        <ActivityScheduleFields defaultValues={defaultValues} serverErrorField={errorField} disabledFields={disabledFields} allowPastRegistrationStart={allowPastRegistrationStart} allowRegistrationDuringActivity={allowRegistrationDuringActivity} />
       </div>
     </section>
   );

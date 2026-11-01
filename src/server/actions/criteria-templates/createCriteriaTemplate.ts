@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 export async function createCriteriaTemplate(formData: FormData) {
   const admin = await requireAdminContext();
-  const db = getDb();
+  const db = getDatabase();
 
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -20,9 +20,7 @@ export async function createCriteriaTemplate(formData: FormData) {
     throw new Error("Đối tượng bộ tiêu chuẩn không hợp lệ.");
   }
 
-  const result = db
-    .prepare(
-      `
+  const result = (await db.execute(`
       INSERT INTO criteria_templates (
         name,
         description,
@@ -30,12 +28,10 @@ export async function createCriteriaTemplate(formData: FormData) {
         created_by,
         created_at
       )
-      VALUES (?, ?, ?, ?, datetime('now'))
-      `
-    )
-    .run(name, description || null, forType, admin.id);
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(3))
+      `, [name, description || null, forType, admin.id]));
 
-  const templateId = Number(result.lastInsertRowid);
+  const templateId = Number(result.insertId);
 
   revalidatePath("/dashboard/admin/criteria-templates");
   revalidatePath("/dashboard/admin/criteria-templates/create");

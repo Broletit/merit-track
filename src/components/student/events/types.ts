@@ -21,6 +21,7 @@ export type StudentEventCriteriaItem = {
   description: string | null;
   groupCode: string;
   groupTitle: string;
+  minRequired?: number;
   isRequired: boolean;
   autoPassed: boolean;
   autoMessage: string | null;

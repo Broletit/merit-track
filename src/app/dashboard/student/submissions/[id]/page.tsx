@@ -1,13 +1,14 @@
+import SubmissionStatusBadge from "@/components/shared/submissions/SubmissionStatusBadge";
+import SubmissionSupportCard from "@/components/shared/submissions/SubmissionSupportCard";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, FileText } from "lucide-react";
 
 import { requireStudentContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import {
   canEditSubmission,
-  getSubmissionStatusLabel,
 } from "@/lib/submissions/submissionStatus";
 
 import StudentSubmissionCriteriaList from "@/components/student/submissions/StudentSubmissionCriteriaList";
@@ -28,6 +29,8 @@ type SubmissionRow = {
   event_id: number;
   event_start_at: string;
   event_end_at: string;
+  event_status: string;
+  event_allow_late: number;
 };
 
 type CriteriaRow = {
@@ -36,6 +39,7 @@ type CriteriaRow = {
   description: string | null;
   group_code: string;
   group_title: string;
+  min_required: number;
   evidence_type: string;
   is_required: number;
   auto_passed: number | null;
@@ -68,20 +72,19 @@ export default async function StudentSubmissionDetailPage({
 }) {
   const user = await requireStudentContext();
   const { id } = await params;
-  const submissionId = Number(id);
+  const submissionId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(submissionId) || submissionId <= 0) {
     notFound();
   }
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const submission = db
-    .prepare(
-      `
+  const submission = (await db.first(`
       SELECT
         s.id,
         s.status,
+        e.status AS event_status, e.allow_late AS event_allow_late,
         s.submitted_at,
         s.updated_at,
         e.title AS event_title,
@@ -92,25 +95,23 @@ export default async function StudentSubmissionDetailPage({
       INNER JOIN events e ON e.id = s.event_id
       WHERE s.id = ?
         AND s.user_id = ?
-        AND s.submitted_at IS NOT NULL
+        AND e.type = 'student'
+
       LIMIT 1
-      `
-    )
-    .get(submissionId, user.id) as SubmissionRow | undefined;
+      `, [submissionId, user.id])) as SubmissionRow | undefined;
 
   if (!submission) {
     notFound();
   }
 
-  const criteria = db
-    .prepare(
-      `
+  const criteria = (await db.rows(`
       SELECT
         i.code,
         i.title,
         i.description,
         i.group_code,
         g.title AS group_title,
+        g.min_required,
         i.evidence_type,
         i.is_required,
         ar.passed AS auto_passed,
@@ -119,17 +120,17 @@ export default async function StudentSubmissionDetailPage({
         si.content_text,
         COALESCE((
           SELECT COUNT(*)
-          FROM submission_files sf
+          FROM submission_ready_files sf
           WHERE sf.submission_id = s.id
             AND sf.criteria_code = i.code
         ), 0) AS file_count
         ,(
-          SELECT sf.file_name FROM submission_files sf
+          SELECT sf.file_name FROM submission_ready_files sf
           WHERE sf.submission_id=s.id AND sf.criteria_code=i.code
           ORDER BY sf.uploaded_at DESC,sf.id DESC LIMIT 1
         ) AS file_name,
-        (SELECT cr.decision FROM submission_criteria_reviews cr WHERE cr.submission_id=s.id AND cr.criteria_code=i.code ORDER BY cr.round DESC LIMIT 1) AS review_decision,
-        (SELECT cr.round FROM submission_criteria_reviews cr WHERE cr.submission_id=s.id AND cr.criteria_code=i.code ORDER BY cr.round DESC LIMIT 1) AS review_round
+        (SELECT cr.decision FROM submission_criteria_reviews cr WHERE cr.submission_id=s.id AND cr.criteria_code=i.code AND cr.round=s.review_round LIMIT 1) AS review_decision,
+        (SELECT cr.round FROM submission_criteria_reviews cr WHERE cr.submission_id=s.id AND cr.criteria_code=i.code AND cr.round=s.review_round LIMIT 1) AS review_round
       FROM submissions s
       INNER JOIN event_criteria_items i
         ON i.event_id = s.event_id
@@ -144,13 +145,9 @@ export default async function StudentSubmissionDetailPage({
        AND si.criteria_code = i.code
       WHERE s.id = ?
       ORDER BY g.sort_order ASC, i.sort_order ASC
-      `
-    )
-    .all(submissionId) as CriteriaRow[];
+      `, [submissionId])) as CriteriaRow[];
 
-  const reviews = db
-    .prepare(
-      `
+  const reviews = (await db.rows(`
       SELECT
         round,
         decision,
@@ -158,27 +155,21 @@ export default async function StudentSubmissionDetailPage({
       FROM reviews
       WHERE submission_id = ?
       ORDER BY id DESC
-      `
-    )
-    .all(submissionId) as ReviewRow[];
+      `, [submissionId])) as ReviewRow[];
 
-  const files = db
-    .prepare(
-      `
+  const files = (await db.rows(`
       SELECT
         id,
         criteria_code,
         file_name,
         mime_type
-      FROM submission_files
+      FROM submission_ready_files
       WHERE submission_id = ?
       ORDER BY uploaded_at DESC, id DESC
-      `
-    )
-    .all(submissionId) as FileRow[];
+      `, [submissionId])) as FileRow[];
 
-  const editable = canEditSubmission(submission.status);
-  const timeline = getSubmissionTimeline(submissionId).map((item) => ({
+  const editable = canEditSubmission(submission.status, {status:submission.event_status,startAt:submission.event_start_at,endAt:submission.event_end_at,allowLate:Number(submission.event_allow_late)===1});
+  const timeline = (await getSubmissionTimeline(submissionId)).map((item) => ({
     ...item,
     actorName: null,
   }));
@@ -193,7 +184,7 @@ export default async function StudentSubmissionDetailPage({
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15">
@@ -210,15 +201,15 @@ export default async function StudentSubmissionDetailPage({
           <Link
             href="/dashboard/student/submissions"
             className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
+           data-back-link>
             <ArrowLeft size={16} />
             Quay về
           </Link>
         </div>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold text-slate-900">Thông tin hồ sơ</h2><span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusClass(submission.status)}`}>{getSubmissionStatusLabel(submission.status)}</span></div>
+      <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold text-slate-900">Thông tin hồ sơ</h2><SubmissionStatusBadge status={submission.status}/></div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           <Info
@@ -239,6 +230,8 @@ export default async function StudentSubmissionDetailPage({
         </div>
 
       </section>
+
+      <SubmissionSupportCard submissionId={submissionId} isDraft={!submission.submitted_at}/>
 
       <ReviewHistory
         items={reviewItems}
@@ -273,11 +266,10 @@ export default async function StudentSubmissionDetailPage({
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
       <div className="text-sm text-slate-500">{label}</div>
       <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
     </div>
   );
 }
 
-function getStatusClass(status:string){if(status==="passed")return "bg-emerald-100 text-emerald-800";if(status==="failed")return "bg-rose-100 text-rose-800";if(status.startsWith("submitted"))return "bg-blue-100 text-blue-800";if(status.startsWith("needs_revision"))return "bg-amber-100 text-amber-800";return "bg-slate-100 text-slate-700";}

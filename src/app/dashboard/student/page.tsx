@@ -1,3 +1,6 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
+import SubmissionStatusBadge from "@/components/shared/submissions/SubmissionStatusBadge";
+import { activityVisibleSql } from "@/server/cohorts/sql";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -12,7 +15,7 @@ import { getSubmissionStatusLabel } from "@/lib/submissions/submissionStatus";
 import { getRequiredActiveTerm } from "@/server/academic-terms/getRequiredActiveTerm";
 import { requireStudentContext } from "@/server/auth/guards";
 import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 type DashboardSummary = {
   registered: number;
@@ -69,6 +72,9 @@ function getActivityBadge(item: UpcomingActivity) {
   if (item.participation_source === "external") {
     return { label: "Đăng ký tại trường", className: "bg-violet-100 text-violet-700" };
   }
+  if (new Date() > new Date(item.registration_end_at)) {
+    return { label: "Đã hết hạn đăng ký", className: "bg-slate-100 text-slate-700" };
+  }
   return { label: "Có thể đăng ký", className: "bg-amber-100 text-amber-800" };
 }
 
@@ -84,51 +90,36 @@ function getEventBadge(item: UpcomingEvent) {
 
 export default async function StudentDashboardPage() {
   const user = await requireStudentContext();
-  const db = getDb();
-  ensureActivityConductScores();
-  const term = getRequiredActiveTerm();
+  const db = getDatabase();
+  (await ensureActivityConductScores());
+  const term = (await getRequiredActiveTerm());
 
-  const visibilitySql = `(a.organizer_level = 'faculty' OR EXISTS (
-    SELECT 1
-    FROM activity_scopes scope
-    INNER JOIN class_members member ON member.class_id = scope.class_id
-    WHERE scope.activity_id = a.id
-      AND member.user_id = ?
-      AND member.left_at IS NULL
-  ))`;
+  const visibilitySql = activityVisibleSql("a", String(user.id));
 
-  const registered = Number((db.prepare(
-    `SELECT COUNT(*) AS total
+  const registered = Number(((await db.first(`SELECT COUNT(*) AS total
      FROM activity_registrations ar
      INNER JOIN activities a ON a.id = ar.activity_id
-     WHERE ar.user_id = ? AND ar.status <> 'cancelled' AND a.term_id = ?`
-  ).get(user.id, term.id) as { total: number }).total);
+     WHERE ar.user_id = ? AND ar.status <> 'cancelled' AND a.term_id = ?`, [user.id, term.id])) as { total: number }).total);
 
-  const attended = Number((db.prepare(
-    `SELECT COUNT(*) AS total
+  const attended = Number(((await db.first(`SELECT COUNT(*) AS total
      FROM activity_registrations ar
      INNER JOIN activities a ON a.id = ar.activity_id
-     WHERE ar.user_id = ? AND ar.status = 'attended' AND a.term_id = ?`
-  ).get(user.id, term.id) as { total: number }).total);
+     WHERE ar.user_id = ? AND ar.status = 'attended' AND a.term_id = ?`, [user.id, term.id])) as { total: number }).total);
 
-  const openEvents = Number((db.prepare(
-    `SELECT COUNT(*) AS total
+  const openEvents = Number(((await db.first(`SELECT COUNT(*) AS total
      FROM events e
      WHERE e.type = 'student'
        AND e.term_id = ?
        AND e.status = 'published'
-       AND datetime(e.end_at) >= datetime('now')`
-  ).get(term.id) as { total: number }).total);
+       AND CAST(e.end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)`, [term.id])) as { total: number }).total);
 
-  const submissions = Number((db.prepare(
-    `SELECT COUNT(*) AS total
+  const submissions = Number(((await db.first(`SELECT COUNT(*) AS total
      FROM submissions s
      INNER JOIN events e ON e.id = s.event_id
      WHERE s.user_id = ?
        AND e.type = 'student'
        AND e.term_id = ?
-       AND s.submitted_at IS NOT NULL`
-  ).get(user.id, term.id) as { total: number }).total);
+       AND s.submitted_at IS NOT NULL`, [user.id, term.id])) as { total: number }).total);
 
   const summary: DashboardSummary = {
     registered,
@@ -137,8 +128,7 @@ export default async function StudentDashboardPage() {
     submissions,
   };
 
-  const upcomingActivities = db.prepare(
-    `SELECT
+  const upcomingActivities = (await db.rows(`SELECT
        a.id,
        a.title,
        a.start_at,
@@ -152,17 +142,15 @@ export default async function StudentDashboardPage() {
      WHERE a.status = 'published'
        AND a.term_id = ?
        AND a.audience_type = 'student'
-       AND datetime(a.end_at) >= datetime('now')
+       AND CAST(a.end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)
        AND ${visibilitySql}
      ORDER BY
-       CASE WHEN datetime(a.start_at) >= datetime('now') THEN 0 ELSE 1 END,
-       datetime(a.start_at) ASC,
+       CASE WHEN CAST(a.start_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3) THEN 0 ELSE 1 END,
+       CAST(a.start_at AS DATETIME(3)) ASC,
        a.id ASC
-     LIMIT 4`
-  ).all(user.id, term.id, user.id) as UpcomingActivity[];
+     LIMIT 4`, [user.id, term.id])) as UpcomingActivity[];
 
-  const upcomingEvents = db.prepare(
-    `SELECT
+  const upcomingEvents = (await db.rows(`SELECT
        e.id,
        e.title,
        e.start_at,
@@ -173,16 +161,14 @@ export default async function StudentDashboardPage() {
      WHERE e.type = 'student'
        AND e.term_id = ?
        AND e.status = 'published'
-       AND datetime(e.end_at) >= datetime('now')
+       AND CAST(e.end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)
      ORDER BY
-       CASE WHEN datetime(e.start_at) <= datetime('now') THEN 0 ELSE 1 END,
-       datetime(e.end_at) ASC,
+       CASE WHEN CAST(e.start_at AS DATETIME(3)) <= CURRENT_TIMESTAMP(3) THEN 0 ELSE 1 END,
+       CAST(e.end_at AS DATETIME(3)) ASC,
        e.id ASC
-     LIMIT 4`
-  ).all(user.id, term.id) as UpcomingEvent[];
+     LIMIT 4`, [user.id, term.id])) as UpcomingEvent[];
 
-  const latestSubmissions = db.prepare(
-    `SELECT s.id, e.title AS event_title, s.status, s.updated_at
+  const latestSubmissions = (await db.rows(`SELECT s.id, e.title AS event_title, s.status, s.updated_at
      FROM submissions s
      INNER JOIN events e ON e.id = s.event_id
      WHERE s.user_id = ?
@@ -195,9 +181,8 @@ export default async function StudentDashboardPage() {
          WHEN s.status IN ('submitted_v1', 'submitted_v2') THEN 1
          ELSE 2
        END,
-       datetime(s.updated_at) DESC
-     LIMIT 4`
-  ).all(user.id, term.id) as SubmissionRow[];
+       CAST(s.updated_at AS DATETIME(3)) DESC
+     LIMIT 4`, [user.id, term.id])) as SubmissionRow[];
 
   const attendedRate = summary.registered > 0
     ? Math.round((summary.attended / summary.registered) * 100)
@@ -206,10 +191,10 @@ export default async function StudentDashboardPage() {
   return (
     <main className="space-y-6">
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat icon={<CalendarCheck2 size={20} />} label="Hoạt động đã đăng ký" value={summary.registered} tone="blue" />
-        <Stat icon={<CheckCircle2 size={20} />} label="Tỷ lệ đã điểm danh" value={`${attendedRate}%`} tone="emerald" />
-        <Stat icon={<Trophy size={20} />} label="Đợt xét còn hiệu lực" value={summary.openEvents} tone="amber" />
-        <Stat icon={<ClipboardCheck size={20} />} label="Hồ sơ đã gửi" value={summary.submissions} tone="violet" />
+        <Stat icon={<CalendarCheck2 size={20} />} label="Hoạt động đã đăng ký" value={summary.registered} />
+        <Stat icon={<CheckCircle2 size={20} />} label="Tỷ lệ đã điểm danh" value={`${attendedRate}%`} />
+        <Stat icon={<Trophy size={20} />} label="Đợt xét còn hiệu lực" value={summary.openEvents} />
+        <Stat icon={<ClipboardCheck size={20} />} label="Hồ sơ đã gửi" value={summary.submissions} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
@@ -258,7 +243,7 @@ export default async function StudentDashboardPage() {
         </DashboardList>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+      <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
@@ -282,12 +267,12 @@ export default async function StudentDashboardPage() {
                 {item.event_title}
               </div>
               <div className="mt-3 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                {getSubmissionStatusLabel(item.status)}
+                <SubmissionStatusBadge status={item.status} />
               </div>
               <div className="mt-3 text-xs text-slate-400">Cập nhật {compactDate(item.updated_at)}</div>
             </Link>
           )) : (
-            <div className="col-span-full rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+            <div className="col-span-full rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 shadow-md shadow-slate-200/60">
               Bạn chưa gửi hồ sơ nào trong học kỳ này.
             </div>
           )}
@@ -297,25 +282,18 @@ export default async function StudentDashboardPage() {
   );
 }
 
-function Stat({ icon, label, value, tone }: {
+function Stat({ icon, label, value }: {
   icon: React.ReactNode;
   label: string;
   value: React.ReactNode;
-  tone: "blue" | "emerald" | "amber" | "violet";
 }) {
-  const tones = {
-    blue: "bg-blue-50 text-blue-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    amber: "bg-amber-50 text-amber-700",
-    violet: "bg-violet-50 text-violet-700",
-  };
   return (
-    <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+    <div className={[statCardStyles.card, "min-w-0"].join(" ")}>
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-medium text-slate-500">{label}</div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tones[tone]}`}>{icon}</div>
+        <div className={statCardStyles.label}>{label}</div>
+        <div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</div>
       </div>
-      <div className="mt-4 text-3xl font-bold text-slate-900">{value}</div>
+      <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div>
     </div>
   );
 }
@@ -329,7 +307,7 @@ function DashboardList({ icon, title, allHref, empty, children }: {
 }) {
   const hasItems = Array.isArray(children) ? children.length > 0 : Boolean(children);
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div className="flex items-start justify-between gap-4">
         <div className="flex gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">{icon}</div>
@@ -343,7 +321,7 @@ function DashboardList({ icon, title, allHref, empty, children }: {
       </div>
       <div className="mt-5 space-y-3">
         {hasItems ? children : (
-          <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">{empty}</div>
+          <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 shadow-md shadow-slate-200/60">{empty}</div>
         )}
       </div>
     </section>

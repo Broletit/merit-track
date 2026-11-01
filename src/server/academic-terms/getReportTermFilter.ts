@@ -1,11 +1,9 @@
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
-export function getReportTermFilter(termId?: string) {
-  const db = getDb();
+export async function getReportTermFilter(termId?: string) {
+  const db = getDatabase();
 
-  const terms = db
-    .prepare(
-      `
+  const terms = (await db.rows(`
       SELECT
         id,
         name,
@@ -13,9 +11,7 @@ export function getReportTermFilter(termId?: string) {
         is_active
       FROM academic_terms
       ORDER BY start_date DESC
-      `
-    )
-    .all() as Array<{
+      `, [])) as Array<{
     id: number;
     name: string;
     school_year: string;

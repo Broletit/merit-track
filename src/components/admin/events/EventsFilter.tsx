@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { resolveEventListPhase } from "@/lib/events/eventSubmissionPhase";
+import FilterRow from "@/components/shared/filters/FilterRow";
+import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -13,8 +15,16 @@ export default function EventsFilter() {
     searchParams.get("keyword") ?? ""
   );
 
+  const searchTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const phase=resolveEventListPhase(searchParams.get("phase"),searchParams.get("status"));
+
   function updateParam(key: string, value: string) {
+    if(searchTimer.current)clearTimeout(searchTimer.current);
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("cohort");
+    params.delete("status");
+    if(key!=="keyword"){if(keyword.trim())params.set("keyword",keyword.trim());else params.delete("keyword");}
+    if(key!=="phase"&&phase)params.set("phase",phase);
 
     if (value) {
       params.set(key, value);
@@ -24,20 +34,21 @@ export default function EventsFilter() {
 
     params.set("page", "1");
 
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`, {scroll:false});
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    if(keyword.trim()===(searchParams.get("keyword")??"").trim())return;
+    searchTimer.current = setTimeout(() => {
       updateParam("keyword", keyword.trim());
     }, 350);
 
-    return () => clearTimeout(timer);
+    return () => {if(searchTimer.current)clearTimeout(searchTimer.current);};
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyword]);
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-3">
       <div className="relative min-w-0">
         <Search
           size={16}
@@ -51,31 +62,16 @@ export default function EventsFilter() {
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
       <select
-        defaultValue={searchParams.get("phase") ?? ""}
+        aria-label="Lọc trạng thái đợt xét" value={phase}
         onChange={(event) => updateParam("phase", event.target.value)}
         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
       >
-        <option value="">Tất cả tình trạng nhận</option>
-        <option value="not_published">Chưa công khai</option>
-        <option value="not_open">Chưa mở nộp</option>
+        <option value="">Tất cả trạng thái đợt xét</option>
+        <option value="not_published">Nháp</option>
+        <option value="not_open">Chưa mở nhận hồ sơ</option>
         <option value="accepting">Đang nhận hồ sơ</option>
-        <option value="late_allowed">Đang nhận hồ sơ trễ</option>
-        <option value="expired">Đã hết hạn nộp</option>
-        <option value="closed">Đã ngừng nhận</option>
-      </select>
-
-      <select
-        defaultValue={searchParams.get("status") ?? ""}
-        onChange={(event) =>
-          updateParam("status", event.target.value)
-        }
-        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
-      >
-        <option value="">Tất cả trạng thái</option>
-        <option value="draft">Nháp</option>
-        <option value="published">Đang mở</option>
+        <option value="expired">Đã hết hạn</option>
         <option value="closed">Đã đóng</option>
       </select>
 
@@ -90,7 +86,6 @@ export default function EventsFilter() {
         <option value="student">Sinh viên</option>
         <option value="officer">Cán bộ</option>
       </select>
-
-    </div>
+    </FilterRow>
   );
 }

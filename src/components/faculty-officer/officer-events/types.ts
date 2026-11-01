@@ -29,6 +29,7 @@ export type OfficerEventCriteriaItem = {
   description: string | null;
   groupCode: string;
   groupTitle: string;
+  minRequired?: number;
   scoreMax: number;
   isRequired: boolean;
   autoPassed: boolean;

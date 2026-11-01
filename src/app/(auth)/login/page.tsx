@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
-import { ShieldCheck, Sparkles, UsersRound } from "lucide-react";
+import { LogIn, ShieldCheck, Sparkles, UsersRound } from "lucide-react";
 
 import { getSessionUser } from "@/server/auth/getSessionUser";
 import { getDefaultRouteByRoleContext } from "@/server/auth/role-context";
 
 import LoginForm from "./LoginForm";
+import styles from "./login.module.css";
 
 export default async function LoginPage() {
   const user = await getSessionUser();
@@ -66,28 +67,22 @@ export default async function LoginPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-center">
-          <div className="w-full max-w-lg">
-            <div className="rounded-4xl bg-white/95 p-2 shadow-[0_32px_90px_rgba(0,0,0,0.38)] ring-1 ring-white/40 backdrop-blur">
-              <div className="rounded-[1.7rem] bg-white px-8 py-9">
-                <div>
-                  <h2 className="text-3xl font-bold text-slate-900">
-                    Đăng nhập hệ thống
-                  </h2>
-
-                  <p className="mt-3 text-sm leading-6 text-slate-500">
-                    Sử dụng MSSV hoặc email được cấp để truy cập tài khoản.
-                  </p>
+        <div className="relative flex items-center justify-center">
+          <div aria-hidden="true" className={styles.halo} />
+          <div className={`relative w-full max-w-md ${styles.appear}`}>
+            <div className={styles.frame}>
+              <div className="relative overflow-hidden rounded-[1.9rem] bg-white px-6 py-8 sm:px-9 sm:py-10">
+                <div aria-hidden="true" className="absolute inset-x-10 top-0 h-px bg-linear-to-r from-transparent via-amber-300 to-transparent" />
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <span className="relative flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-linear-to-br from-blue-700 to-blue-950 text-white shadow-lg shadow-blue-900/25 ring-4 ring-blue-50"><LogIn size={28} aria-hidden="true" /><span aria-hidden="true" className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-[3px] border-white bg-amber-300 text-blue-950"><Sparkles size={12} /></span></span>
+                  <h2 className="text-[1.75rem] font-bold tracking-tight text-blue-950">Đăng nhập</h2>
+                  <span aria-hidden="true" className="-mt-2 h-1 w-10 rounded-full bg-amber-300" />
                 </div>
 
-                <div className="mt-8">
+                <div className="mt-6">
                   <LoginForm />
                 </div>
 
-                <div className="mt-8 rounded-2xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500 ring-1 ring-slate-100">
-                  Một tài khoản duy nhất cho sinh viên và cán bộ với khả năng
-                  chuyển đổi giao diện linh hoạt.
-                </div>
               </div>
             </div>
           </div>

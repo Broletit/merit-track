@@ -1,18 +1,21 @@
-import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import TableResultsFooter from "@/components/common/TableResultsFooter";
+import PaginationArrow from "@/components/common/PaginationArrow";
 
 export default function ReviewPagination({
   page,
   totalPages,
+  totalResults,
+  resultLabel,
   basePath,
   searchParams,
 }: {
   page: number;
   totalPages: number;
+  totalResults?: number;
+  resultLabel?: string;
   basePath: string;
   searchParams: Record<string, string | undefined>;
 }) {
-  if (totalPages <= 1) return null;
 
   function buildLink(nextPage: number) {
     const params = new URLSearchParams();
@@ -27,36 +30,10 @@ export default function ReviewPagination({
   }
 
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <div className="text-sm text-slate-500">
-        Trang {page} / {totalPages}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Link
-          href={buildLink(Math.max(1, page - 1))}
-          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
-            page <= 1
-              ? "pointer-events-none border-slate-100 bg-slate-100 text-slate-400"
-              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          <ChevronLeft size={16} />
-          Trước
-        </Link>
-
-        <Link
-          href={buildLink(Math.min(totalPages, page + 1))}
-          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
-            page >= totalPages
-              ? "pointer-events-none border-slate-100 bg-slate-100 text-slate-400"
-              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          Sau
-          <ChevronRight size={16} />
-        </Link>
-      </div>
-    </div>
+    <TableResultsFooter totalResults={totalResults} resultLabel={resultLabel}>
+        <PaginationArrow href={buildLink(Math.max(1,page-1))} direction="left" disabled={page<=1}/>
+        <div className="text-sm text-slate-500">Trang {page}/{totalPages}</div>
+        <PaginationArrow href={buildLink(Math.min(totalPages,page+1))} direction="right" disabled={page>=totalPages}/>
+    </TableResultsFooter>
   );
 }

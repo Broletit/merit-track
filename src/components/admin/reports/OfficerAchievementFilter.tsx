@@ -1,4 +1,6 @@
 "use client";
+import CohortFilter from "@/components/shared/CohortFilter";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -26,6 +28,7 @@ export default function OfficerAchievementFilter({
     else params.delete(key);
 
     params.set("page", "1");
+    params.set("potentialPage", "1");
     router.push(`${pathname}?${params.toString()}`);
   }
 
@@ -39,22 +42,28 @@ export default function OfficerAchievementFilter({
   }, [keyword]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-[minmax(280px,2fr)_minmax(220px,1fr)_minmax(150px,1fr)]">
-      <div className="relative">
+    <FilterRow className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="filter-field">
+        <label htmlFor="officer-achievement-keyword">Tìm kiếm</label>
+        <div className="relative">
         <Search
           size={16}
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
         />
 
         <input
+          id="officer-achievement-keyword"
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="Tìm cán bộ / MSSV / lớp..."
+          placeholder="Tên hoặc MSSV"
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
+        </div>
       </div>
-
-      <select
+      <div className="filter-field"><label htmlFor="officer-achievement-assessment">Đánh giá</label><select id="officer-achievement-assessment" defaultValue={searchParams.get("assessment") ?? ""} onChange={(event) => updateParam("assessment", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"><option value="">Tất cả đánh giá</option><option value="ready">Đủ điều kiện</option><option value="potential">Tiềm năng</option></select></div>
+      <div className="filter-field"><label>Khóa</label><CohortFilter /></div>
+      <div className="filter-field"><label htmlFor="officer-achievement-event">Đợt xét</label><select
+        id="officer-achievement-event"
         defaultValue={searchParams.get("eventId") ?? ""}
         onChange={(event) => updateParam("eventId", event.target.value)}
         className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
@@ -66,16 +75,7 @@ export default function OfficerAchievementFilter({
           </option>
         ))}
       </select>
-
-      <select
-        defaultValue={searchParams.get("top") ?? "20"}
-        onChange={(event) => updateParam("top", event.target.value)}
-        className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
-      >
-        <option value="5">Top 5</option>
-        <option value="10">Top 10</option>
-        <option value="20">Top 20</option>
-      </select>
-    </div>
+      </div>
+    </FilterRow>
   );
 }

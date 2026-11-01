@@ -1,5 +1,5 @@
 import { requireStudentContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
 import StudentEventsHeader from "@/components/student/events/StudentEventsHeader";
 import StudentEventsTable from "@/components/student/events/StudentEventsTable";
@@ -10,7 +10,7 @@ import {
 } from "@/server/academic-terms/getAcademicTermForView";
 import { getEventSubmissionPhaseFilter } from "@/server/events/eventSubmissionPhaseFilter";
 
-type SearchParams = Promise<{
+type SearchParams = Promise<{ cohort?: string;
   termId?: string;
   keyword?: string;
   submissionStatus?: string;
@@ -37,16 +37,16 @@ export default async function StudentEventsPage({
   const user = await requireStudentContext();
   const params = await searchParams;
 
-  const db = getDb();
-  const terms = getAcademicTermsForSelect();
-  const selectedTerm = getAcademicTermForView(params.termId);
+  const db = getDatabase();
+  const terms = (await getAcademicTermsForSelect());
+  const selectedTerm = (await getAcademicTermForView(params.termId));
 
   const keyword = String(params.keyword ?? "").trim();
   const submissionStatus = String(params.submissionStatus ?? "").trim();
   const phase = String(params.phase ?? "").trim();
 
   const where: string[] = [
-    `e.status = 'published'`,
+    `(e.status='published' OR (e.status='closed' AND s.id IS NOT NULL))`,
     `e.type = 'student'`,
     `e.term_id = ?`,
   ];
@@ -55,8 +55,8 @@ export default async function StudentEventsPage({
 
   // 🔍 keyword
   if (keyword) {
-    where.push(`(e.title LIKE ? OR e.description LIKE ?)`);
-    values.push(`%${keyword}%`, `%${keyword}%`);
+    where.push(`e.title LIKE ?`);
+    values.push(`%${keyword}%`);
   }
 
   // trạng thái hồ sơ
@@ -74,9 +74,7 @@ export default async function StudentEventsPage({
 
   const whereSql = `WHERE ${where.join(" AND ")}`;
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         e.id,
         e.title,
@@ -92,10 +90,8 @@ export default async function StudentEventsPage({
         ON s.event_id = e.id
        AND s.user_id = ?
       ${whereSql}
-      ORDER BY datetime(e.start_at) DESC, e.id DESC
-      `
-    )
-    .all(user.id, ...values) as Row[];
+      ORDER BY CAST(e.start_at AS DATETIME(3)) DESC, e.id DESC
+      `, [user.id, ...values])) as Row[];
 
   const items: StudentEventItem[] = rows.map((item) => ({
     id: Number(item.id),
@@ -116,7 +112,7 @@ export default async function StudentEventsPage({
       <StudentEventsHeader termSelect={<AcademicTermSelect variant="header" terms={terms} selectedTermId={selectedTerm.id} />} />
 
       {!selectedTerm.isActive ? (
-        <section className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-700 ring-1 ring-amber-100">
+        <section className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-700 ring-1 ring-amber-100 shadow-md shadow-slate-200/60">
           Bạn đang xem học kỳ cũ. Chỉ xem lại đợt xét, không gửi hồ sơ mới.
         </section>
       ) : null}

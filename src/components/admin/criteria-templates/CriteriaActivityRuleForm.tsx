@@ -1,4 +1,6 @@
 "use client";
+import RequiredMark from "@/components/common/RequiredMark";
+
 
 import { useActionState, useMemo, useState } from "react";
 import { addCriteriaActivityRule } from "@/server/actions/criteria-templates/addCriteriaActivityRule";
@@ -25,6 +27,13 @@ export default function CriteriaActivityRuleForm({
   activities: CriteriaTemplateActivityOption[];
 }) {
   const [keyword, setKeyword] = useState("");
+  const termOptions = useMemo(
+    () => Array.from(new Map(activities.map((item) => [item.termId, item.termName])).entries()),
+    [activities]
+  );
+  const [termId, setTermId] = useState<number>(() =>
+    activities.find((item) => item.isCurrentTerm)?.termId ?? activities[0]?.termId ?? 0
+  );
 
   async function action(_prev: State, formData: FormData): Promise<State> {
     try {
@@ -52,12 +61,13 @@ export default function CriteriaActivityRuleForm({
   const filteredActivities = useMemo(() => {
     const value = keyword.trim().toLowerCase();
 
-    if (!value) return activities.slice(0, 30);
+    const inSelectedTerm = activities.filter((item) => item.termId === termId);
+    if (!value) return inSelectedTerm.slice(0, 30);
 
-    return activities
+    return inSelectedTerm
       .filter((item) => item.title.toLowerCase().includes(value))
       .slice(0, 30);
-  }, [activities, keyword]);
+  }, [activities, keyword, termId]);
 
   return (
     <>
@@ -65,7 +75,7 @@ export default function CriteriaActivityRuleForm({
     <form action={formAction} className="space-y-2">
       <label className="block text-xs font-medium text-slate-500">
         Gán hoạt động đáp ứng tiêu chí
-      </label>
+      <RequiredMark required={true}/></label>
 
       <input
         value={keyword}
@@ -73,6 +83,16 @@ export default function CriteriaActivityRuleForm({
         placeholder="Tìm hoạt động..."
         className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs outline-none focus:border-blue-500"
       />
+
+      <select
+        value={termId}
+        onChange={(event) => setTermId(Number(event.target.value))}
+        className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs outline-none focus:border-blue-500"
+      >
+        {termOptions.map(([optionId, name]) => (
+          <option key={optionId} value={optionId}>{name}</option>
+        ))}
+      </select>
 
       <div className="flex gap-2">
         <select
@@ -92,7 +112,7 @@ export default function CriteriaActivityRuleForm({
 
         <button
           disabled={pending}
-          className="h-9 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          className="min-h-9 h-auto whitespace-normal rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 py-2 max-w-full break-words"
         >
           Gắn
         </button>

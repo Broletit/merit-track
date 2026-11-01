@@ -1,0 +1,14 @@
+const fs=require('fs'),ts=require('typescript'),Module=require('module'),assert=require('assert/strict');
+const m=new Module('assessment',module);m.paths=module.paths;m._compile(ts.transpileModule(fs.readFileSync('src/lib/submissions/candidateAssessment.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,'assessment');
+const assess=m.exports.assessCandidateCriteria;
+const criteria=[{code:'A1',group_code:'A',is_required:1},{code:'A2',group_code:'A',is_required:0},{code:'A3',group_code:'A',is_required:0},{code:'B1',group_code:'B',is_required:1}];
+const groups=[{code:'A',min_required:2},{code:'B',min_required:1}];
+const facts={submitted:true,autoPassed:new Set(['A1']),files:new Set(['A2','B1']),reviews:new Map([['A2','fail'],['B1','pass']])};
+let result=assess(criteria,groups,facts);assert.equal(result.passed,2);assert.equal(result.total,4);assert.deepEqual(result.missing.map(i=>i.code),['A2','A3']);assert.match(result.missing[0].reason,/không đạt/);assert.match(result.missing[1].reason,/Chưa nộp/);assert.equal(result.deficientGroups[0].code,'A');assert(result.blockingCount>0);
+result=assess(criteria,groups,{...facts,reviews:new Map([['A2','pass'],['B1','pass']])});assert.equal(result.passed,3);assert.equal(result.blockingCount,0,'Group minimum allows optional criterion to remain unmet');assert.equal(result.missing[0].code,'A3');
+result=assess(criteria,groups,{...facts,autoPassed:new Set(['A1','A2'])});assert(result.missing.some(i=>i.code==='A2'),'Explicit failure cannot be hidden by an auto/evidence result');
+result=assess(criteria,groups,{...facts,files:new Set(),reviews:new Map([['B1','pass']])});assert(result.missing.some(i=>i.code==='B1'),'A review pass without required uploaded evidence cannot satisfy manual criterion');
+result=assess(criteria,groups,{...facts,reviews:new Map()});assert(result.missing.some(i=>i.reason.includes('chờ đánh giá')),'Uploaded evidence alone is not an approved submitted criterion');
+result=assess(criteria,groups,{...facts,submitted:false,reviews:new Map()});assert.equal(result.passed,3,'Unsubmitted candidates retain provisional evidence eligibility');
+const history=fs.readFileSync('src/components/shared/reviews/ReviewHistory.tsx','utf8');for(const label of ['Số lần nộp','Số lần yêu cầu bổ sung','Vòng đã hoàn tất'])assert(!history.includes(label));
+console.log('Passed: all criteria counted; reviewer failure overrides evidence; missing files and pending review listed; group thresholds preserved; closed/expired results need no open-event gate; history summary cards removed.');

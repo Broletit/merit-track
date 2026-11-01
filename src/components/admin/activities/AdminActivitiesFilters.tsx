@@ -1,4 +1,6 @@
 "use client";
+import CohortFilter from "@/components/shared/CohortFilter";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
@@ -18,10 +20,11 @@ export default function ActivitiesFilter() {
     else params.delete(key);
 
     params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
   useEffect(() => {
+    if (keyword.trim() === (searchParams.get("keyword") ?? "").trim()) return;
     const timer = setTimeout(() => {
       updateParam("keyword", keyword.trim());
     }, 350);
@@ -31,8 +34,8 @@ export default function ActivitiesFilter() {
   }, [keyword]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-      <div className="relative">
+    <FilterRow className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="relative xl:col-span-5">
         <Search
           size={16}
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -44,7 +47,7 @@ export default function ActivitiesFilter() {
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
+      <CohortFilter />
       <select
         defaultValue={searchParams.get("status") ?? ""}
         onChange={(event) => updateParam("status", event.target.value)}
@@ -54,7 +57,6 @@ export default function ActivitiesFilter() {
         <option value="draft">Nháp</option>
         <option value="published">Công khai</option>
       </select>
-
       <select
         defaultValue={searchParams.get("audience") ?? ""}
         onChange={(event) => updateParam("audience", event.target.value)}
@@ -64,7 +66,6 @@ export default function ActivitiesFilter() {
         <option value="student">Sinh viên</option>
         <option value="officer">Cán bộ</option>
       </select>
-
       <select
         defaultValue={searchParams.get("checkin") ?? ""}
         onChange={(event) => updateParam("checkin", event.target.value)}
@@ -74,7 +75,6 @@ export default function ActivitiesFilter() {
         <option value="qr">QR check-in</option>
         <option value="manual">Thủ công</option>
       </select>
-
       <select
         defaultValue={searchParams.get("time") ?? ""}
         onChange={(event) => updateParam("time", event.target.value)}
@@ -85,6 +85,6 @@ export default function ActivitiesFilter() {
         <option value="ongoing">Đang diễn ra</option>
         <option value="ended">Đã kết thúc</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

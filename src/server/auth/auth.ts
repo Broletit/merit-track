@@ -1,6 +1,6 @@
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { verifyPasswordSync, hashPasswordSync } from "./password";
-import { createSession, revokeCurrentSession } from "./session";
+import { createSession } from "./session";
 import { getSessionUser } from "./getSessionUser";
 import { getDefaultLoginContextAfterLogin } from "./role-context";
 
@@ -11,18 +11,14 @@ export async function loginWithPassword(params: {
   ip?: string | null;
 }) {
   const { mssv, password } = params;
-  const db = getDb();
+  const db = getDatabase();
 
-  const user = db
-    .prepare(
-      `
+  const user = (await db.first(`
       SELECT *
       FROM users
       WHERE mssv = ?
       LIMIT 1
-      `
-    )
-    .get(mssv.trim()) as
+      `, [mssv.trim()])) as
     | {
         id: number;
         mssv: string;
@@ -68,23 +64,19 @@ export async function changeCurrentUserPassword(params: {
   newPassword: string;
 }) {
   const { currentPassword, newPassword } = params;
-  const db = getDb();
+  const db = getDatabase();
   const sessionUser = await getSessionUser();
 
   if (!sessionUser) {
     return { ok: false as const, error: "Bạn chưa đăng nhập." };
   }
 
-  const user = db
-    .prepare(
-      `
+  const user = (await db.first(`
       SELECT id, password_hash
       FROM users
       WHERE id = ?
       LIMIT 1
-      `
-    )
-    .get(sessionUser.id) as { id: number; password_hash: string } | undefined;
+      `, [sessionUser.id])) as { id: number; password_hash: string } | undefined;
 
   if (!user) {
     return { ok: false as const, error: "Không tìm thấy tài khoản." };
@@ -95,28 +87,23 @@ export async function changeCurrentUserPassword(params: {
     return { ok: false as const, error: "Mật khẩu hiện tại không đúng." };
   }
 
-  if (newPassword.trim().length < 4) {
-    return { ok: false as const, error: "Mật khẩu mới phải có ít nhất 4 ký tự." };
+  if (newPassword.length < 8 || Buffer.byteLength(newPassword,"utf8") > 72) {
+    return { ok: false as const, error: "Mật khẩu mới cần ít nhất 8 ký tự và tối đa 72 byte." };
   }
 
-  const newHash = hashPasswordSync(newPassword.trim());
+  const newHash = hashPasswordSync(newPassword);
 
-  db.prepare(
-    `
+  (await db.execute(`
     UPDATE users
     SET password_hash = ?,
         must_change_pw = 0,
-        updated_at = datetime('now')
+        updated_at = CURRENT_TIMESTAMP(3)
     WHERE id = ?
-    `
-  ).run(newHash, sessionUser.id);
+    `, [newHash, sessionUser.id]));
 
-  await revokeCurrentSession();
-  await createSession({
-    userId: sessionUser.id,
-    role: sessionUser.role,
-    loginContext: sessionUser.loginContext as "student" | "class_officer" | "faculty_officer" | "admin",
-  });
+  (await db.execute("UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP(3) WHERE user_id=? AND revoked_at IS NULL", [sessionUser.id]));
+  // Keep the revoked cookie unchanged until navigation so the success dialog can render.
+
 
   return { ok: true as const };
 }

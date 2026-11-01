@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import type { LoginRoleContext } from "./role-context";
 
 export type SessionPayload = {
@@ -20,18 +20,16 @@ type SessionRow = {
 
 export async function createSession(payload: SessionPayload) {
   const cookieStore = await cookies();
-  const db = getDb();
+  const db = getDatabase();
   const sessionId = crypto.randomUUID();
   const expiresAt = new Date(
     Date.now() + SESSION_MAX_AGE_SECONDS * 1000
   ).toISOString();
 
-  db.prepare(
-    `
+  (await db.execute(`
     INSERT INTO sessions (id, user_id, login_context, expires_at)
     VALUES (?, ?, ?, ?)
-    `
-  ).run(sessionId, payload.userId, payload.loginContext, expiresAt);
+    `, [sessionId, payload.userId, payload.loginContext, expiresAt]));
 
   cookieStore.set(SESSION_COOKIE, sessionId, {
     httpOnly: true,
@@ -48,20 +46,16 @@ export async function getSession(): Promise<SessionPayload | null> {
 
   if (!sessionId) return null;
 
-  const row = getDb()
-    .prepare(
-      `
+  const row = (await getDatabase().first(`
       SELECT s.user_id, s.login_context, u.role
       FROM sessions s
       INNER JOIN users u ON u.id = s.user_id
       WHERE s.id = ?
         AND s.revoked_at IS NULL
-        AND datetime(s.expires_at) > datetime('now')
+        AND CAST(s.expires_at AS DATETIME(3)) > CURRENT_TIMESTAMP(3)
         AND u.is_active = 1
       LIMIT 1
-      `
-    )
-    .get(sessionId) as SessionRow | undefined;
+      `, [sessionId])) as SessionRow | undefined;
 
   if (!row) {
     return null;
@@ -80,20 +74,16 @@ export async function updateSessionLoginContext(loginContext: LoginRoleContext) 
 
   if (!sessionId) return null;
 
-  const result = getDb()
-    .prepare(
-      `
+  const result = (await getDatabase().execute(`
       UPDATE sessions
       SET login_context = ?
       WHERE id = ?
         AND revoked_at IS NULL
-        AND datetime(expires_at) > datetime('now')
-      `
-    )
-    .run(loginContext, sessionId);
+        AND CAST(expires_at AS DATETIME(3)) > CURRENT_TIMESTAMP(3)
+      `, [loginContext, sessionId]));
 
   if (result.changes === 0) return null;
-  return getSession();
+  return (await getSession());
 }
 
 export async function revokeCurrentSession() {
@@ -101,11 +91,7 @@ export async function revokeCurrentSession() {
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
 
   if (sessionId) {
-    getDb()
-      .prepare(
-        `UPDATE sessions SET revoked_at = datetime('now') WHERE id = ? AND revoked_at IS NULL`
-      )
-      .run(sessionId);
+    (await getDatabase().execute(`UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP(3) WHERE id = ? AND revoked_at IS NULL`, [sessionId]));
   }
 
   cookieStore.delete(SESSION_COOKIE);

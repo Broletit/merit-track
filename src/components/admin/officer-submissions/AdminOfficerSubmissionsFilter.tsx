@@ -1,46 +1,48 @@
 "use client";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-type EventOption = {
-  id: number;
-  title: string;
-};
-
-export default function AdminOfficerSubmissionsFilter({
-  eventOptions,
-}: {
-  eventOptions: EventOption[];
-}) {
+export default function AdminOfficerSubmissionsFilter() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyword, setKeyword] = useState(searchParams.get("keyword") ?? "");
 
   function updateParam(key: string, value: string) {
+    if (timerRef.current) clearTimeout(timerRef.current);
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("eventId");
+    if (key !== "keyword") {
+      if (keyword.trim()) params.set("keyword", keyword.trim());
+      else params.delete("keyword");
+    }
+    params.delete("cohort");
 
     if (value) params.set(key, value);
     else params.delete(key);
 
     params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
   useEffect(() => {
+    if (keyword.trim() === (searchParams.get("keyword") ?? "").trim()) return;
     const timer = setTimeout(() => {
       updateParam("keyword", keyword.trim());
     }, 350);
 
+    timerRef.current = timer;
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyword]);
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
       <div className="relative min-w-0">
         <Search
           size={16}
@@ -50,25 +52,10 @@ export default function AdminOfficerSubmissionsFilter({
         <input
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="Cán bộ / MSSV..."
+          placeholder="Tìm họ tên, MSSV hoặc tên đợt xét..."
           className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
-      <select
-        defaultValue={searchParams.get("eventId") ?? ""}
-        onChange={(event) => updateParam("eventId", event.target.value)}
-        className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
-      >
-        <option value="">Tất cả đợt xét</option>
-
-        {eventOptions.map((item) => (
-          <option key={item.id} value={String(item.id)}>
-            {item.title}
-          </option>
-        ))}
-      </select>
-
       <select
         defaultValue={searchParams.get("status") ?? ""}
         onChange={(event) => updateParam("status", event.target.value)}
@@ -79,9 +66,7 @@ export default function AdminOfficerSubmissionsFilter({
         <option value="needs_revision_v1">Cần chỉnh sửa</option>
         <option value="passed">Đạt</option>
         <option value="failed">Không đạt</option>
-        <option value="closed">Đã đóng</option>
       </select>
-
       <select
         defaultValue={searchParams.get("sort") ?? "latest"}
         onChange={(event) => updateParam("sort", event.target.value)}
@@ -92,6 +77,6 @@ export default function AdminOfficerSubmissionsFilter({
         <option value="score_desc">Điểm cao nhất</option>
         <option value="score_asc">Điểm thấp nhất</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

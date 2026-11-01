@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { assertCriteriaTemplateMutable } from "@/server/criteria-templates/assertCriteriaTemplateMutable";
 
 function makeGroupCode(index: number) {
@@ -16,48 +16,47 @@ export async function createCriteriaGroup(
   formData: FormData
 ) {
   await requireAdminContext();
-  assertCriteriaTemplateMutable(getDb(), templateId);
+  (await assertCriteriaTemplateMutable(getDatabase(), templateId));
 
-  const db = getDb();
+  const db = getDatabase();
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const minRequired = Number(formData.get("minRequired") ?? 1);
+  const template = (await db.first(`SELECT for_type FROM criteria_templates WHERE id=? LIMIT 1`, [templateId])) as {for_type:string}|undefined;
+  if (!template) throw new Error("Bộ tiêu chuẩn không tồn tại.");
+  const scoreMax = template.for_type === "officer" ? Number(formData.get("scoreMax") ?? 0) : 0;
 
   if (!title) {
     throw new Error("Vui lòng nhập tên tiêu chuẩn.");
   }
 
-  if (!Number.isFinite(minRequired) || minRequired < 0) {
+  if (!Number.isInteger(minRequired) || minRequired < 0) {
     throw new Error("Số tiêu chí cần đạt không hợp lệ.");
   }
+  if (template.for_type === "officer" && (!Number.isFinite(scoreMax) || scoreMax <= 0)) throw new Error("Điểm tối đa của tiêu chuẩn phải lớn hơn 0.");
 
-  const countRow = db
-    .prepare(
-      `
+  const countRow = (await db.first(`
       SELECT COUNT(*) AS total
       FROM criteria_template_groups
       WHERE template_id = ?
-      `
-    )
-    .get(templateId) as { total: number };
+      `, [templateId])) as { total: number };
 
   const sortOrder = Number(countRow.total ?? 0) + 1;
   const code = makeGroupCode(sortOrder - 1);
 
-  db.prepare(
-    `
+  (await db.execute(`
     INSERT INTO criteria_template_groups (
       template_id,
       code,
       title,
       description,
       min_required,
+      score_max,
       sort_order
     )
-    VALUES (?, ?, ?, ?, ?, ?)
-    `
-  ).run(templateId, code, title, description || null, minRequired, sortOrder);
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [templateId, code, title, description || null, minRequired, scoreMax, sortOrder]));
 
   revalidatePath(`/dashboard/admin/criteria-templates/${templateId}/configure`);
 

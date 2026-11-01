@@ -1,9 +1,11 @@
 "use client";
+import CohortFilter from "@/components/shared/CohortFilter";
 
 import { useCallback, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CheckinLogActivityOption } from "./types";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 export default function FacultyOfficerAttendanceLogsFilter({
   activities,
@@ -36,8 +38,8 @@ export default function FacultyOfficerAttendanceLogsFilter({
   }, [keyword, updateParam]);
 
   return (
-    <div >
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <FilterRow className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <CohortFilter />
         <div className="relative">
           <Search
             size={16}
@@ -90,7 +92,6 @@ export default function FacultyOfficerAttendanceLogsFilter({
           onChange={(event) => updateParam("logTo", event.target.value)}
           className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
         />
-      </div>
-    </div>
+    </FilterRow>
   );
 }

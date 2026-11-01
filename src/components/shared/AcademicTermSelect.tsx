@@ -59,7 +59,7 @@ export default function AcademicTermSelect({
   }
 
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-900">

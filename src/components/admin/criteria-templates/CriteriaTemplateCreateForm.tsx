@@ -1,4 +1,6 @@
 "use client";
+import RequiredMark from "@/components/common/RequiredMark";
+
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -46,17 +48,17 @@ export default function CriteriaTemplateCreateForm() {
     <>
       <ActionFeedback pending={pending} message={state.message} ok={state.ok} />
     <form action={formAction} className="space-y-6">
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+      <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
         <h2 className="text-xl font-semibold text-slate-900">
           Thông tin bộ tiêu chuẩn
         </h2>
 
 
-        <div className="mt-5 grid gap-4">
+        <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Tên bộ tiêu chuẩn
-            </label>
+            <RequiredMark required={true}/></label>
             <input
               name="name"
               required
@@ -68,7 +70,7 @@ export default function CriteriaTemplateCreateForm() {
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Đối tượng
-            </label>
+            <RequiredMark required={true}/></label>
             <select
               name="forType"
               required
@@ -79,7 +81,7 @@ export default function CriteriaTemplateCreateForm() {
             </select>
           </div>
 
-          <div>
+          <div className="col-span-full">
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Mô tả
             </label>
@@ -104,7 +106,7 @@ export default function CriteriaTemplateCreateForm() {
       </div>
 
       {state.ok && state.templateId ? (
-        <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
           <div>
               <Link
                 href={`/dashboard/admin/criteria-templates/${state.templateId}/configure`}

@@ -1,11 +1,15 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
+import NumberedTable from "@/components/common/NumberedTable";
+import { addCohortFilter } from "@/server/cohorts/sql";
 import TableActionLink from "@/components/shared/TableActionLink";
-import { Users } from "lucide-react";
+import { ShieldCheck, UserCheck, UserRoundCog, UserX, Users } from "lucide-react";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
+import { getUserPublicId } from "@/server/auth/publicUserId";
 import Pagination from "@/components/common/Pagination";
 import AdminUsersFilter from "@/components/admin/users/AdminUsersFilter";
 
-type SearchParams = Promise<{
+type SearchParams = Promise<{ cohort?: string;
   page?: string;
   keyword?: string;
   role?: string;
@@ -16,6 +20,7 @@ type SearchParams = Promise<{
 type Row = {
   id: number;
   mssv: string;
+  cohort: number|null;
   full_name: string;
   email: string | null;
   role: string;
@@ -27,6 +32,7 @@ type ClassOption = {
   id: number;
   code: string;
   name: string;
+  cohort: number | null;
 };
 
 const PAGE_SIZE = 10;
@@ -45,7 +51,7 @@ export default async function AdminUsersPage({
   await requireAdminContext();
 
   const params = await searchParams;
-  const db = getDb();
+  const db = getDatabase();
 
   const page = Math.max(1, Number(params.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
@@ -53,27 +59,26 @@ export default async function AdminUsersPage({
   const keyword = String(params.keyword ?? "").trim();
   const role = String(params.role ?? "").trim();
   const active = String(params.active ?? "").trim();
-  const classId = Number(params.classId ?? 0);
+  const requestedClassId = Number(params.classId ?? 0);
 
-  const classes = db
-    .prepare(
-      `
-      SELECT id, code, name
+  const classes = (await db.rows(`
+      SELECT id, code, name, cohort
       FROM classes
       WHERE is_active = 1
       ORDER BY code ASC, id ASC
-      `
-    )
-    .all() as ClassOption[];
+      `, [])) as ClassOption[];
+
+  const classId = classes.some(item => item.id === requestedClassId && (!params.cohort || String(item.cohort) === params.cohort)) ? requestedClassId : 0;
 
   const where: string[] = [`u.role != 'admin'`];
   const values: unknown[] = [];
+  addCohortFilter(where,values,params.cohort,"u.cohort");
 
   if (keyword) {
     where.push(
-      `(u.full_name LIKE ? OR u.mssv LIKE ? OR u.email LIKE ? OR c.code LIKE ?)`
+      `(u.full_name LIKE ? OR u.mssv LIKE ?)`
     );
-    values.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
+    values.push(`%${keyword}%`, `%${keyword}%`);
   }
 
   if (role) {
@@ -93,29 +98,24 @@ export default async function AdminUsersPage({
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  const totalRow = db
-    .prepare(
-      `
+  const totalRow = (await db.first(`
       SELECT COUNT(DISTINCT u.id) AS total
       FROM users u
       LEFT JOIN class_members cm ON cm.user_id = u.id AND cm.left_at IS NULL
       LEFT JOIN classes c ON c.id = cm.class_id
       ${whereSql}
-      `
-    )
-    .get(...values) as { total: number };
+      `, [...values])) as { total: number };
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         u.id,
         u.mssv,
+        u.cohort,
         u.full_name,
         u.email,
         u.role,
         u.is_active,
-        GROUP_CONCAT(c.code, ', ') AS class_code
+        GROUP_CONCAT(c.code SEPARATOR ', ') AS class_code
       FROM users u
       LEFT JOIN class_members cm ON cm.user_id = u.id AND cm.left_at IS NULL
       LEFT JOIN classes c ON c.id = cm.class_id
@@ -124,16 +124,15 @@ export default async function AdminUsersPage({
       ORDER BY u.id DESC
       LIMIT ?
       OFFSET ?
-      `
-    )
-    .all(...values, PAGE_SIZE, offset) as Row[];
+      `, [...values, PAGE_SIZE, offset])) as Row[];
 
   const total = Number(totalRow.total ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const userSummary = (await db.first(`SELECT COUNT(*) total, SUM(CASE WHEN is_active=1 THEN 1 ELSE 0 END) active_count, SUM(CASE WHEN is_active=0 THEN 1 ELSE 0 END) inactive_count, SUM(CASE WHEN role='faculty_officer' THEN 1 ELSE 0 END) faculty_count, SUM(CASE WHEN role='class_officer' THEN 1 ELSE 0 END) class_count FROM users WHERE role<>'admin'`, [])) as { total: number; active_count: number; inactive_count: number; faculty_count: number; class_count: number };
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
@@ -147,23 +146,31 @@ export default async function AdminUsersPage({
         </div>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <h2 className="text-xl font-semibold text-slate-900">
-          Danh sách tài khoản
-        </h2>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <UserSummaryCard icon={<UserCheck size={19} />} label="Đang hoạt động" value={userSummary.active_count} total={userSummary.total} />
+        <UserSummaryCard icon={<UserX size={19} />} label="Đã vô hiệu hóa" value={userSummary.inactive_count} total={userSummary.total} />
+        <UserSummaryCard icon={<ShieldCheck size={19} />} label="Cán bộ khoa" value={userSummary.faculty_count} total={userSummary.total} />
+        <UserSummaryCard icon={<UserRoundCog size={19} />} label="Cán bộ lớp" value={userSummary.class_count} total={userSummary.total} />
+      </section>
 
-        <div className="mt-5">
+      <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+        <div>
           <AdminUsersFilter classes={classes} />
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-          <table className="min-w-full table-fixed divide-y divide-slate-200">
+      <h2 className="mt-5 text-xl font-semibold text-slate-900">
+          Danh sách tài khoản
+        </h2>
+
+        <div data-table-frame className="mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<div className="overflow-hidden rounded-none border border-slate-200">
+          <NumberedTable page={page} className="min-w-full table-fixed divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
                 <th className="w-[28%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                   Người dùng
                 </th>
-                <th className="w-[16%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+                <th data-column-align="left" className="w-[16%] px-4 py-3  text-sm font-semibold text-slate-700 text-left">
                   Lớp
                 </th>
                 <th className="w-[18%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -179,7 +186,7 @@ export default async function AdminUsersPage({
             </thead>
 
             <tbody className="divide-y divide-slate-100 bg-white">
-              {rows.map((item) => (
+              {(await Promise.all(rows.map(async (item) => (
                 <tr key={item.id} className="transition hover:bg-slate-50/70">
                   <td className="px-4 py-4">
                     <div className="text-sm font-semibold text-slate-900">
@@ -190,7 +197,7 @@ export default async function AdminUsersPage({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 text-sm text-slate-700">
+                  <td data-column-align="left" className="px-4 py-4 text-sm text-slate-700 text-left">
                     {item.class_code || "-"}
                   </td>
 
@@ -213,14 +220,14 @@ export default async function AdminUsersPage({
 
                   <td className="px-4 py-4 text-center">
                     <TableActionLink
-                      href={`/dashboard/admin/users/${item.id}`}
+                      href={`/dashboard/admin/users/${(await getUserPublicId(db, item.id))}`}
                       variant="view"
                     >
                       Xem
                     </TableActionLink>
                   </td>
                 </tr>
-              ))}
+              ))))}
 
               {rows.length === 0 ? (
                 <tr>
@@ -233,14 +240,13 @@ export default async function AdminUsersPage({
                 </tr>
               ) : null}
             </tbody>
-          </table>
+          </NumberedTable>
         </div>
-
-        <div className="mt-5">
-          <Pagination
+<div className="mt-5">
+          <Pagination totalResults={total} resultLabel="tài khoản"
             page={page}
             totalPages={totalPages}
-            searchParams={{
+            searchParams={{ cohort: params.cohort,
               keyword,
               role,
               active,
@@ -248,7 +254,12 @@ export default async function AdminUsersPage({
             }}
           />
         </div>
+</div>
       </section>
     </main>
   );
+}
+
+function UserSummaryCard({ icon, label, value, total }: { icon: React.ReactNode; label: string; value: number; total: number }) {
+  return <div className={[statCardStyles.card, "min-w-0"].join(" ")}><div className="flex items-center justify-between gap-3"><span className={statCardStyles.label}>{label}</span><span className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</span></div><div className="mt-4 flex items-baseline gap-1.5"><span className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</span><span className={statCardStyles.label}>/ {total}</span></div></div>;
 }

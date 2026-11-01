@@ -1,4 +1,5 @@
 "use client";
+import useConfirmation from "@/components/shared/useConfirmation";
 
 import { useState, useTransition } from "react";
 import ActionFeedback from "@/components/shared/ActionFeedback";
@@ -8,13 +9,14 @@ import toast from "react-hot-toast";
 export default function DeleteEntityButton({ label, confirmMessage, action, disabled = false, disabledReason = "Không thể xóa vì đã có dữ liệu liên quan" }: { label: string; confirmMessage: string; action: (formData?: FormData) => Promise<{ message: string }>; disabled?: boolean; disabledReason?: string }) {
   const [pending, startTransition] = useTransition();
   const router=useRouter();
+  const { confirm, modal } = useConfirmation();
   const [feedback, setFeedback] = useState({ message: "", ok: false });
   return <>
-    <ActionFeedback pending={pending} message={feedback.message} ok={feedback.ok} />
-    <button type="button" title={disabled ? disabledReason : label} aria-label={label} disabled={disabled || pending} onClick={() => {
-      if (!window.confirm(confirmMessage)) return;
-      const reason=window.prompt("Nhập lý do xóa (tối thiểu 10 ký tự):")?.trim()??"";
-      if(reason.length<10){setFeedback({message:"Vui lòng nhập lý do xóa cụ thể, tối thiểu 10 ký tự.",ok:false});return;}
+    {modal}
+      <ActionFeedback pending={pending} message={feedback.message} ok={feedback.ok} />
+    <button type="button" title={disabled ? disabledReason : label} aria-label={label} disabled={disabled || pending} onClick={async () => {
+      const reason = await confirm({ title: 'Xác nhận xóa', message: confirmMessage, confirmLabel: 'Xác nhận xóa', requireReason: true });
+      if (reason === null) return;
       const formData=new FormData();formData.set("reason",reason);
       startTransition(async () => {
         try { const result = await action(formData); toast.success(result.message, {id:`delete-success-${label}-${confirmMessage}`}); setFeedback({ message: "", ok: true }); router.refresh(); }

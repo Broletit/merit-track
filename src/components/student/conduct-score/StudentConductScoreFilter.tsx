@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import FilterRow from "@/components/shared/filters/FilterRow";
 import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -9,29 +10,38 @@ export default function StudentConductScoreFilter() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyword, setKeyword] = useState(searchParams.get("keyword") ?? "");
 
   function updateParam(key: string, value: string) {
+    if (timerRef.current) clearTimeout(timerRef.current);
     const params = new URLSearchParams(searchParams.toString());
+    if (key !== "keyword") {
+      if (keyword.trim()) params.set("keyword", keyword.trim());
+      else params.delete("keyword");
+    }
+    params.delete("cohort");
 
     if (value) params.set(key, value);
     else params.delete(key);
 
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
   useEffect(() => {
+    if (keyword.trim() === (searchParams.get("keyword") ?? "").trim()) return;
     const timer = setTimeout(() => {
       updateParam("keyword", keyword.trim());
     }, 350);
 
+    timerRef.current = timer;
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keyword]);
+  }, [keyword, searchParams]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <div className="relative xl:col-span-2">
+    <FilterRow className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="relative">
         <Search
           size={16}
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -43,7 +53,13 @@ export default function StudentConductScoreFilter() {
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
+      <select aria-label="Lọc theo phạm vi" value={searchParams.get("scope")??""}
+        onChange={event=>updateParam("scope",event.target.value)}
+        className="h-11 min-w-0 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500">
+        <option value="">Tất cả phạm vi</option>
+        <option value="class">Chi đoàn</option>
+        <option value="faculty">Cấp khoa</option>
+      </select>
       <select
         defaultValue={searchParams.get("status") ?? ""}
         onChange={(event) => updateParam("status", event.target.value)}
@@ -52,18 +68,18 @@ export default function StudentConductScoreFilter() {
         <option value="">Tất cả trạng thái</option>
         <option value="registered">Đã đăng ký</option>
         <option value="attended">Đã tham gia</option>
+        <option value="absent">Vắng</option>
       </select>
-
       <select
-        defaultValue={searchParams.get("score") ?? ""}
+        value={searchParams.get("score") === "none" ? "pending" : searchParams.get("score") ?? ""}
         onChange={(event) => updateParam("score", event.target.value)}
         className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
       >
         <option value="">Tất cả điểm</option>
-        <option value="added">Đã cộng điểm</option>
-        <option value="pending">Chờ cộng điểm</option>
-        <option value="none">Chưa được cộng</option>
+        <option value="added">Đã cộng</option>
+        <option value="deducted">Đã trừ</option>
+        <option value="pending">Chưa xác nhận</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

@@ -22,6 +22,7 @@ export type CriteriaTemplateGroupItem = {
   title: string;
   description: string | null;
   minRequired: number;
+  scoreMax: number;
   sortOrder: number;
   criteriaCount: number;
 };
@@ -55,4 +56,7 @@ export type CriteriaTemplateConductRule = {
 export type CriteriaTemplateActivityOption = {
   id: number;
   title: string;
+  termId: number;
+  termName: string;
+  isCurrentTerm: boolean;
 };

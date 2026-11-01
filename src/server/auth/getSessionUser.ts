@@ -1,5 +1,7 @@
-import { getDb } from "@/server/db/sqlite";
+import { finalizeExpiredSubmissions } from "@/server/submissions/finalizeExpiredSubmissions";
+import { getDatabase } from "@/server/db/mysql";
 import { getSession } from "./session";
+import { canUseLoginContext } from "./role-context";
 
 type DbUserRow = {
   id: number;
@@ -8,6 +10,7 @@ type DbUserRow = {
   email: string | null;
   role: string;
   is_active: number;
+  must_change_pw: number;
 };
 
 export async function getSessionUser() {
@@ -17,26 +20,24 @@ export async function getSessionUser() {
     return null;
   }
 
-  const db = getDb();
+  const db = getDatabase();
+  await finalizeExpiredSubmissions(db);
 
-  const user = db
-    .prepare(
-      `
+  const user = (await db.first(`
       SELECT
         id,
         mssv,
         full_name,
         email,
         role,
-        is_active
+        is_active,
+        must_change_pw
       FROM users
       WHERE id = ?
       LIMIT 1
-      `
-    )
-    .get(session.userId) as DbUserRow | undefined;
+      `, [session.userId])) as DbUserRow | undefined;
 
-  if (!user || !user.is_active) {
+  if (!user || !user.is_active || !canUseLoginContext(user.role, session.loginContext)) {
     return null;
   }
 
@@ -47,6 +48,7 @@ export async function getSessionUser() {
     email: user.email ? String(user.email) : null,
     role: String(user.role ?? ""),
     is_active: Number(user.is_active ?? 0),
+    must_change_pw: Number(user.must_change_pw ?? 0),
     loginContext: String(session.loginContext ?? "student"),
   };
 }

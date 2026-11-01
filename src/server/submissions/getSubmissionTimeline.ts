@@ -1,5 +1,5 @@
 import type { SubmissionTimelineItem } from "@/components/shared/reviews/ReviewHistory";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 type Row = {
   id: number;
@@ -11,8 +11,8 @@ type Row = {
   created_at: string;
 };
 
-export function getSubmissionTimeline(submissionId: number): SubmissionTimelineItem[] {
-  const rows = getDb().prepare(`
+export async function getSubmissionTimeline(submissionId: number): Promise<SubmissionTimelineItem[]> {
+  const rows = (await getDatabase().rows(`
     SELECT
       timeline.id,
       timeline.action,
@@ -24,8 +24,8 @@ export function getSubmissionTimeline(submissionId: number): SubmissionTimelineI
     FROM submission_timeline timeline
     LEFT JOIN users actor ON actor.id = timeline.actor_user_id
     WHERE timeline.submission_id = ?
-    ORDER BY datetime(timeline.created_at) ASC, timeline.id ASC
-  `).all(submissionId) as Row[];
+    ORDER BY CAST(timeline.created_at AS DATETIME(3)) ASC, timeline.id ASC
+  `, [submissionId])) as Row[];
 
   return rows.map((item) => ({
     id: Number(item.id),

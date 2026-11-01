@@ -1,25 +1,27 @@
+import { cohortClause } from "@/server/cohorts/sql";
 import { NextResponse } from "next/server";
-import { getDb } from "@/server/db/sqlite";
-import { requireAdmin } from "@/server/auth/guards";
+import { getDatabase } from "@/server/db/mysql";
+import { requireAdminContext } from "@/server/auth/guards";
 
-export async function GET() {
-  await requireAdmin();
-  const db = getDb();
+export async function GET(req:Request) {
+  await requireAdminContext();
+  const db = getDatabase();
 
-  const items = db.prepare(`
+  const items = (await db.rows(`
     SELECT
       c.id,
       c.code,
       c.name,
       c.faculty,
-      c.intake_year,
+      c.cohort,
       c.is_active,
       COUNT(cm.id) AS member_count
     FROM classes c
     LEFT JOIN class_members cm ON cm.class_id = c.id
+    WHERE ${cohortClause(new URL(req.url).searchParams.get("cohort"),"c.cohort")}
     GROUP BY c.id
     ORDER BY c.code ASC
-  `).all();
+  `, []));
 
   return NextResponse.json({ items });
 }

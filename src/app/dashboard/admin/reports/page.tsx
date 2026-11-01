@@ -1,10 +1,5 @@
 import Link from "next/link";
-import {
-  Activity,
-  Award,
-  ClipboardCheck,
-  Trophy,
-} from "lucide-react";
+import { Activity, ClipboardCheck, Trophy } from "lucide-react";
 import { requireAdminContext } from "@/server/auth/guards";
 
 export default async function AdminReportsPage() {
@@ -12,11 +7,11 @@ export default async function AdminReportsPage() {
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <h1 className="text-2xl font-semibold">Báo cáo & thống kê</h1>
       </section>
 
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         <ReportCard
           href="/dashboard/admin/reports/student-activities"
           icon={<Activity size={22} />}
@@ -27,23 +22,17 @@ export default async function AdminReportsPage() {
         <ReportCard
           href="/dashboard/admin/reports/student-awards"
           icon={<ClipboardCheck size={22} />}
-          title="Xét thưởng sinh viên"
+          title="Đợt xét sinh viên"
           description="Thống kê đạt/không đạt, thiếu tiêu chí và danh sách đủ điều kiện."
         />
 
         <ReportCard
           href="/dashboard/admin/reports/officer-achievements"
           icon={<Trophy size={22} />}
-          title="Cán bộ đoàn tiêu biểu"
+          title="Đợt xét cán bộ"
           description="Xếp hạng cán bộ theo điểm hồ sơ, phục vụ báo cáo cấp trường."
         />
 
-        <ReportCard
-          href="/dashboard/admin/reports/overview"
-          icon={<Award size={22} />}
-          title="Tổng quan khoa"
-          description="Tổng hợp nhanh toàn bộ chỉ số hoạt động và xét duyệt."
-        />
       </section>
     </main>
   );
@@ -63,14 +52,14 @@ function ReportCard({
   return (
     <Link
       href={href}
-      className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:shadow-md"
+      className="group relative overflow-hidden rounded-3xl border border-blue-100 bg-linear-to-br from-white via-blue-50 to-cyan-50 p-6 shadow-[0_10px_28px_rgba(37,99,235,.10)] transition duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-[0_18px_38px_rgba(37,99,235,.18)]"
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-700 text-white shadow-lg shadow-blue-200 transition group-hover:scale-105">
         {icon}
       </div>
 
       <h2 className="mt-5 text-lg font-semibold text-slate-900">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
+      {description ? null : null}
     </Link>
   );
 }

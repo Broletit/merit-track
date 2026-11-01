@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Gauge,
   GraduationCap,
+  School,
   Award,
   QrCode,
   Settings,
@@ -40,6 +41,7 @@ export function getSidebarGroups(role: string): SidebarGroup[] {
         icon: Users,
         items: [
           { href: "/dashboard/admin/users", label: "Người dùng", icon: Users },
+          { href: "/dashboard/admin/classes", label: "Lớp học", icon: School },
           { href: "/dashboard/admin/students-import", label: "Import sinh viên", icon: Upload },
           { href: "/dashboard/admin/academic-terms", label: "Học kỳ", icon: GraduationCap },
         ],
@@ -59,7 +61,6 @@ export function getSidebarGroups(role: string): SidebarGroup[] {
         icon: ClipboardCheck,
         items: [
           { href: "/dashboard/admin/submissions", label: "Hồ sơ sinh viên", icon: ClipboardCheck },
-          { href: "/dashboard/admin/officer-submissions", label: "Hồ sơ cán bộ", icon: ClipboardList },
           { href: "/dashboard/admin/officer-reviews", label: "Duyệt hồ sơ cán bộ", icon: Trophy },
         ],
       },
@@ -69,7 +70,6 @@ export function getSidebarGroups(role: string): SidebarGroup[] {
         items: [
           { href: "/dashboard/admin/reports", label: "Báo cáo", icon: BarChart3 },
           { href: "/dashboard/admin/audit-logs", label: "Nhật ký hệ thống", icon: ClipboardList },
-          { href: "/dashboard/admin/settings", label: "Cài đặt", icon: Settings },
           { href: "/dashboard/admin/notifications", label: "Thông báo", icon: Bell },
         ],
       },
@@ -90,8 +90,7 @@ export function getSidebarGroups(role: string): SidebarGroup[] {
           { href: "/dashboard/faculty-officer/activities", label: "Hoạt động", icon: CalendarCheck2 },
           { href: "/dashboard/faculty-officer/checkin", label: "Điểm danh QR", icon: QrCode },
           { href: "/dashboard/faculty-officer/events", label: "Đợt xét", icon: Trophy },
-          { href: "/dashboard/faculty-officer/submissions", label: "Hồ sơ", icon: ClipboardCheck },
-          { href: "/dashboard/faculty-officer/reviews", label: "Duyệt vòng 2", icon: ClipboardList },
+          { href: "/dashboard/faculty-officer/reviews", label: "Duyệt hồ sơ", icon: ClipboardList },
         ],
       },
       {
@@ -127,8 +126,7 @@ export function getSidebarGroups(role: string): SidebarGroup[] {
         items: [
           { href: "/dashboard/class-officer/activities", label: "Hoạt động", icon: CalendarCheck2 },
           { href: "/dashboard/class-officer/events", label: "Đợt xét", icon: Trophy },
-          { href: "/dashboard/class-officer/submissions", label: "Hồ sơ", icon: ClipboardCheck },
-          { href: "/dashboard/class-officer/reviews", label: "Duyệt vòng 1", icon: ClipboardList },
+          { href: "/dashboard/class-officer/reviews", label: "Duyệt hồ sơ", icon: ClipboardList },
 
         ],
       },

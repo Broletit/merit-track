@@ -2,16 +2,14 @@ import type { EventSubmissionPhase } from "@/lib/events/eventSubmissionPhase";
 
 const PHASE_FILTERS: Record<EventSubmissionPhase, string> = {
   not_published: "e.status NOT IN ('published', 'closed')",
-  not_open: "e.status = 'published' AND datetime(e.start_at) > datetime('now')",
+  not_open: "e.status = 'published' AND CAST(e.start_at AS DATETIME(3)) > CURRENT_TIMESTAMP(3)",
   accepting:
-    "e.status = 'published' AND datetime(e.start_at) <= datetime('now') AND datetime(e.end_at) >= datetime('now')",
-  late_allowed:
-    "e.status = 'published' AND datetime(e.end_at) < datetime('now') AND e.allow_late = 1",
+    "e.status = 'published' AND CAST(e.start_at AS DATETIME(3)) <= CURRENT_TIMESTAMP(3) AND CAST(e.end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)",
   expired:
-    "e.status = 'published' AND datetime(e.end_at) < datetime('now') AND e.allow_late = 0",
+    "e.status = 'published' AND CAST(e.end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)",
   closed: "e.status = 'closed'",
 };
 
 export function getEventSubmissionPhaseFilter(phase: string) {
-  return PHASE_FILTERS[phase as EventSubmissionPhase] ?? null;
+  return Object.hasOwn(PHASE_FILTERS,phase) ? PHASE_FILTERS[phase as EventSubmissionPhase] : null;
 }

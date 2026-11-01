@@ -1,11 +1,13 @@
 "use client";
+import RequiredMark from "@/components/common/RequiredMark";
+
 
 import { useActionState } from "react";
 import { updateCriteriaTemplate } from "@/server/actions/criteria-templates/updateCriteriaTemplate";
 import { cloneCriteriaTemplate } from "@/server/actions/criteria-templates/cloneCriteriaTemplate";
 import ActionFeedback from "@/components/shared/ActionFeedback";
 import toast from "react-hot-toast";
-import { ArrowLeft } from "lucide-react";
+import { SquareX } from "lucide-react";
 import type { AdminCriteriaTemplateItem } from "./types";
 
 type State = {
@@ -53,7 +55,7 @@ export default function CriteriaTemplateEditInlineForm({
   return (
     <>
       <ActionFeedback pending={pending} message={state.message} ok={state.ok} />
-    <section className="mt-5 rounded-2xl bg-amber-50 p-5 ring-1 ring-amber-200">
+    <section className="mt-5 rounded-none bg-amber-50 p-5 ring-1 ring-amber-200 shadow-md shadow-slate-200/60">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h3 className="text-base font-semibold text-slate-900">
@@ -66,24 +68,23 @@ export default function CriteriaTemplateEditInlineForm({
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-        >
-          <ArrowLeft size={16} />
-          Quay về
+          className="inline-flex h-10! w-10! min-h-10! min-w-10! shrink-0 items-center justify-center rounded-md! border-0! bg-transparent! p-0! text-red-500! shadow-none! transition-colors hover:bg-red-50! hover:text-red-700! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300 disabled:opacity-50"
+         aria-label="Đóng chỉnh sửa bộ tiêu chuẩn" title="Đóng">
+          <SquareX size={24} strokeWidth={1.75} />
         </button>
       </div>
 
       <form key={item.id} action={formAction} className="mt-4 space-y-4">
         {item.usedEvents > 0 ? (
-          <div className="rounded-xl bg-white px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+          <div className="rounded-none bg-white px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200 shadow-md shadow-slate-200/60">
             Bộ tiêu chuẩn đang được {item.usedEvents} đợt xét sử dụng nên chỉ được đổi tên và mô tả. Hãy lưu thành bản sao nếu cần thay đổi đối tượng hoặc cấu hình.
           </div>
         ) : null}
-        <div className="grid gap-4 md:grid-cols-12">
-          <div className="md:col-span-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="min-w-0">
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Tên bộ tiêu chuẩn
-            </label>
+            <RequiredMark required={true}/></label>
             <input
               name="name"
               required
@@ -92,11 +93,11 @@ export default function CriteriaTemplateEditInlineForm({
             />
           </div>
 
-          <div className="md:col-span-3">
+          <div className="min-w-0">
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Đối tượng
-            </label>
-            <select
+            <RequiredMark/></label>
+            <select required
               name="forType"
               defaultValue={item.forType}
               disabled={item.usedEvents > 0}
@@ -108,11 +109,11 @@ export default function CriteriaTemplateEditInlineForm({
             {item.usedEvents > 0 ? <input type="hidden" name="forType" value={item.forType} /> : null}
           </div>
 
-          <div className="flex items-end gap-2 md:col-span-4">
+          <div className="flex flex-wrap items-start justify-end gap-2 sm:col-span-2">
             <button
               type="button"
               onClick={onCancel}
-              className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="min-h-11 h-auto rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 py-2 max-w-full break-words"
             >
               Hủy
             </button>
@@ -122,7 +123,7 @@ export default function CriteriaTemplateEditInlineForm({
               name="intent"
               value="copy"
               disabled={pending}
-              className="h-11 rounded-xl border border-blue-600 bg-white px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+              className="min-h-11 h-auto rounded-xl border border-blue-600 bg-white px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60 py-2 max-w-full break-words"
             >
               Lưu thành bản sao
             </button>
@@ -132,7 +133,7 @@ export default function CriteriaTemplateEditInlineForm({
               name="intent"
               value="save"
               disabled={pending}
-              className="h-11 flex-1 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:opacity-100"
+              className="min-h-11 h-auto flex-1 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:opacity-100 py-2 max-w-full break-words"
             >
               {pending ? "Đang lưu..." : "Lưu thay đổi"}
             </button>

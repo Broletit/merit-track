@@ -2,15 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { requireLogin } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 export async function markNotificationRead(notificationId: number) {
   const user = await requireLogin();
-  getDb().prepare(
-    `UPDATE notifications
-     SET is_read = 1, read_at = COALESCE(read_at, datetime('now'))
-     WHERE id = ? AND user_id = ?`
-  ).run(notificationId, user.id);
+  (await getDatabase().execute(`UPDATE notifications
+     SET is_read = 1, read_at = COALESCE(read_at, CURRENT_TIMESTAMP(3))
+     WHERE id = ? AND user_id = ? AND role_context = ?`, [notificationId, user.id, user.loginContext ?? "student"]));
   revalidatePath("/dashboard/student/notifications");
   revalidatePath("/dashboard/class-officer/notifications");
   revalidatePath("/dashboard/faculty-officer/notifications");
@@ -20,11 +18,9 @@ export async function markNotificationRead(notificationId: number) {
 
 export async function markAllNotificationsRead() {
   const user = await requireLogin();
-  getDb().prepare(
-    `UPDATE notifications
-     SET is_read = 1, read_at = COALESCE(read_at, datetime('now'))
-     WHERE user_id = ? AND is_read = 0`
-  ).run(user.id);
+  (await getDatabase().execute(`UPDATE notifications
+     SET is_read = 1, read_at = COALESCE(read_at, CURRENT_TIMESTAMP(3))
+     WHERE user_id = ? AND role_context = ? AND is_read = 0`, [user.id, user.loginContext ?? "student"]));
   revalidatePath("/dashboard/student/notifications");
   revalidatePath("/dashboard/class-officer/notifications");
   revalidatePath("/dashboard/faculty-officer/notifications");

@@ -13,7 +13,7 @@ export default function FacultyOfficerReviewEvidenceCard({
   filePath,
 }: Props) {
   return (
-    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-md shadow-slate-200/60">
       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">

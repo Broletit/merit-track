@@ -2,20 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { requireChangeReason, writeAuditLog } from "@/server/audit/writeAuditLog";
 
 const ROLES = ["student", "class_officer", "faculty_officer"];
 
 export async function updateUserAdmin(userId: number, formData: FormData) {
   const admin = await requireAdminContext();
-  const reason = requireChangeReason(formData.get("reason"));
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const target = db
-    .prepare(`SELECT id, role, is_active FROM users WHERE id = ? LIMIT 1`)
-    .get(userId) as { id: number; role: string; is_active:number } | undefined;
+  const target = (await db.first(`SELECT id, role, is_active FROM users WHERE id = ? LIMIT 1`, [userId])) as { id: number; role: string; is_active:number } | undefined;
 
   if (!target) {
     throw new Error("Không tìm thấy tài khoản.");
@@ -32,76 +29,63 @@ export async function updateUserAdmin(userId: number, formData: FormData) {
     throw new Error("Vai trò không hợp lệ.");
   }
 
-  if (role === "class_officer" && isActive === 1) {
-    const membership = db.prepare(`SELECT class_id FROM class_members WHERE user_id=? AND left_at IS NULL ORDER BY joined_at DESC LIMIT 1`).get(userId) as { class_id: number } | undefined;
-    if (!membership) {
-      throw new Error("Cần phân công lớp sinh hoạt trước khi cấp quyền cán bộ lớp.");
-    }
-    const currentOfficers = db.prepare(`
-      SELECT u.full_name, u.mssv
-      FROM class_members cm
-      INNER JOIN users u ON u.id=cm.user_id
-      WHERE cm.class_id=? AND cm.left_at IS NULL AND u.role='class_officer' AND u.is_active=1 AND u.id<>?
-      ORDER BY u.full_name, u.id
-    `).all(membership.class_id, userId) as Array<{ full_name: string; mssv: string }>;
-    if (currentOfficers.length >= 4) {
-      const officerList = currentOfficers.map((item) => `${item.full_name} (${item.mssv})`).join(", ");
-      throw new Error(`Lớp đã đủ tối đa 4 cán bộ lớp: ${officerList}. Hãy điều chỉnh một cán bộ hiện tại trước khi cấp thêm quyền.`);
-    }
-  }
+  if (role === target.role && isActive === Number(target.is_active)) throw new Error("Chưa thay đổi vai trò hoặc trạng thái tài khoản.");
+  const reason = requireChangeReason(formData.get("reason"));
+
 
   const removesActiveClassOfficer = target.role === "class_officer" && Number(target.is_active) === 1 && (role !== "class_officer" || isActive === 0);
-  const facultyAssignmentIds = (db.prepare(
-    `SELECT class_id FROM faculty_class_assignments WHERE faculty_officer_id=? ORDER BY class_id`
-  ).all(userId) as Array<{ class_id: number }>).map((item) => Number(item.class_id));
+  const facultyAssignmentIds = ((await db.rows(`SELECT class_id FROM faculty_class_assignments WHERE faculty_officer_id=? ORDER BY class_id`, [userId])) as Array<{ class_id: number }>).map((item) => Number(item.class_id));
   const revokedFacultyAssignmentIds = role !== "faculty_officer"
     ? facultyAssignmentIds
     : [];
   const currentClass = removesActiveClassOfficer
-    ? db.prepare(`SELECT c.id,c.code,c.name FROM class_members cm INNER JOIN classes c ON c.id=cm.class_id WHERE cm.user_id=? AND cm.left_at IS NULL LIMIT 1`).get(userId) as { id: number; code: string; name: string } | undefined
+    ? (await db.first(`SELECT c.id,c.code,c.name FROM class_members cm INNER JOIN classes c ON c.id=cm.class_id WHERE cm.user_id=? AND cm.left_at IS NULL LIMIT 1`, [userId])) as { id: number; code: string; name: string } | undefined
     : undefined;
   let vacantClassCode = "";
 
-  db.transaction(() => {
-    db.prepare(
-      `UPDATE users SET role=?,is_active=?,updated_at=datetime('now') WHERE id=?`
-    ).run(role, isActive, userId);
+  (await (async () => (await db.withTransaction(async () => {
+    if (role === "class_officer" && isActive === 1) {
+      const membership = (await db.first(`SELECT class_id FROM class_members WHERE user_id=? AND left_at IS NULL ORDER BY joined_at DESC LIMIT 1`, [userId])) as { class_id: number } | undefined;
+      if (!membership) {
+        throw new Error("Cần phân công lớp sinh hoạt trước khi cấp quyền cán bộ lớp.");
+      }
+      const currentOfficers = (await db.rows(`
+        SELECT u.full_name, u.mssv
+        FROM class_members cm
+        INNER JOIN users u ON u.id=cm.user_id
+        WHERE cm.class_id=? AND cm.left_at IS NULL AND u.role='class_officer' AND u.is_active=1 AND u.id<>?
+        ORDER BY u.full_name, u.id
+      `, [membership.class_id, userId])) as Array<{ full_name: string; mssv: string }>;
+      if (currentOfficers.length >= 8) {
+        const officerList = currentOfficers.map((item) => `${item.full_name} (${item.mssv})`).join(", ");
+        throw new Error(`Lớp đã đủ tối đa 8 cán bộ lớp: ${officerList}. Hãy điều chỉnh một cán bộ hiện tại trước khi cấp thêm quyền.`);
+      }
+    }
+
+    (await db.execute(`UPDATE users SET role=?,is_active=?,updated_at=CURRENT_TIMESTAMP(3) WHERE id=?`, [role, isActive, userId]));
+    (await db.execute("UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP(3) WHERE user_id=? AND revoked_at IS NULL", [userId]));
 
     if (revokedFacultyAssignmentIds.length > 0) {
-      db.prepare(`DELETE FROM faculty_class_assignments WHERE faculty_officer_id=?`).run(userId);
+      (await db.execute(`DELETE FROM faculty_class_assignments WHERE faculty_officer_id=?`, [userId]));
     }
 
     if (currentClass) {
-      const remaining = db.prepare(`SELECT COUNT(*) total FROM class_members cm INNER JOIN users u ON u.id=cm.user_id WHERE cm.class_id=? AND cm.left_at IS NULL AND u.role='class_officer' AND u.is_active=1`).get(currentClass.id) as { total: number };
+      const remaining = (await db.first(`SELECT COUNT(*) total FROM class_members cm INNER JOIN users u ON u.id=cm.user_id WHERE cm.class_id=? AND cm.left_at IS NULL AND u.role='class_officer' AND u.is_active=1`, [currentClass.id])) as { total: number };
       if (Number(remaining.total) === 0) {
         vacantClassCode = currentClass.code;
-        const admins = db.prepare(`SELECT id FROM users WHERE role='admin' AND is_active=1`).all() as Array<{ id: number }>;
-        const notify = db.prepare(`INSERT INTO notifications(user_id,type,title,content,link) VALUES(?,?,?,?,?)`);
+        const admins = (await db.rows(`SELECT id FROM users WHERE role='admin' AND is_active=1`, [])) as Array<{ id: number }>;
+        
         for (const recipient of admins) {
-          notify.run(recipient.id, "class_officer_vacancy", `Lớp ${currentClass.code} đang khuyết cán bộ lớp`, `Lớp ${currentClass.code} - ${currentClass.name} không còn cán bộ lớp đang hoạt động. Vui lòng phân công ít nhất một cán bộ.`, "/dashboard/admin/users");
+          (await db.execute(`INSERT INTO notifications(user_id,type,title,content,link) VALUES(?,?,?,?,?)`, [recipient.id, "class_officer_vacancy", `Lớp ${currentClass.code} đang khuyết cán bộ lớp`, `Lớp ${currentClass.code} - ${currentClass.name} không còn cán bộ lớp đang hoạt động. Vui lòng phân công ít nhất một cán bộ.`, `/dashboard/admin/classes?classId=${currentClass.id}&keyword=${encodeURIComponent(currentClass.code)}&officerStatus=vacant`]));
         }
       }
     }
 
-    writeAuditLog({
-      db,
-      actorUserId: admin.id,
-      action: "user.access.update",
-      entityType: "user",
-      entityId: userId,
-      reason,
-      before: {
-        role: target.role,
-        isActive: target.is_active,
-        facultyClassAssignments: facultyAssignmentIds,
-      },
-      after: {
-        role,
-        isActive,
-        facultyClassAssignments: role === "faculty_officer" ? facultyAssignmentIds : [],
-      },
-    });
-  })();
+    const auditBefore={role:target.role,isActive:target.is_active,facultyClassAssignments:facultyAssignmentIds};
+    const auditAfter={role,isActive,facultyClassAssignments:role === "faculty_officer" ? facultyAssignmentIds : []};
+    if(role!==target.role)(await writeAuditLog({db,actorUserId:admin.id,action:"user.role.update",entityType:"user",entityId:userId,reason,before:auditBefore,after:auditAfter}));
+    if(isActive!==Number(target.is_active))(await writeAuditLog({db,actorUserId:admin.id,action:"user.status.update",entityType:"user",entityId:userId,reason,before:auditBefore,after:auditAfter}));
+  })))());
 
   revalidatePath("/dashboard/admin/users");
   revalidatePath(`/dashboard/admin/users/${userId}`);

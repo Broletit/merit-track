@@ -1,6 +1,7 @@
+import NumberedTable from "@/components/common/NumberedTable";
 import Link from "next/link";
 import { requireOfficerParticipantContext } from "@/server/auth/requireOfficerParticipantContext";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import SubmissionStatusBadge from "@/components/shared/submissions/SubmissionStatusBadge";
 import ReviewPagination from "@/components/shared/reviews/ReviewPagination";
@@ -8,7 +9,7 @@ import OfficerSubmissionsFilter from "@/components/faculty-officer/officer-submi
 import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
 import { getAcademicTermForView, getAcademicTermsForSelect } from "@/server/academic-terms/getAcademicTermForView";
 
-type SearchParams = Promise<{
+type SearchParams = Promise<{ cohort?: string;
   keyword?: string;
   status?: string;
   sort?: string;
@@ -39,9 +40,9 @@ export async function OfficerSubmissionsPageView({
 }) {
   const user = await requireOfficerParticipantContext();
   const params = await searchParams;
-  const db = getDb();
-  const terms = getAcademicTermsForSelect();
-  const selectedTerm = getAcademicTermForView(params.termId);
+  const db = getDatabase();
+  const terms = (await getAcademicTermsForSelect());
+  const selectedTerm = (await getAcademicTermForView(params.termId));
 
   const keyword = String(params.keyword ?? "").trim();
   const status = String(params.status ?? "").trim();
@@ -49,12 +50,12 @@ export async function OfficerSubmissionsPageView({
   const page = Math.max(1, Number(params.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
 
-  const where: string[] = ["s.user_id = ?", "e.type = 'officer'", "e.term_id = ?"];
+  const where: string[] = ["s.user_id = ?", "e.type = 'officer'", "e.term_id = ?", "s.submitted_at IS NOT NULL"];
   const values: unknown[] = [user.id, selectedTerm.id];
 
   if (keyword) {
-    where.push("(e.title LIKE ? OR e.description LIKE ?)");
-    values.push(`%${keyword}%`, `%${keyword}%`);
+    where.push("e.title LIKE ?");
+    values.push(`%${keyword}%`);
   }
 
   if (status) {
@@ -65,23 +66,17 @@ export async function OfficerSubmissionsPageView({
   const whereSql = `WHERE ${where.join(" AND ")}`;
   const orderSql =
     sort === "oldest"
-      ? "datetime(s.updated_at) ASC, s.id ASC"
-      : "datetime(s.updated_at) DESC, s.id DESC";
+      ? "CAST(s.updated_at AS DATETIME(3)) ASC, s.id ASC"
+      : "CAST(s.updated_at AS DATETIME(3)) DESC, s.id DESC";
 
-  const total = db
-    .prepare(
-      `
+  const total = (await db.first(`
       SELECT COUNT(*) AS total
       FROM submissions s
       INNER JOIN events e ON e.id = s.event_id
       ${whereSql}
-      `
-    )
-    .get(...values) as { total: number };
+      `, [...values])) as { total: number };
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         s.id,
         s.status,
@@ -96,23 +91,25 @@ export async function OfficerSubmissionsPageView({
       ORDER BY ${orderSql}
       LIMIT ?
       OFFSET ?
-      `
-    )
-    .all(...values, PAGE_SIZE, offset) as Row[];
+      `, [...values, PAGE_SIZE, offset])) as Row[];
 
   const totalPages = Math.max(1, Math.ceil(Number(total.total ?? 0) / PAGE_SIZE));
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold">Hồ sơ xét cán bộ</h1>
           <AcademicTermSelect variant="header" terms={terms} selectedTermId={selectedTerm.id} />
         </div>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+        <div>
+          <OfficerSubmissionsFilter />
+        </div>
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-semibold text-slate-900">Danh sách hồ sơ</h2>
 
           <Link
@@ -123,16 +120,10 @@ export async function OfficerSubmissionsPageView({
           </Link>
         </div>
 
-        <div className="mt-5">
-          <OfficerSubmissionsFilter />
-        </div>
 
-        <div className="mt-4 text-sm font-medium text-slate-600">
-          Tìm thấy {Number(total.total ?? 0)} hồ sơ
-        </div>
-
-        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-          <table className="min-w-full table-fixed divide-y divide-slate-200">
+        <div data-table-frame className="mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<div className="overflow-hidden rounded-none border border-slate-200">
+          <NumberedTable page={page} className="min-w-full table-fixed divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
                 <th className="w-[34%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -201,11 +192,10 @@ export async function OfficerSubmissionsPageView({
                 </tr>
               )}
             </tbody>
-          </table>
+          </NumberedTable>
         </div>
-
-        <div className="mt-5">
-          <ReviewPagination
+<div className="mt-5">
+          <ReviewPagination totalResults={Number(total.total ?? 0)} resultLabel="hồ sơ"
             page={page}
             totalPages={totalPages}
             basePath={basePath}
@@ -217,6 +207,7 @@ export async function OfficerSubmissionsPageView({
             }}
           />
         </div>
+</div>
       </section>
     </main>
   );

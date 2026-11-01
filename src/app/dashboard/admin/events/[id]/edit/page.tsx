@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import EventEditHeader from "@/components/admin/events/EventEditHeader";
 import EventEditForm from "@/components/admin/events/EventEditForm";
 import type { AdminCriteriaTemplateOption } from "@/components/admin/events/types";
@@ -21,6 +21,7 @@ type EventRow = {
   criteria_template_id: number | null;
   submissions: number;
   term_is_active: number;
+  score_max: number | null;
 };
 
 type TemplateRow = {
@@ -37,17 +38,15 @@ export default async function AdminEditEventPage({
   await requireAdminContext();
 
   const { id } = await params;
-  const eventId = Number(id);
+  const eventId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(eventId) || eventId <= 0) {
     notFound();
   }
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const event = db
-    .prepare(
-      `
+  const event = (await db.first(`
       SELECT
         e.id,
         e.title,
@@ -58,6 +57,7 @@ export default async function AdminEditEventPage({
         e.end_at,
         e.allow_late,
         e.criteria_template_id,
+        e.score_max,
         at.is_active AS term_is_active,
         (
           SELECT COUNT(*)
@@ -68,27 +68,21 @@ export default async function AdminEditEventPage({
       INNER JOIN academic_terms at ON at.id = e.term_id
       WHERE e.id = ?
       LIMIT 1
-      `
-    )
-    .get(eventId) as EventRow | undefined;
+      `, [eventId])) as EventRow | undefined;
 
   if (!event) {
     notFound();
   }
   if (!event.term_is_active) notFound();
 
-  const templateRows = db
-    .prepare(
-      `
+  const templateRows = (await db.rows(`
       SELECT
         id,
         name,
         for_type
       FROM criteria_templates
       ORDER BY id DESC
-      `
-    )
-    .all() as TemplateRow[];
+      `, [])) as TemplateRow[];
 
   const templates: AdminCriteriaTemplateOption[] = templateRows.map((item) => ({
     id: Number(item.id),
@@ -116,6 +110,7 @@ export default async function AdminEditEventPage({
             ? Number(event.criteria_template_id)
             : null,
           submissions: Number(event.submissions ?? 0),
+          scoreMax: event.score_max === null ? null : Number(event.score_max),
         }}
         templates={templates}
       />

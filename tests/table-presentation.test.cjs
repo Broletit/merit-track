@@ -1,0 +1,12 @@
+const fs=require('fs'),ts=require('typescript'),Module=require('module'),React=require('react'),assert=require('assert/strict');
+const m=new Module('data-table',module);m.paths=module.paths;m._compile(ts.transpileModule(fs.readFileSync('src/components/common/DataTable.tsx','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,'data-table');
+const {alignTableChildren,tableColumnAlignment}=m.exports;
+for(const label of ['Họ tên','Tên lớp','Mô tả','Đợt xét','Hoạt động','Nội dung thay đổi'])assert.equal(tableColumnAlignment(label),'left',label);
+for(const label of ['STT','MSSV','Trạng thái','Trạng thái tiếp nhận','Thời gian','Điểm','Ngành','Thao tác'])assert.equal(tableColumnAlignment(label),'center',label);
+const h=React.createElement;
+const result=alignTableChildren([h('thead',{key:'head'},h('tr',null,['Họ tên','MSSV','Mô tả','Trạng thái'].map(label=>h('th',{key:label},label)))),h('tbody',{key:'body'},h(React.Fragment,null,h('tr',{key:1},['A','123','Description','Active'].map((text,index)=>h('td',{key:index,className:'text-left align-top'},text))),h('tr',{key:2},h('td',{colSpan:4},'Empty'))))]);
+const head=result[0].props.children[0].props.children,body=result[1].props.children[0].props.children;
+assert.deepEqual(head.map(cell=>cell.props.style.textAlign),['left','center','left','center']);assert.deepEqual(body.map(cell=>cell.props.style.textAlign),['left','center','left','center']);assert(body.every(cell=>cell.props.style.verticalAlign==='middle'));
+assert.equal(result[1].props.children[1].props.children[0].props.style.textAlign,'center');
+const page=fs.readFileSync('src/components/student/events/StudentEventDetailCard.tsx','utf8');assert(!page.includes('{phaseError}'));assert(page.includes('md:grid-cols-2'));assert(page.includes('Mô tả'));assert(page.includes('Trạng thái tiếp nhận'));
+console.log('Passed: header/body alignment by column meaning; names/descriptions left, other columns centered; fragments, spanning/empty rows; paired event details without duplicate expiry message.');

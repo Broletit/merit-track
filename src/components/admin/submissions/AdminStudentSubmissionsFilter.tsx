@@ -1,4 +1,5 @@
 "use client";
+import CohortFilter from "@/components/shared/CohortFilter";
 
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
@@ -27,40 +28,37 @@ export default function AdminStudentSubmissionsFilter() {
   }, [keyword]);
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(320px,2fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
-      <div className="relative">
+    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <label className="filter-field"><span className="filter-field-label">Tìm kiếm</span><div className="relative">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="Tìm sinh viên / MSSV / lớp / đợt xét..."
+          placeholder="Tìm họ tên hoặc MSSV..."
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
-      </div>
-
-      <select
+      </div></label>
+      <div className="filter-field"><label>Khóa</label><CohortFilter /></div>
+      <label className="filter-field"><span className="filter-field-label">Trạng thái hồ sơ</span><select
         defaultValue={searchParams.get("status") ?? ""}
         onChange={(event) => updateParam("status", event.target.value)}
         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
       >
         <option value="">Tất cả trạng thái</option>
-        <option value="draft">Nháp</option>
         <option value="submitted_v1">Chờ duyệt vòng 1</option>
         <option value="needs_revision_v1">Cần chỉnh sửa</option>
         <option value="submitted_v2">Chờ duyệt vòng 2</option>
         <option value="passed">Đạt</option>
         <option value="failed">Không đạt</option>
-        <option value="closed">Đã đóng</option>
-      </select>
-
-      <select
+      </select></label>
+      <label className="filter-field"><span className="filter-field-label">Sắp xếp</span><select
         defaultValue={searchParams.get("sort") ?? "latest"}
         onChange={(event) => updateParam("sort", event.target.value)}
         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
       >
         <option value="latest">Mới cập nhật</option>
         <option value="oldest">Cũ nhất</option>
-      </select>
+      </select></label>
     </div>
   );
 }

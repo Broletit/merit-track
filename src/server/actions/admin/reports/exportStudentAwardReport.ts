@@ -1,7 +1,8 @@
 "use server";
 
+import { addCohortFilter } from "@/server/cohorts/sql";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 function csvEscape(value: unknown) {
   const text = String(value ?? "");
@@ -11,7 +12,7 @@ function csvEscape(value: unknown) {
 export async function exportStudentAwardReport(formData: FormData) {
   await requireAdminContext();
 
-  const db = getDb();
+  const db = getDatabase();
 
   const termId = Number(formData.get("termId"));
   const eventId = Number(formData.get("eventId") ?? 0);
@@ -44,11 +45,10 @@ export async function exportStudentAwardReport(formData: FormData) {
     where.push("s.status IN ('submitted_v1','submitted_v2','needs_revision_v1','needs_revision_v2')");
   }
 
+  addCohortFilter(where,values,formData.get("cohort"),"u.cohort");
   const whereSql = `WHERE ${where.join(" AND ")}`;
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         u.full_name,
         u.mssv,
@@ -81,7 +81,7 @@ export async function exportStudentAwardReport(formData: FormData) {
             ON ar.submission_id = s.id
            AND ar.criteria_code = i.code
            AND ar.passed = 1
-          LEFT JOIN submission_files sf
+          LEFT JOIN submission_ready_files sf
             ON sf.submission_id = s.id
            AND sf.criteria_code = i.code
           LEFT JOIN submission_items si
@@ -98,13 +98,13 @@ export async function exportStudentAwardReport(formData: FormData) {
             )
         ) AS missing_count,
         (
-          SELECT GROUP_CONCAT(i.title, '; ')
+          SELECT GROUP_CONCAT(i.title SEPARATOR '; ')
           FROM event_criteria_items i
           LEFT JOIN submission_auto_results ar
             ON ar.submission_id = s.id
            AND ar.criteria_code = i.code
            AND ar.passed = 1
-          LEFT JOIN submission_files sf
+          LEFT JOIN submission_ready_files sf
             ON sf.submission_id = s.id
            AND sf.criteria_code = i.code
           LEFT JOIN submission_items si
@@ -126,9 +126,7 @@ export async function exportStudentAwardReport(formData: FormData) {
       LEFT JOIN classes c ON c.id = s.class_id
       ${whereSql}
       ORDER BY c.code ASC, u.full_name ASC
-      `
-    )
-    .all(...values) as Array<Record<string, unknown>>;
+      `, [...values])) as Array<Record<string, unknown>>;
 
   const filtered = rows.filter((item) => {
     const missing = Number(item.missing_count ?? 0);

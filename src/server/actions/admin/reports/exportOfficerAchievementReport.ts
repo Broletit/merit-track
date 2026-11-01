@@ -1,7 +1,8 @@
 "use server";
 
+import { addCohortFilter } from "@/server/cohorts/sql";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 function csvEscape(value: unknown) {
   const text = String(value ?? "");
@@ -11,11 +12,10 @@ function csvEscape(value: unknown) {
 export async function exportOfficerAchievementReport(formData: FormData) {
   await requireAdminContext();
 
-  const db = getDb();
+  const db = getDatabase();
 
   const termId = Number(formData.get("termId"));
   const eventId = Number(formData.get("eventId") ?? 0);
-  const top = Number(formData.get("top") ?? 20);
   const exportType = String(formData.get("exportType") ?? "passed");
 
   if (!Number.isFinite(termId) || termId <= 0) {
@@ -34,16 +34,14 @@ export async function exportOfficerAchievementReport(formData: FormData) {
     values.push(eventId);
   }
 
+  addCohortFilter(where,values,formData.get("cohort"),"u.cohort");
   const whereSql = `WHERE ${where.join(" AND ")}`;
-  const limit = Number.isFinite(top) && top > 0 ? top : 20;
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         u.full_name,
         u.mssv,
-        GROUP_CONCAT(c.code, ', ') AS class_codes,
+        GROUP_CONCAT(c.code SEPARATOR ', ') AS class_codes,
         e.title AS event_title,
         s.status,
         s.score_total,
@@ -56,10 +54,7 @@ export async function exportOfficerAchievementReport(formData: FormData) {
       ${whereSql}
       GROUP BY s.id
       ORDER BY s.score_total DESC, u.full_name ASC
-      LIMIT ?
-      `
-    )
-    .all(...values, limit) as Array<Record<string, unknown>>;
+      `, [...values])) as Array<Record<string, unknown>>;
 
   const header = [
     "Hạng",

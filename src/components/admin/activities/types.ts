@@ -1,4 +1,5 @@
 export type ActivityClassOption = {
+  cohort?: number | null;
   id: number;
   code: string;
   name: string;
@@ -19,6 +20,7 @@ export type ConductCategoryOption = {
   scoreMax: number;
   parentId?: number | null;
   depth?: number;
+  hasChildren?: boolean;
 };
 
 export type ActivityCreateState = {
@@ -27,6 +29,7 @@ export type ActivityCreateState = {
   revision?: number;
   field?: string;
   values?: {
+    maxRegistrations: string;
     title: string;
     description: string;
     audienceType: string;
@@ -39,6 +42,7 @@ export type ActivityCreateState = {
     endAt: string;
     scopeMode: string;
     classIds: string[];
+    cohorts: string[];
     organizerLevel: string;
     participationSource: string;
     conductCategoryId: string;
@@ -56,12 +60,14 @@ export type AdminActivityItem = {
   registrationStartAt: string;
   registrationEndAt: string;
   conductScore: number;
+  absencePenalty: number;
   qrCheckinEnabled: boolean;
   participants: number;
   attended: number;
 };
 
 export type ActivityEditDetail = {
+  maxRegistrations: number | null;
   id: number;
   title: string;
   description: string;
@@ -72,9 +78,12 @@ export type ActivityEditDetail = {
   registrationStartAt: string;
   registrationEndAt: string;
   conductScore: number;
+  absencePenalty: number;
   conductCategoryId: number | null;
   qrCheckinEnabled: boolean;
   selectedClassIds: number[];
+  selectedCohorts: number[];
+  organizerLevel: string;
   selectedCriteriaBindings: string[];
   attendedCount: number;
   participantCount: number;

@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { verifyPassword } from "@/server/auth/password";
 import { createSession } from "@/server/auth/session";
 import {
@@ -34,35 +34,31 @@ export async function loginAction(
   if (!mssv || !password) {
     return {
       ok: false,
-      message: "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.",
+      message: "Vui lòng nhập đầy đủ MSSV và mật khẩu.",
     };
   }
 
-  const db = getDb();
+  if (mssv.length > 254 || Buffer.byteLength(password,"utf8") > 72) return {ok:false,message:"Tài khoản hoặc mật khẩu không hợp lệ."};
+  const db = getDatabase();
 
-  const user = db
-    .prepare(
-      `
+  const user = (await db.first(`
       SELECT id, mssv, full_name, email, password_hash, role, is_active
       FROM users
       WHERE mssv = ?
-         OR email = ?
       LIMIT 1
-      `
-    )
-    .get(mssv, mssv) as DbUser | undefined;
+      `, [mssv])) as DbUser | undefined;
 
   if (!user) {
     return {
       ok: false,
-      message: "Tài khoản không tồn tại.",
+      message: "Tài khoản hoặc mật khẩu không đúng.",
     };
   }
 
   if (!user.is_active) {
     return {
       ok: false,
-      message: "Tài khoản đã bị khóa.",
+      message: "Tài khoản hoặc mật khẩu không đúng.",
     };
   }
 
@@ -71,7 +67,7 @@ export async function loginAction(
   if (!valid) {
     return {
       ok: false,
-      message: "Sai mật khẩu.",
+      message: "Tài khoản hoặc mật khẩu không đúng.",
     };
   }
 

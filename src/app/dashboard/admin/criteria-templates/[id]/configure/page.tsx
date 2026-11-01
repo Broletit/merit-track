@@ -1,7 +1,7 @@
+import CriteriaDefinitionTable from "@/components/shared/criteria/CriteriaDefinitionTable";
 import { notFound } from "next/navigation";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
-import { getRequiredActiveTerm } from "@/server/academic-terms/getRequiredActiveTerm";
+import { getDatabase } from "@/server/db/mysql";
 import CriteriaTemplateConfigureHeader from "@/components/admin/criteria-templates/CriteriaTemplateConfigureHeader";
 import CriteriaTemplateConfigureClient from "@/components/admin/criteria-templates/CriteriaTemplateConfigureClient";
 import CloneTemplateForConfigurationButton from "@/components/admin/criteria-templates/CloneTemplateForConfigurationButton";
@@ -28,6 +28,7 @@ type GroupRow = {
   title: string;
   description: string | null;
   min_required: number;
+  score_max: number;
   sort_order: number;
   criteria_count: number;
 };
@@ -70,42 +71,35 @@ export default async function AdminConfigureCriteriaTemplatePage({
 }) {
   await requireAdminContext();
 
-  const term = getRequiredActiveTerm();
-
   const { id } = await params;
-  const templateId = Number(id);
+  const templateId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(templateId) || templateId <= 0) {
     notFound();
   }
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const templateRow = db
-    .prepare(
-      `
+  const templateRow = (await db.first(`
       SELECT ct.id, ct.name, ct.description, ct.for_type,
         (SELECT COUNT(*) FROM events e WHERE e.criteria_template_id = ct.id) AS used_events
       FROM criteria_templates ct
       WHERE ct.id = ?
       LIMIT 1
-      `
-    )
-    .get(templateId) as TemplateRow | undefined;
+      `, [templateId])) as TemplateRow | undefined;
 
   if (!templateRow) {
     notFound();
   }
 
-  const groupRows = db
-    .prepare(
-      `
+  const groupRows = (await db.rows(`
       SELECT
         g.id,
         g.code,
         g.title,
         g.description,
         g.min_required,
+        g.score_max,
         g.sort_order,
         (
           SELECT COUNT(*)
@@ -116,13 +110,9 @@ export default async function AdminConfigureCriteriaTemplatePage({
       FROM criteria_template_groups g
       WHERE g.template_id = ?
       ORDER BY g.sort_order ASC, g.code ASC
-      `
-    )
-    .all(templateId) as GroupRow[];
+      `, [templateId])) as GroupRow[];
 
-  const criteriaRows = db
-    .prepare(
-      `
+  const criteriaRows = (await db.rows(`
       SELECT
         id,
         group_code,
@@ -136,13 +126,9 @@ export default async function AdminConfigureCriteriaTemplatePage({
 FROM criteria_template_items
       WHERE template_id = ?
       ORDER BY sort_order ASC, code ASC
-      `
-    )
-    .all(templateId) as CriteriaRow[];
+      `, [templateId])) as CriteriaRow[];
 
-  const activityRuleRows = db
-    .prepare(
-      `
+  const activityRuleRows = (await db.rows(`
       SELECT
         r.id,
         r.criteria_code,
@@ -152,31 +138,21 @@ FROM criteria_template_items
       INNER JOIN activities a ON a.id = r.activity_id
       WHERE r.template_id = ?
       ORDER BY a.title ASC
-      `
-    )
-    .all(templateId) as ActivityRuleRow[];
+      `, [templateId])) as ActivityRuleRow[];
 
-  const conductRuleRows = db
-    .prepare(
-      `
+  const conductRuleRows = (await db.rows(`
       SELECT id, criteria_code, min_score, period_scope
       FROM criteria_conduct_rules
       WHERE template_id = ?
-      `
-    )
-    .all(templateId) as ConductRuleRow[];
+      `, [templateId])) as ConductRuleRow[];
 
-  const activityRows = db
-    .prepare(
-      `
-      SELECT id, title
-      FROM activities
-      WHERE status = 'published'
-        AND term_id = ?
-      ORDER BY datetime(start_at) DESC, id DESC
-      `
-    )
-    .all(term.id) as ActivityRow[];
+  const activityRows = (await db.rows(`
+      SELECT a.id, a.title, a.term_id, at.name AS term_name, at.is_active
+      FROM activities a
+      INNER JOIN academic_terms at ON at.id = a.term_id
+      WHERE a.status = 'published'
+      ORDER BY at.is_active DESC, CAST(at.start_at AS DATETIME(3)) DESC, CAST(a.start_at AS DATETIME(3)) DESC, a.id DESC
+      `, [])) as Array<ActivityRow & { term_id:number; term_name:string; is_active:number }>;
 
   const template: AdminCriteriaTemplateDetail = {
     id: Number(templateRow.id),
@@ -191,6 +167,7 @@ FROM criteria_template_items
     title: String(item.title ?? ""),
     description: item.description ? String(item.description) : null,
     minRequired: Number(item.min_required ?? 0),
+    scoreMax: Number(item.score_max ?? 0),
     sortOrder: Number(item.sort_order ?? 0),
     criteriaCount: Number(item.criteria_count ?? 0),
   }));
@@ -198,6 +175,9 @@ FROM criteria_template_items
   const activities: CriteriaTemplateActivityOption[] = activityRows.map((item) => ({
     id: Number(item.id),
     title: String(item.title ?? ""),
+    termId: Number(item.term_id),
+    termName: String(item.term_name ?? ""),
+    isCurrentTerm: Number(item.is_active) === 1,
   }));
 
   const activityRulesByCriteria = new Map<string, CriteriaTemplateActivityRule[]>();
@@ -243,14 +223,9 @@ isRequired: Number(item.is_required ?? 0) === 1,
     <main className="space-y-6">
       <CriteriaTemplateConfigureHeader template={template} />
 
-      <section className="rounded-2xl bg-blue-50 px-5 py-4 text-sm text-blue-800 ring-1 ring-blue-100">
-        Hoạt động để gắn tiêu chí đang lấy theo học kỳ hiện hành:{" "}
-        <span className="font-semibold">{term.name}</span>
-      </section>
-
       {Number(templateRow.used_events ?? 0) > 0 ? (
         <>
-          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-amber-50 px-5 py-4 ring-1 ring-amber-200">
+          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-amber-50 px-5 py-4 ring-1 ring-amber-200 shadow-md shadow-slate-200/60">
             <div>
               <h2 className="font-semibold text-amber-900">Cấu hình đã được khóa</h2>
               <p className="mt-1 text-sm text-amber-800">
@@ -260,24 +235,7 @@ isRequired: Number(item.is_required ?? 0) === 1,
             <CloneTemplateForConfigurationButton template={template} />
           </section>
 
-          <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-            <h2 className="text-lg font-semibold text-slate-900">Cấu hình hiện tại</h2>
-            <div className="mt-5 space-y-4">
-              {groups.map((group) => (
-                <div key={group.id} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="font-semibold text-slate-900">{group.code}. {group.title}</div>
-                  <div className="mt-3 space-y-2">
-                    {criteria.filter((item) => item.groupCode === group.code).map((item) => (
-                      <div key={item.id} className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        <span className="font-semibold">{item.code}</span> — {item.title}
-                        <span className="ml-2 text-slate-500">({item.scoreMax} điểm{item.isRequired ? ", bắt buộc" : ""})</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <CriteriaDefinitionTable templateId={template.id} title="Cấu hình hiện tại"/>
         </>
       ) : (
         <CriteriaTemplateConfigureClient

@@ -1,4 +1,6 @@
 "use client";
+import PaginatedTable from "@/components/common/PaginatedTable";
+
 
 import type { ImportPreviewResult } from "./types";
 
@@ -46,25 +48,21 @@ export default function StudentsImportValidationTable({
   }
 
   return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <div className="mt-5">
       <h2 className="text-lg font-semibold text-slate-900">
-        Kết quả kiểm tra từng dòng
+        Kết quả kiểm tra dữ liệu
       </h2>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
+      <PaginatedTable data-no-row-number className="min-w-full divide-y divide-slate-200" containerClassName="mt-3 max-h-96 overflow-auto rounded-none border border-slate-200" resultLabel="dòng dữ liệu">
+          <thead className="sticky top-0 z-10 bg-slate-50">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                Dòng
-              </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 MSSV
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Họ tên
               </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="left" className="px-4 py-3  text-sm font-semibold text-slate-700 text-left">
                 Lớp hiện tại
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -79,10 +77,9 @@ export default function StudentsImportValidationTable({
           <tbody className="divide-y divide-slate-100 bg-white">
             {preview.rows.map((row) => (
               <tr key={`${row.rowNumber}-${row.mssv}-${row.status}`}>
-                <td className="px-4 py-4 text-sm text-slate-700">{row.rowNumber}</td>
                 <td className="px-4 py-4 text-sm text-slate-800">{row.mssv || "-"}</td>
                 <td className="px-4 py-4 text-sm text-slate-800">{row.full_name || "-"}</td>
-                <td className="px-4 py-4 text-sm text-slate-600">
+                <td data-column-align="left" className="px-4 py-4 text-sm text-slate-600 text-left">
                   {row.currentClass || "-"}
                 </td>
                 <td className="px-4 py-4">
@@ -98,8 +95,7 @@ export default function StudentsImportValidationTable({
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
-    </section>
+        </PaginatedTable>
+    </div>
   );
 }

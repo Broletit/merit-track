@@ -1,3 +1,5 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
+import { classActivityVisibleSql } from "@/server/cohorts/sql";
 import Link from "next/link";
 import {
   CalendarCheck,
@@ -6,8 +8,10 @@ import {
   Users,
 } from "lucide-react";
 import { requireFacultyOfficerContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
+import ActivityAttendanceRateChart from "@/components/admin/reports/ActivityAttendanceRateChart";
+import DonutChart from "@/components/admin/reports/DonutChart";
 import {
   getAcademicTermForView,
   getAcademicTermsForSelect,
@@ -42,6 +46,7 @@ type ClassRow = {
   code: string;
   name: string;
 };
+type CountRow = { label: string; value: number };
 
 export default async function FacultyOfficerDashboardPage({
   searchParams,
@@ -51,23 +56,19 @@ export default async function FacultyOfficerDashboardPage({
   const user = await requireFacultyOfficerContext();
 
   const params = await searchParams;
-  const db = getDb();
+  const db = getDatabase();
 
-  const terms = getAcademicTermsForSelect();
-  const term = getAcademicTermForView(params.termId);
+  const terms = (await getAcademicTermsForSelect());
+  const term = (await getAcademicTermForView(params.termId));
 
-  const classRows = db
-    .prepare(
-      `
+  const classRows = (await db.rows(`
       SELECT DISTINCT c.id, c.code, c.name
       FROM faculty_class_assignments fca
       INNER JOIN classes c ON c.id = fca.class_id
       WHERE fca.faculty_officer_id = ?
         AND c.is_active = 1
       ORDER BY c.code ASC
-      `
-    )
-    .all(user.id) as ClassRow[];
+      `, [user.id])) as ClassRow[];
 
   const classIds = classRows.map((item) => Number(item.id));
   const classPlaceholders = classIds.length
@@ -75,16 +76,14 @@ export default async function FacultyOfficerDashboardPage({
     : "NULL";
 
   const activityHasTermId = (
-    db.prepare(`PRAGMA table_info(activities)`).all() as { name: string }[]
+    (await db.rows(`SELECT COLUMN_NAME AS name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='activities'`, [])) as { name: string }[]
   ).some((item) => item.name === "term_id");
 
   const activityTermFilter = activityHasTermId ? "AND a.term_id = ?" : "";
   const activityTermValues = activityHasTermId ? [term.id] : [];
 
   const summary = classIds.length
-    ? (db
-        .prepare(
-          `
+    ? ((await db.first(`
           SELECT
             (
               SELECT COUNT(DISTINCT c.id)
@@ -107,8 +106,7 @@ export default async function FacultyOfficerDashboardPage({
               WHERE a.status = 'published'
                 AND a.audience_type = 'student'
               ${activityTermFilter}
-                AND (NOT EXISTS (SELECT 1 FROM activity_scopes axs WHERE axs.activity_id=a.id)
-                  OR EXISTS (SELECT 1 FROM activity_scopes axs INNER JOIN faculty_class_assignments fca ON fca.class_id=axs.class_id WHERE axs.activity_id=a.id AND fca.faculty_officer_id=?))
+                AND EXISTS (SELECT 1 FROM faculty_class_assignments fca WHERE fca.faculty_officer_id=? AND ${classActivityVisibleSql("a","fca.class_id")})
             ) AS activities,
 
             (
@@ -136,6 +134,7 @@ export default async function FacultyOfficerDashboardPage({
               WHERE s.class_id IN (${classPlaceholders})
                 AND e.type = 'student'
                 AND e.term_id = ?
+                AND s.submitted_at IS NOT NULL
             ) AS submissions,
 
             (
@@ -145,7 +144,7 @@ export default async function FacultyOfficerDashboardPage({
               WHERE s.class_id IN (${classPlaceholders})
                 AND e.type = 'student'
                 AND e.term_id = ?
-                AND s.status = 'submitted_v2'
+                AND s.status IN ('submitted_v1','submitted_v2')
             ) AS pending_reviews,
 
             (
@@ -157,24 +156,7 @@ export default async function FacultyOfficerDashboardPage({
                 AND e.term_id = ?
                 AND s.status = 'passed'
             ) AS passed
-          `
-        )
-        .get(
-          ...classIds,
-          ...classIds,
-          ...activityTermValues,
-          user.id,
-          ...classIds,
-          ...activityTermValues,
-          ...classIds,
-          ...activityTermValues,
-          ...classIds,
-          term.id,
-          ...classIds,
-          term.id,
-          ...classIds,
-          term.id
-        ) as Summary)
+          `, [...classIds, ...classIds, ...activityTermValues, user.id, ...classIds, ...activityTermValues, ...classIds, ...activityTermValues, ...classIds, term.id, ...classIds, term.id, ...classIds, term.id])) as Summary)
     : {
         assigned_classes: 0,
         students: 0,
@@ -187,9 +169,7 @@ export default async function FacultyOfficerDashboardPage({
       };
 
   const pendingReviews = classIds.length
-    ? (db
-        .prepare(
-          `
+    ? ((await db.rows(`
           SELECT
             s.id,
             e.title AS event_title,
@@ -204,13 +184,57 @@ export default async function FacultyOfficerDashboardPage({
           WHERE s.class_id IN (${classPlaceholders})
             AND e.type = 'student'
             AND e.term_id = ?
-            AND s.status = 'submitted_v2'
-          ORDER BY datetime(s.updated_at) ASC, s.id ASC
+            AND s.status IN ('submitted_v1','submitted_v2')
+          ORDER BY CAST(s.updated_at AS DATETIME(3)) ASC, s.id ASC
           LIMIT 5
-          `
-        )
-        .all(...classIds, term.id) as PendingReviewRow[])
+          `, [...classIds, term.id])) as PendingReviewRow[])
     : [];
+
+  const facultyActivitySummary = (await db.first(`
+    SELECT COUNT(DISTINCT a.id) activities,
+      COUNT(CASE WHEN ar.status!='cancelled' THEN 1 END) registrations,
+      COUNT(CASE WHEN ar.status='attended' THEN 1 END) attended
+    FROM activities a
+    LEFT JOIN activity_registrations ar ON ar.activity_id=a.id
+    WHERE a.term_id=? AND a.audience_type='student' AND a.status IN ('published','closed')
+  `, [term.id])) as { activities: number; registrations: number; attended: number };
+  const activityComparison = (await db.rows(`
+    SELECT a.title AS label,
+      COUNT(CASE WHEN ar.status != 'cancelled' THEN 1 END) AS registrations,
+      COUNT(CASE WHEN ar.status = 'attended' THEN 1 END) AS attended
+    FROM activities a
+    LEFT JOIN activity_registrations ar ON ar.activity_id = a.id
+    WHERE a.term_id = ? AND a.audience_type = 'student' AND a.status IN ('published','closed')
+    GROUP BY a.id, a.title
+    ORDER BY attended DESC, registrations DESC, CAST(a.start_at AS DATETIME(3)) DESC
+    LIMIT 10
+  `, [term.id])) as Array<{ label: string; registrations: number; attended: number }>;
+  const submissionProgress = classIds.length ? (await db.rows(`
+    SELECT CASE
+      WHEN s.status = 'passed' THEN 'Đạt'
+      WHEN s.status = 'failed' THEN 'Không đạt'
+      WHEN s.status LIKE 'needs_revision%' THEN 'Cần bổ sung'
+      ELSE 'Chờ duyệt'
+    END AS label, COUNT(*) AS value
+    FROM submissions s
+    INNER JOIN events e ON e.id = s.event_id
+    WHERE s.class_id IN (${classPlaceholders}) AND e.type = 'student' AND e.term_id = ? AND s.submitted_at IS NOT NULL
+    GROUP BY CASE
+      WHEN s.status = 'passed' THEN 'Đạt'
+      WHEN s.status = 'failed' THEN 'Không đạt'
+      WHEN s.status LIKE 'needs_revision%' THEN 'Cần bổ sung'
+      ELSE 'Chờ duyệt'
+    END
+  `, [...classIds, term.id])) as CountRow[] : [];
+  const activityLevels = (await db.rows(`
+    SELECT CASE WHEN a.organizer_level = 'class' THEN 'Cấp chi đoàn' ELSE 'Cấp khoa' END AS label, COUNT(*) AS value
+    FROM activities a
+    WHERE a.term_id = ? AND a.audience_type = 'student' AND a.status IN ('published','closed')
+    GROUP BY CASE WHEN a.organizer_level = 'class' THEN 'Cấp chi đoàn' ELSE 'Cấp khoa' END
+  `, [term.id])) as CountRow[];
+  summary.activities = Number(facultyActivitySummary.activities ?? 0);
+  summary.activity_registrations = Number(facultyActivitySummary.registrations ?? 0);
+  summary.activity_attended = Number(facultyActivitySummary.attended ?? 0);
 
   const attendedRate =
     Number(summary.activity_registrations ?? 0) > 0
@@ -221,17 +245,9 @@ export default async function FacultyOfficerDashboardPage({
         )
       : 0;
 
-  const passRate =
-    Number(summary.submissions ?? 0) > 0
-      ? Math.round(
-          (Number(summary.passed ?? 0) / Number(summary.submissions ?? 0)) *
-            100
-        )
-      : 0;
-
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Dashboard cán bộ khoa</h1>
@@ -250,7 +266,7 @@ export default async function FacultyOfficerDashboardPage({
 
         <Stat
           icon={<CalendarCheck size={20} />}
-          label="Tỉ lệ tham gia các lớp phụ trách"
+          label="Tỉ lệ điểm danh hoạt động"
           value={`${attendedRate}%`}
         />
 
@@ -262,37 +278,23 @@ export default async function FacultyOfficerDashboardPage({
 
         <Stat
           icon={<ClipboardList size={20} />}
-          label="Chờ duyệt vòng 2"
+          label="Hồ sơ chờ duyệt"
           value={summary.pending_reviews ?? 0}
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_420px]">
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-          <h2 className="text-xl font-semibold text-slate-900">Lối tắt</h2>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
-            <ShortcutCard
-              href="/dashboard/faculty-officer/activities"
-              title="Hoạt động lớp phụ trách"
-              icon={<CalendarCheck size={22} />}
-            />
-
-            <ShortcutCard
-              href="/dashboard/faculty-officer/reviews"
-              title="Duyệt vòng 2"
-              icon={<ClipboardList size={22} />}
-            />
-
-            <ShortcutCard
-              href="/dashboard/faculty-officer/events"
-              title="Đợt xét"
-              icon={<FileStack size={22} />}
-            />
-          </div>
+      <section className="grid gap-6 xl:grid-cols-2">
+        <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60 xl:col-span-2">
+          <div className="flex items-center gap-2 text-slate-900"><span className="text-blue-700"><CalendarCheck size={20} /></span><h2 className="text-xl font-semibold">Hiệu quả tham gia hoạt động</h2></div>
+          <div className="mt-5"><ActivityAttendanceRateChart items={activityComparison.map((item) => ({ label: item.label, registrations: Number(item.registrations ?? 0), attended: Number(item.attended ?? 0) }))} /></div>
         </div>
 
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <div className="grid gap-6 md:grid-cols-2 xl:col-span-2">
+          <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60"><h2 className="text-xl font-semibold text-slate-900">Tiến độ xét duyệt hồ sơ</h2><div className="mt-5"><DonutChart items={submissionProgress.map((item) => ({label:item.label,value:Number(item.value ?? 0),className:item.label === "Đạt" ? "#16a34a" : item.label === "Không đạt" ? "#ef4444" : item.label === "Cần bổ sung" ? "#f59e0b" : "#2563eb"}))} /></div></div>
+          <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60"><h2 className="text-xl font-semibold text-slate-900">Cơ cấu hoạt động theo cấp</h2><div className="mt-5"><DonutChart items={activityLevels.map((item) => ({label:item.label,value:Number(item.value ?? 0),className:item.label === "Cấp chi đoàn" ? "#2563eb" : "#16a34a"}))} centerLabel="hoạt động" /></div></div>
+        </div>
+
+        <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
           <h2 className="text-xl font-semibold text-slate-900">
             Hồ sơ cần duyệt
           </h2>
@@ -314,50 +316,24 @@ export default async function FacultyOfficerDashboardPage({
                 </Link>
               ))
             ) : (
-              <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 shadow-md shadow-slate-200/60">
                 Không có hồ sơ chờ duyệt vòng 2.
               </div>
             )}
           </div>
         </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
-          <div className="text-sm font-medium text-slate-500">
-            Tỉ lệ hồ sơ đạt của lớp phụ trách
-          </div>
-          <div className="mt-3 text-3xl font-bold text-slate-900">
-            {passRate}%
-          </div>
-          <div className="mt-1 text-sm text-slate-500">
-            {summary.passed ?? 0}/{summary.submissions ?? 0} hồ sơ đạt.
-          </div>
-        </div>
-
-        <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
-          <div className="text-sm font-medium text-slate-500">
-            Lớp được phân công
-          </div>
-          <div className="mt-3 text-sm leading-7 text-slate-700">
-            {classRows.length > 0
-              ? classRows.map((item) => item.code).join(", ")
-              : "Chưa được phân công lớp"}
-          </div>
+        <div className="min-w-0 rounded-3xl bg-white p-5 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+          <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold text-slate-900">Lớp được phân công</h2><div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600"><Users size={18} /></div></div>
+          <div className="mt-3 text-sm leading-7 text-slate-700">{classRows.length > 0 ? classRows.map((item) => item.code).join(", ") : "Chưa được phân công lớp"}</div>
         </div>
       </section>
 
       {!classIds.length ? (
-        <section className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-700 ring-1 ring-amber-100">
-          Tài khoản chưa được admin phân công lớp trong faculty_class_assignments.
+        <section className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-700 ring-1 ring-amber-100 shadow-md shadow-slate-200/60">
+          Tài khoản chưa được phân công lớp để theo dõi đợt xét và duyệt hồ sơ.
         </section>
       ) : null}
 
-      {!activityHasTermId ? (
-        <section className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-700 ring-1 ring-amber-100">
-          Lưu ý: bảng activities chưa có term_id nên thống kê hoạt động chưa lọc chính xác theo học kỳ.
-        </section>
-      ) : null}
     </main>
   );
 }
@@ -372,46 +348,16 @@ function Stat({
   value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+    <div className={[statCardStyles.card, "min-w-0"].join(" ")}>
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-medium text-slate-500">{label}</div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+        <div className={statCardStyles.label}>{label}</div>
+        <div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>
           {icon}
         </div>
       </div>
 
-      <div className="mt-4 text-3xl font-bold text-slate-900">{value}</div>
+      <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div>
     </div>
   );
 }
 
-function ShortcutCard({
-  href,
-  title,
-  icon,
-}: {
-  href: string;
-  title: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group rounded-3xl border border-slate-200 bg-white p-5 transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_16px_40px_rgba(37,99,235,0.10)]"
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 transition group-hover:bg-blue-50 group-hover:text-blue-700">
-          {icon}
-        </div>
-
-        <div className="text-sm font-semibold text-blue-700 opacity-0 transition group-hover:opacity-100">
-          →
-        </div>
-      </div>
-
-      <div className="mt-5">
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-      </div>
-    </Link>
-  );
-}

@@ -1,17 +1,8 @@
 import { requireFacultyOfficerContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
-import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
+import { getDatabase } from "@/server/db/mysql";
 import FacultyOfficerCheckinHeader from "@/components/faculty-officer/checkin/FacultyOfficerCheckinHeader";
 import FacultyOfficerCheckinForm from "@/components/faculty-officer/checkin/FacultyOfficerCheckinForm";
 import type { CheckinActivityOption } from "@/components/faculty-officer/checkin/types";
-import {
-  getAcademicTermForView,
-  getAcademicTermsForSelect,
-} from "@/server/academic-terms/getAcademicTermForView";
-
-type SearchParams = Promise<{
-  termId?: string;
-}>;
 
 type Row = {
   id: number;
@@ -22,22 +13,13 @@ type Row = {
   qr_checkin_enabled: number;
 };
 
-export default async function FacultyOfficerCheckinPage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
+export default async function FacultyOfficerCheckinPage() {
   await requireFacultyOfficerContext();
 
-  const params = await searchParams;
-  const db = getDb();
+  const db = getDatabase();
 
-  const terms = getAcademicTermsForSelect();
-  const selectedTerm = getAcademicTermForView(params.termId);
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         id,
         title,
@@ -48,11 +30,10 @@ export default async function FacultyOfficerCheckinPage({
       FROM activities
       WHERE status = 'published'
         AND qr_checkin_enabled = 1
-        AND term_id = ?
-      ORDER BY datetime(start_at) DESC, id DESC
-      `
-    )
-    .all(selectedTerm.id) as Row[];
+        AND EXISTS(SELECT 1 FROM academic_terms t WHERE t.id=activities.term_id AND t.is_active=1)
+        AND CAST(start_at AS DATETIME(3))<=CURRENT_TIMESTAMP(3) AND CAST(end_at AS DATETIME(3))>CURRENT_TIMESTAMP(3)
+      ORDER BY CAST(start_at AS DATETIME(3)) DESC, id DESC
+      `, [])) as Row[];
 
   const activities: CheckinActivityOption[] = rows.map((item) => ({
     id: Number(item.id),
@@ -65,16 +46,10 @@ export default async function FacultyOfficerCheckinPage({
 
   return (
     <main className="space-y-6">
-      <FacultyOfficerCheckinHeader termSelect={<AcademicTermSelect variant="header" terms={terms} selectedTermId={selectedTerm.id} />} />
-
-      {!selectedTerm.isActive ? (
-        <section className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-700 ring-1 ring-amber-100">
-          Bạn đang xem học kỳ cũ. Chỉ xem lại dữ liệu, không nên điểm danh.
-        </section>
-      ) : null}
+      <FacultyOfficerCheckinHeader />
 
       <FacultyOfficerCheckinForm
-        activities={selectedTerm.isActive ? activities : []}
+        activities={activities}
       />
     </main>
   );

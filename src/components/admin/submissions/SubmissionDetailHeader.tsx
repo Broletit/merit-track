@@ -1,25 +1,5 @@
+import SubmissionStatusBadge from "@/components/shared/submissions/SubmissionStatusBadge";
 import type { AdminSubmissionSummary } from "./types";
-
-function mapStatusLabel(status: string) {
-  switch (status) {
-    case "draft":
-      return "Nháp";
-    case "submitted_v1":
-      return "Chờ duyệt vòng 1";
-    case "needs_revision_v1":
-      return "Cần bổ sung";
-    case "submitted_v2":
-      return "Chờ duyệt vòng 2";
-    case "passed":
-      return "Đạt";
-    case "failed":
-      return "Không đạt";
-    case "closed":
-      return "Đã đóng";
-    default:
-      return status;
-  }
-}
 
 export default function SubmissionDetailHeader({
   summary,
@@ -27,7 +7,7 @@ export default function SubmissionDetailHeader({
   summary: AdminSubmissionSummary;
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div>
           <div className="text-sm font-medium text-slate-500">Sinh viên</div>
@@ -52,8 +32,8 @@ export default function SubmissionDetailHeader({
 
         <div>
           <div className="text-sm font-medium text-slate-500">Trạng thái</div>
-          <div className="mt-2 inline-flex rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
-            {mapStatusLabel(summary.status)}
+          <div className="mt-2">
+            <SubmissionStatusBadge status={summary.status} />
           </div>
         </div>
       </div>

@@ -3,7 +3,7 @@ import Link from "next/link";
 const actions = [
   {
     title: "Hoạt động",
-    description: "Xem danh sách hoạt động và tiến độ tham gia của nhiều lớp.",
+    description: "Theo dõi hoạt động và tình hình tham gia của sinh viên toàn khoa.",
     href: "/dashboard/faculty-officer/activities",
     bgClass: "bg-blue-50",
   },
@@ -14,16 +14,16 @@ const actions = [
     bgClass: "bg-amber-50",
   },
   {
-    title: "Hồ sơ khoa",
-    description: "Duyệt hồ sơ vòng 2 và lọc theo từng lớp phụ trách.",
-    href: "/dashboard/faculty-officer/submissions",
+    title: "Duyệt hồ sơ",
+    description: "Duyệt vòng 1 hỗ trợ cán bộ lớp và tiếp tục duyệt vòng 2.",
+    href: "/dashboard/faculty-officer/reviews",
     bgClass: "bg-violet-50",
   },
 ];
 
 export default function FacultyOfficerQuickActions() {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="min-w-0 rounded-3xl bg-linear-to-br from-white via-blue-50 to-sky-100 p-6 shadow-md ring-1 ring-blue-100 transition-all duration-200 motion-safe:hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-100/60">
       <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
         Truy cập nhanh
       </h2>

@@ -20,8 +20,8 @@ export default function FacultyOfficerSubmissionFilters({
   selectedStatus?: string;
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <form className="grid gap-4 md:grid-cols-3">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <form className="filter-row grid gap-4 md:grid-cols-3">
         <ClassFilter
           classes={classes}
           selectedClassId={selectedClassId}
@@ -49,7 +49,7 @@ export default function FacultyOfficerSubmissionFilters({
         <div className="flex items-end gap-3">
           <button
             type="submit"
-            className="h-11 rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white transition hover:bg-blue-800"
+            className="min-h-11 h-auto rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white transition hover:bg-blue-800 py-2 max-w-full break-words"
           >
             Áp dụng
           </button>

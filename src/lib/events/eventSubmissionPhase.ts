@@ -2,7 +2,6 @@ export type EventSubmissionPhase =
   | "not_published"
   | "not_open"
   | "accepting"
-  | "late_allowed"
   | "expired"
   | "closed";
 
@@ -10,7 +9,8 @@ export type EventSubmissionState = {
   status: string;
   startAt: string;
   endAt: string;
-  allowLate: boolean;
+  /** Ignored legacy field: acceptance depends exclusively on opening/closing times. */
+  allowLate?: boolean;
 };
 
 export function getEventSubmissionPhase(
@@ -29,29 +29,26 @@ export function getEventSubmissionPhase(
 
   if (now < start) return "not_open";
   if (now <= end) return "accepting";
-  if (event.allowLate) return "late_allowed";
   return "expired";
 }
 
 export function canSubmitToEvent(event: EventSubmissionState, now = new Date()) {
   const phase = getEventSubmissionPhase(event, now);
-  return phase === "accepting" || phase === "late_allowed";
+  return phase === "accepting";
 }
 
 export function getEventSubmissionPhaseLabel(phase: EventSubmissionPhase) {
   switch (phase) {
     case "not_published":
-      return "Chưa công khai";
+      return "Nháp";
     case "not_open":
-      return "Chưa mở nộp";
+      return "Chưa mở nhận hồ sơ";
     case "accepting":
       return "Đang nhận hồ sơ";
-    case "late_allowed":
-      return "Đang nhận hồ sơ trễ";
     case "expired":
-      return "Đã hết hạn nộp";
+      return "Đã hết hạn";
     case "closed":
-      return "Đã ngừng nhận";
+      return "Đã đóng";
   }
 }
 
@@ -66,7 +63,6 @@ export function getEventSubmissionPhaseError(phase: EventSubmissionPhase) {
     case "closed":
       return "Đợt xét đã ngừng nhận hồ sơ.";
     case "accepting":
-    case "late_allowed":
       return "";
   }
 }
@@ -76,4 +72,13 @@ export function assertEventAcceptsSubmissions(event: EventSubmissionState) {
   const error = getEventSubmissionPhaseError(phase);
   if (error) throw new Error(error);
   return phase;
+}
+
+/** One event lifecycle filter; explicit phase supersedes old publication-status URLs. */
+export function resolveEventListPhase(phase:unknown,status?:unknown):EventSubmissionPhase|"" {
+  if(["not_published","not_open","accepting","expired","closed"].includes(String(phase??"")))return phase as EventSubmissionPhase;
+  if(status==="draft")return "not_published";
+  if(status==="published")return "accepting";
+  if(status==="closed")return "closed";
+  return "";
 }

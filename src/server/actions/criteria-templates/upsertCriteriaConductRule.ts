@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { assertCriteriaTemplateMutable } from "@/server/criteria-templates/assertCriteriaTemplateMutable";
 
 export async function upsertCriteriaConductRule(
@@ -11,8 +11,8 @@ export async function upsertCriteriaConductRule(
   formData: FormData
 ) {
   await requireAdminContext();
-  const db = getDb();
-  assertCriteriaTemplateMutable(db, templateId);
+  const db = getDatabase();
+  (await assertCriteriaTemplateMutable(db, templateId));
 
   const minScore = Number(formData.get("minScore") ?? 0);
   const periodScope = String(formData.get("periodScope") ?? "current").trim();
@@ -27,8 +27,7 @@ export async function upsertCriteriaConductRule(
     throw new Error("Phạm vi kỳ điểm không hợp lệ.");
   }
 
-  db.prepare(
-    `
+  (await db.execute(`
     INSERT INTO criteria_conduct_rules (
       template_id,
       criteria_code,
@@ -36,12 +35,10 @@ export async function upsertCriteriaConductRule(
       period_scope
     )
     VALUES (?, ?, ?, ?)
-    ON CONFLICT(template_id, criteria_code)
-    DO UPDATE SET
-      min_score = excluded.min_score,
-      period_scope = excluded.period_scope
-    `
-  ).run(templateId, criteriaCode, minScore, periodScope);
+    ON DUPLICATE KEY UPDATE
+      min_score = VALUES(min_score),
+      period_scope = VALUES(period_scope)
+    `, [templateId, criteriaCode, minScore, periodScope]));
 
   revalidatePath(`/dashboard/admin/criteria-templates/${templateId}/configure`);
 

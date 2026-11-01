@@ -1,3 +1,5 @@
+import CohortFilter from "@/components/shared/CohortFilter";
+import { cohortClause } from "@/server/cohorts/sql";
 import {
   Activity,
   Award,
@@ -6,7 +8,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import ReportPageHeader from "@/components/admin/reports/ReportPageHeader";
 import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
 import OverviewStatCard from "@/components/admin/reports/OverviewStatCard";
@@ -23,7 +25,7 @@ import {
   getAdminOverviewSummary,
 } from "@/server/reports/getAdminOverviewSummary";
 
-type SearchParams = Promise<{ termId?: string }>;
+type SearchParams = Promise<{ cohort?:string; termId?: string }>;
 type ChartRow = { label: string; subLabel?: string; value: number };
 
 export default async function AdminOverviewReportPage({
@@ -33,15 +35,13 @@ export default async function AdminOverviewReportPage({
 }) {
   await requireAdminContext();
   const params = await searchParams;
-  const db = getDb();
-  const terms = getAcademicTermsForSelect();
-  const selectedTerm = getAcademicTermForView(params.termId);
-  const summary = getAdminOverviewSummary(selectedTerm.id);
+  const db = getDatabase();
+  const terms = (await getAcademicTermsForSelect());
+  const selectedTerm = (await getAcademicTermForView(params.termId));
+  const summary = (await getAdminOverviewSummary(selectedTerm.id,params.cohort));
   const rates = calculateOverviewRates(summary);
 
-  const classParticipationChart = db
-    .prepare(
-      `
+  const classParticipationChart = (await db.rows(`
       WITH class_stats AS (
         SELECT
           c.id,
@@ -56,7 +56,7 @@ export default async function AdminOverviewReportPage({
           ) AS participant_count
         FROM classes c
         LEFT JOIN class_members cm ON cm.class_id = c.id
-        LEFT JOIN users u ON u.id = cm.user_id
+        LEFT JOIN users u ON u.id = cm.user_id AND ${cohortClause(params.cohort,"u.cohort")}
         LEFT JOIN activity_registrations ar
           ON ar.user_id = u.id AND ar.status = 'attended'
         LEFT JOIN activities a
@@ -66,19 +66,15 @@ export default async function AdminOverviewReportPage({
       )
       SELECT
         code AS label,
-        participant_count || '/' || student_count || ' sinh viên' AS subLabel,
+        CONCAT(CONCAT(CONCAT(participant_count, '/'), student_count), ' sinh viên') AS subLabel,
         ROUND(100.0 * participant_count / NULLIF(student_count, 0)) AS value
       FROM class_stats
       WHERE student_count > 0
       ORDER BY value ASC, participant_count ASC, code ASC
       LIMIT 8
-      `
-    )
-    .all(selectedTerm.id) as ChartRow[];
+      `, [selectedTerm.id])) as ChartRow[];
 
-  const studentResultByClass = db
-    .prepare(
-      `
+  const studentResultByClass = (await db.rows(`
       WITH class_results AS (
         SELECT
           COALESCE(c.code, 'Chưa gán lớp') AS class_code,
@@ -88,31 +84,29 @@ export default async function AdminOverviewReportPage({
         FROM submissions s
         INNER JOIN events e ON e.id = s.event_id
         LEFT JOIN classes c ON c.id = s.class_id
-        WHERE e.type = 'student' AND e.term_id = ?
+        WHERE e.type = 'student' AND e.term_id = ? AND ${cohortClause(params.cohort,"(SELECT cohort FROM users WHERE id=s.user_id)")}
         GROUP BY c.id
       )
       SELECT
         class_code AS label,
-        passed_count || '/' || finalized_count || ' hồ sơ có kết quả' AS subLabel,
+        CONCAT(CONCAT(CONCAT(passed_count, '/'), finalized_count), ' hồ sơ có kết quả') AS subLabel,
         ROUND(100.0 * passed_count / NULLIF(finalized_count, 0)) AS value
       FROM class_results
       WHERE finalized_count > 0
       ORDER BY value ASC, finalized_count DESC, class_code ASC
       LIMIT 8
-      `
-    )
-    .all(selectedTerm.id) as ChartRow[];
+      `, [selectedTerm.id])) as ChartRow[];
 
-  const activityTrend = db.prepare(`
-    SELECT strftime('%m/%Y', a.start_at) AS label,
+  const activityTrend = (await db.rows(`
+    SELECT DATE_FORMAT(MIN(a.start_at), '%m/%Y') AS label,
       COUNT(CASE WHEN ar.status!='cancelled' THEN 1 END) AS primary_value,
       SUM(CASE WHEN ar.status='attended' THEN 1 ELSE 0 END) AS secondary_value
     FROM activities a
-    LEFT JOIN activity_registrations ar ON ar.activity_id=a.id
+    LEFT JOIN activity_registrations ar ON ar.activity_id=a.id AND ${cohortClause(params.cohort,"(SELECT cohort FROM users WHERE id=ar.user_id)")}
     WHERE a.term_id=? AND a.audience_type='student' AND a.status='published'
-    GROUP BY strftime('%Y-%m', a.start_at)
-    ORDER BY strftime('%Y-%m', a.start_at)
-  `).all(selectedTerm.id) as Array<{label:string;primary_value:number;secondary_value:number}>;
+    GROUP BY DATE_FORMAT(a.start_at, '%Y-%m')
+    ORDER BY DATE_FORMAT(a.start_at, '%Y-%m')
+  `, [selectedTerm.id])) as Array<{label:string;primary_value:number;secondary_value:number}>;
 
   return (
     <main className="space-y-6">
@@ -122,6 +116,7 @@ export default async function AdminOverviewReportPage({
         termSelect={<AcademicTermSelect variant="header" terms={terms} selectedTermId={selectedTerm.id} />}
       />
 
+      <section className="rounded-2xl bg-white p-4 shadow-md shadow-slate-200/60"><div className="max-w-sm"><CohortFilter /></div></section>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OverviewStatCard
           icon={<UsersRound size={20} />}
@@ -153,7 +148,7 @@ export default async function AdminOverviewReportPage({
         <OverviewReportCard
           icon={<ClipboardCheck size={20} />}
           title="Luồng hồ sơ sinh viên"
-          description={`${summary.student_submitted} hồ sơ đã nộp; không tính bản nháp.`}
+          description={`${summary.student_submitted} hồ sơ đã gửi.`}
         >
           <DonutChart items={submissionItems(
             summary.student_passed,
@@ -166,7 +161,7 @@ export default async function AdminOverviewReportPage({
         <OverviewReportCard
           icon={<Award size={20} />}
           title="Luồng hồ sơ cán bộ"
-          description={`${summary.officer_submitted} hồ sơ đã nộp; không tính bản nháp.`}
+          description={`${summary.officer_submitted} hồ sơ đã gửi.`}
         >
           <DonutChart items={submissionItems(
             summary.officer_passed,

@@ -22,6 +22,7 @@ export function NotificationLink({ id, href, children }: {
       disabled={pending}
       onClick={() => startTransition(async () => {
         await markNotificationRead(id);
+        window.dispatchEvent(new Event('app:notifications-updated'));
         router.push(href);
       })}
       className="shrink-0 text-left text-sm font-semibold text-blue-700 transition hover:text-blue-900 disabled:opacity-60"
@@ -41,6 +42,7 @@ export function MarkAllNotificationsReadButton() {
       disabled={pending}
       onClick={() => startTransition(async () => {
         const result = await markAllNotificationsRead();
+        window.dispatchEvent(new Event('app:notifications-updated'));
         toast.success(result.message);
         router.refresh();
       })}

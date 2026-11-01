@@ -1,6 +1,7 @@
+import { getTransferClassOptions } from "@/server/cohorts/classCohortIntegrity";
 import { notFound } from "next/navigation";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import StudentDetailHeader from "@/components/admin/students/StudentDetailHeader";
 import StudentInfoCard from "@/components/admin/students/StudentInfoCard";
 import StudentManagementCard from "@/components/admin/students/StudentManagementCard";
@@ -31,20 +32,19 @@ export default async function AdminStudentDetailPage({
   await requireAdminContext();
 
   const { id } = await params;
-  const studentId = Number(id);
+  const studentId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(studentId)) {
     notFound();
   }
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const student = db
-    .prepare(
-      `
+  const student = (await db.first(`
       WITH latest_membership AS (
-        SELECT cm.user_id, MAX(cm.rowid) AS latest_rowid
+        SELECT cm.user_id, MAX(cm.id) AS latest_rowid
         FROM class_members cm
+        WHERE cm.left_at IS NULL
         GROUP BY cm.user_id
       )
       SELECT
@@ -58,27 +58,17 @@ export default async function AdminStudentDetailPage({
         c.name AS class_name
       FROM users u
       LEFT JOIN latest_membership lm ON lm.user_id = u.id
-      LEFT JOIN class_members cm ON cm.rowid = lm.latest_rowid
+      LEFT JOIN class_members cm ON cm.id = lm.latest_rowid
       LEFT JOIN classes c ON c.id = cm.class_id
       WHERE u.id = ?
       LIMIT 1
-      `
-    )
-    .get(studentId) as StudentRow | undefined;
+      `, [studentId])) as StudentRow | undefined;
 
   if (!student || student.role !== "student") {
     notFound();
   }
 
-  const classes = db
-    .prepare(
-      `
-      SELECT id, code, name
-      FROM classes
-      ORDER BY name ASC, id ASC
-      `
-    )
-    .all() as ClassRow[];
+  const classes: ClassRow[] = (await getTransferClassOptions(db,studentId));
 
   const classOptions: AdminClassOption[] = classes.map((item) => ({
     id: Number(item.id),

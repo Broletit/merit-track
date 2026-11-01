@@ -1,8 +1,9 @@
 "use server";
+import { notifyActivityAttendance } from "@/server/activities/notifyActivityAttendance";
 
 import { revalidatePath } from "next/cache";
 import { requireLogin } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { decodeAndVerifyStudentQr } from "@/server/auth/qr";
 
 type CheckinMethod = "qr" | "manual";
@@ -23,7 +24,7 @@ function makePayload(method: CheckinMethod, raw: string, mssv: string) {
   return method === "manual" ? JSON.stringify({ mssv }) : raw;
 }
 
-function insertAttendanceLog({
+async function insertAttendanceLog({
   activityId,
   userId,
   payload,
@@ -38,10 +39,11 @@ function insertAttendanceLog({
   result: LogResult;
   note: string;
 }) {
-  const db = getDb();
+  const db = getDatabase();
 
-  db.prepare(
-    `
+
+
+  (await db.execute(`
     INSERT INTO activity_attendance_logs (
       activity_id,
       user_id,
@@ -51,9 +53,8 @@ function insertAttendanceLog({
       result,
       note
     )
-    VALUES (?, ?, ?, ?, datetime('now'), ?, ?)
-    `
-  ).run(activityId, userId, payload, scannedBy, result, note);
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(3), ?, ?)
+    `, [activityId, userId, payload, scannedBy, result, note]));
 }
 
 export async function scanActivityQr(
@@ -70,8 +71,9 @@ export async function scanActivityQr(
   ) {
     throw new Error("Bạn không có quyền điểm danh hoạt động.");
   }
-  const db = getDb();
+  const db = getDatabase();
 
+  if (method !== "qr" && method !== "manual") throw new Error("Phương thức điểm danh không hợp lệ.");
   const verifiedQr = method === "qr" ? decodeAndVerifyStudentQr(rawPayload) : null;
   const mssv = method === "manual" ? rawPayload.trim() : verifiedQr?.mssv.trim() ?? "";
 
@@ -85,14 +87,14 @@ export async function scanActivityQr(
   }
 
   if (!mssv) {
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: null,
       payload: payloadForLog,
       scannedBy: officer.id,
       result: "invalid",
       note: "QR hoặc MSSV không hợp lệ",
-    });
+    }));
 
     return {
       ok: false,
@@ -100,9 +102,7 @@ export async function scanActivityQr(
     };
   }
 
-  const activity = db
-    .prepare(
-      `
+  const activity = (await db.first(`
       SELECT
         id,
         title,
@@ -114,9 +114,7 @@ export async function scanActivityQr(
       FROM activities
       WHERE id = ?
       LIMIT 1
-      `
-    )
-    .get(activityId) as
+      `, [activityId])) as
     | {
         id: number;
         title: string;
@@ -136,14 +134,14 @@ export async function scanActivityQr(
   }
 
   if (activity.status !== "published") {
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: null,
       payload: payloadForLog,
       scannedBy: officer.id,
       result: "invalid",
       note: "Hoạt động chưa được công khai",
-    });
+    }));
 
     return {
       ok: false,
@@ -152,14 +150,14 @@ export async function scanActivityQr(
   }
 
   if (method === "qr" && Number(activity.qr_checkin_enabled ?? 0) !== 1) {
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: null,
       payload: payloadForLog,
       scannedBy: officer.id,
       result: "invalid",
       note: "Hoạt động chưa bật QR check-in",
-    });
+    }));
 
     return {
       ok: false,
@@ -177,14 +175,14 @@ export async function scanActivityQr(
     Number.isNaN(startAt.getTime()) ||
     Number.isNaN(endAt.getTime())
   ) {
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: null,
       payload: payloadForLog,
       scannedBy: officer.id,
       result: "invalid",
       note: "Hoạt động chưa có thời gian hợp lệ",
-    });
+    }));
 
     return {
       ok: false,
@@ -193,7 +191,7 @@ export async function scanActivityQr(
   }
 
   if (now < startAt || now > endAt) {
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: null,
       payload: payloadForLog,
@@ -203,7 +201,7 @@ export async function scanActivityQr(
         now < startAt
           ? "Hoạt động chưa diễn ra"
           : "Hoạt động đã kết thúc",
-    });
+    }));
 
     return {
       ok: false,
@@ -214,16 +212,12 @@ export async function scanActivityQr(
     };
   }
 
-  const user = db
-    .prepare(
-      `
+  const user = (await db.first(`
       SELECT id, full_name, mssv, role
       FROM users
-      WHERE mssv = ?
+      WHERE mssv = ? AND is_active=1
       LIMIT 1
-      `
-    )
-    .get(mssv) as
+      `, [mssv])) as
     | {
         id: number;
         full_name: string;
@@ -233,14 +227,14 @@ export async function scanActivityQr(
     | undefined;
 
   if (!user) {
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: null,
       payload: payloadForLog,
       scannedBy: officer.id,
       result: "invalid",
       note: `Không tìm thấy người dùng có MSSV ${mssv}`,
-    });
+    }));
 
     return {
       ok: false,
@@ -249,14 +243,14 @@ export async function scanActivityQr(
   }
 
   if (method === "qr" && Number(user.id) !== Number(verifiedQr?.userId)) {
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: user.id,
       payload: payloadForLog,
       scannedBy: officer.id,
       result: "invalid",
       note: "Mã QR không khớp tài khoản sinh viên",
-    });
+    }));
 
     return {
       ok: false,
@@ -265,14 +259,14 @@ export async function scanActivityQr(
   }
 
   if (!["student", "class_officer", "faculty_officer"].includes(user.role)) {
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: user.id,
       payload: payloadForLog,
       scannedBy: officer.id,
       result: "invalid",
       note: "Tài khoản không thuộc đối tượng được điểm danh",
-    });
+    }));
 
     return {
       ok: false,
@@ -280,17 +274,13 @@ export async function scanActivityQr(
     };
   }
 
-  const registration = db
-    .prepare(
-      `
+  const registration = (await db.first(`
       SELECT id, status
       FROM activity_registrations
       WHERE activity_id = ?
         AND user_id = ?
       LIMIT 1
-      `
-    )
-    .get(activityId, user.id) as
+      `, [activityId, user.id])) as
     | {
         id: number;
         status: string;
@@ -298,14 +288,14 @@ export async function scanActivityQr(
     | undefined;
 
   if (!registration) {
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: user.id,
       payload: payloadForLog,
       scannedBy: officer.id,
       result: "not_registered",
       note: "Người dùng chưa đăng ký hoạt động này",
-    });
+    }));
 
     return {
       ok: false,
@@ -314,14 +304,14 @@ export async function scanActivityQr(
   }
 
   if (registration.status === "attended") {
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: user.id,
       payload: payloadForLog,
       scannedBy: officer.id,
       result: "duplicate",
       note: "Người dùng đã điểm danh trước đó",
-    });
+    }));
 
     return {
       ok: false,
@@ -329,31 +319,29 @@ export async function scanActivityQr(
     };
   }
 
-  const activePeriod = db
-    .prepare(
-      `
+  if (!["registered", "absent"].includes(registration.status)) {
+    return {ok:false,message:"Lượt đăng ký không còn hiệu lực để điểm danh."};
+  }
+
+  const activePeriod = (await db.first(`
       SELECT id
       FROM conduct_periods
       WHERE is_active = 1
-      ORDER BY rowid DESC
+      ORDER BY id DESC
       LIMIT 1
-      `
-    )
-    .get() as { id: number } | undefined;
+      `, [])) as { id: number } | undefined;
 
-  const tx = db.transaction(() => {
-    db.prepare(
-      `
+  const tx = (async () => (await db.withTransaction(async () => {
+    (await db.execute(`
       UPDATE activity_registrations
       SET
         status = 'attended',
-        checked_in_at = datetime('now'),
+        checked_in_at = CURRENT_TIMESTAMP(3),
         checked_in_by = ?
       WHERE id = ?
-      `
-    ).run(officer.id, registration.id);
+      `, [officer.id, registration.id]));
 
-    insertAttendanceLog({
+    (await insertAttendanceLog({
       activityId,
       userId: user.id,
       payload: payloadForLog,
@@ -363,26 +351,10 @@ export async function scanActivityQr(
         method === "qr"
           ? "Quét QR thành công"
           : "Điểm danh thủ công thành công",
-    });
+    }));
 
     if (activePeriod && Number(activity.conduct_score ?? 0) > 0) {
-      const existedConduct = db
-        .prepare(
-          `
-          SELECT id
-          FROM conduct_scores
-          WHERE user_id = ?
-            AND period_id = ?
-            AND source_type = 'activity'
-            AND source_id = ?
-          LIMIT 1
-          `
-        )
-        .get(user.id, activePeriod.id, activityId) as { id: number } | undefined;
-
-      if (!existedConduct) {
-        db.prepare(
-          `
+      (await db.execute(`
           INSERT INTO conduct_scores (
             user_id,
             period_id,
@@ -393,33 +365,15 @@ export async function scanActivityQr(
             created_by,
             created_at
           )
-          VALUES (?, ?, 'activity', ?, ?, ?, ?, datetime('now'))
-          `
-        ).run(
-          user.id,
-          activePeriod.id,
-          activityId,
-          activity.conduct_score,
-          "Điểm tự động từ hoạt động",
-          officer.id
-        );
-      }
+          VALUES (?, ?, 'activity', ?, ?, ?, ?, CURRENT_TIMESTAMP(3))
+          ON DUPLICATE KEY UPDATE score_value=VALUES(score_value),note=VALUES(note),created_by=VALUES(created_by)
+          `, [user.id, activePeriod.id, activityId, activity.conduct_score, "Điểm tự động từ hoạt động", officer.id]));
     }
 
-    db.prepare(
-      `INSERT INTO notifications (user_id, type, title, content, link)
-       VALUES (?, 'activity_attendance', ?, ?, ?)`
-    ).run(
-      user.id,
-      "Điểm danh hoạt động thành công",
-      Number(activity.conduct_score ?? 0) > 0
-        ? `Bạn đã được ghi nhận tham gia “${activity.title}”. Điểm rèn luyện của hoạt động: ${activity.conduct_score} điểm (điểm thực nhận phụ thuộc giới hạn của khung điểm).`
-        : `Bạn đã được ghi nhận tham gia “${activity.title}”.`,
-      `/dashboard/student/activities/${activityId}`
-    );
-  });
+    (await notifyActivityAttendance(db, activityId, user.id));
+  })));
 
-  tx();
+  (await tx());
 
   revalidatePath("/dashboard/faculty-officer/checkin");
   revalidatePath(`/dashboard/faculty-officer/activities/${activityId}`);

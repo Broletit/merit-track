@@ -14,16 +14,16 @@ const actions = [
     bgClass: "bg-amber-50",
   },
   {
-    title: "Hồ sơ",
+    title: "Duyệt hồ sơ",
     description: "Tiếp nhận, kiểm tra và duyệt hồ sơ vòng 1 của lớp.",
-    href: "/dashboard/class-officer/submissions",
+    href: "/dashboard/class-officer/reviews",
     bgClass: "bg-violet-50",
   },
 ];
 
 export default function ClassOfficerQuickActions() {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="min-w-0 rounded-3xl bg-linear-to-br from-white via-blue-50 to-sky-100 p-6 shadow-md ring-1 ring-blue-100 transition-all duration-200 motion-safe:hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-100/60">
       <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
         Truy cập nhanh
       </h2>

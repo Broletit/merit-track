@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Bell, Menu, LogOut, KeyRound, UserRound, Shuffle } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { logoutAction } from "@/app/(auth)/logout/actions";
@@ -11,6 +12,7 @@ import {
   type LoginRoleContext,
 } from "@/server/auth/role-context";
 import ActionFeedback from "@/components/shared/ActionFeedback";
+import MobileNavigation from "./MobileNavigation";
 
 function getProfileHref(loginContext: string) {
   if (loginContext === "class_officer") return "/dashboard/class-officer/profile";
@@ -30,13 +32,46 @@ export default function Topbar({
   role,
   loginContext,
   roleLabel,
+  emailMissing = false,
 }: {
   fullName: string;
   role: string;
   loginContext: string;
   roleLabel: string;
+  emailMissing?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const pathname = usePathname();
+  useEffect(() => {
+    let active = true;
+    let running = false;
+    let queued = false;
+    async function refreshCount() {
+      if (running) { queued = true; return; }
+      running = true;
+      try {
+        const response = await fetch('/api/notifications/unread-count', { cache: 'no-store' });
+        if (response.ok) {
+          const data = await response.json() as {count:number};
+          if (active) setUnreadCount(data.count);
+        }
+      } catch {} finally {
+        running = false;
+        if (active && queued) { queued = false; void refreshCount(); }
+      }
+    }
+    void refreshCount();
+    const timer = window.setInterval(refreshCount, 15000);
+    window.addEventListener('focus', refreshCount);
+    window.addEventListener('app:notifications-updated', refreshCount);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshCount);
+      window.removeEventListener('app:notifications-updated', refreshCount);
+    };
+  }, [pathname]);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -75,46 +110,45 @@ export default function Topbar({
   }
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: PointerEvent) {
       if (!menuRef.current) return;
       if (!menuRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between gap-4 bg-white px-6 py-2.5 shadow-[0_6px_24px_rgba(15,23,42,0.06)]">
+    <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-1 border-b border-blue-100 bg-white px-2 py-2 shadow-[0_4px_18px_rgba(30,58,138,0.07)] sm:gap-4 sm:px-6 sm:py-2.5">
       <ActionFeedback pending={pending} message={error} ok={false} />
-      <p className="min-w-0 truncate text-sm text-slate-500">Xin chào, <span className="font-semibold text-slate-800">{fullName}</span>!</p>
-      <div className="relative flex items-center gap-3" ref={menuRef}>
+      <MobileNavigation role={loginContext} emailMissing={emailMissing} />
+      <p className="hidden min-w-0 flex-1 truncate text-sm text-slate-500 sm:block">Xin chào, <span className="font-semibold text-slate-800">{fullName}</span>!</p>
+      <div className="relative ml-auto flex shrink-0 items-center gap-1 sm:gap-3" ref={menuRef}>
         <Link
-            href={getNotificationHref(loginContext)}
-            aria-label="Mở thông báo"
-            className="rounded-xl bg-slate-50 p-2.5 text-slate-600 transition hover:bg-amber-100 hover:text-amber-800"
-          >
-            <Bell size={18} />
+          href={getNotificationHref(loginContext)}
+          aria-label={`Mở thông báo${unreadCount ? `, ${unreadCount} thông báo chưa đọc` : ''}`}
+          className="relative rounded-xl bg-slate-50 p-2.5 text-slate-600 transition hover:bg-amber-100 hover:text-amber-800"
+        >
+          <Bell size={18} />
+          {unreadCount > 0 ? <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">{unreadCount}</span> : null}
         </Link>
-        <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
+        <span className="inline-flex max-w-28 items-center rounded-full bg-amber-100 px-2 py-1 text-center text-xs font-medium text-amber-700 sm:max-w-none sm:px-3">
           {roleLabel}
         </span>
 
-        <div className="flex items-center gap-3 rounded-2xl bg-white px-3 py-2 shadow-[0_8px_24px_rgba(15,23,42,0.10)]">
+        <div className="flex items-center gap-1 rounded-2xl bg-white px-1 py-1 sm:gap-3 sm:px-3 sm:py-2 shadow-[0_8px_24px_rgba(15,23,42,0.10)] shadow-slate-200/60">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-900 text-sm font-semibold text-white">
             {fullName?.charAt(0)?.toUpperCase() || "U"}
-          </div>
-
-          <div className="hidden text-sm font-medium text-slate-700 sm:block">
-            {fullName}
           </div>
 
           <button
             type="button"
             onClick={() => setOpen((prev) => !prev)}
-            className="rounded-lg p-1.5 text-slate-600 transition hover:bg-slate-100"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"
+            aria-expanded={open}
             aria-label="Mở menu tài khoản"
           >
             <Menu size={18} />
@@ -122,9 +156,9 @@ export default function Topbar({
         </div>
 
         {open ? (
-          <div className="absolute right-0 top-16 w-64 overflow-hidden rounded-2xl bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)] ring-1 ring-slate-100">
+          <div className="absolute right-0 top-full mt-2 max-h-[calc(100dvh-6rem)] w-64 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-2xl bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)] ring-1 ring-slate-100">
             <div className="flex flex-col py-2">
-              {role !== "admin" ? (
+              {role !== "admin" && loginContext !== "student" ? (
                 <Link
                   href={getProfileHref(loginContext)}
                   onClick={() => setOpen(false)}

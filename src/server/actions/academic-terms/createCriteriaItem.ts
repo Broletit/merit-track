@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { assertCriteriaTemplateMutable } from "@/server/criteria-templates/assertCriteriaTemplateMutable";
 
 export async function createCriteriaItem(
@@ -11,8 +11,8 @@ export async function createCriteriaItem(
 ) {
   await requireAdminContext();
 
-  const db = getDb();
-  assertCriteriaTemplateMutable(db, templateId);
+  const db = getDatabase();
+  (await assertCriteriaTemplateMutable(db, templateId));
 
   const groupCode = String(formData.get("groupCode") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
@@ -28,39 +28,30 @@ export async function createCriteriaItem(
     throw new Error("Loại xét tiêu chí không hợp lệ.");
   }
 
-  const group = db
-    .prepare(
-      `
+  const group = (await db.first(`
       SELECT code
       FROM criteria_template_groups
       WHERE template_id = ?
         AND code = ?
       LIMIT 1
-      `
-    )
-    .get(templateId, groupCode) as { code: string } | undefined;
+      `, [templateId, groupCode])) as { code: string } | undefined;
 
   if (!group) {
     throw new Error("Tiêu chuẩn không tồn tại.");
   }
 
-  const countRow = db
-    .prepare(
-      `
+  const countRow = (await db.first(`
       SELECT COUNT(*) AS total
       FROM criteria_template_items
       WHERE template_id = ?
         AND group_code = ?
-      `
-    )
-    .get(templateId, groupCode) as { total: number };
+      `, [templateId, groupCode])) as { total: number };
 
   const nextIndex = Number(countRow.total ?? 0) + 1;
   const code = `${groupCode}${nextIndex}`;
   const sortOrder = nextIndex;
 
-  db.prepare(
-    `
+  (await db.execute(`
     INSERT INTO criteria_template_items (
       template_id,
       group_code,
@@ -73,18 +64,7 @@ export async function createCriteriaItem(
       sort_order
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `
-  ).run(
-    templateId,
-    groupCode,
-    code,
-    title,
-    description || null,
-    scoreMax,
-    evidenceType,
-    isRequired ? 1 : 0,
-    sortOrder
-  );
+    `, [templateId, groupCode, code, title, description || null, scoreMax, evidenceType, isRequired ? 1 : 0, sortOrder]));
 
   revalidatePath(`/dashboard/admin/criteria-templates/${templateId}/configure`);
 

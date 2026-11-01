@@ -1,0 +1,40 @@
+.panel {
+  container: conduct-categories / inline-size;
+}
+.form {
+  display: grid;
+  grid-template-columns: 14rem minmax(0, 1fr) minmax(0, 1fr) 15rem auto;
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+.code, .name, .parent, .score {
+  display: block;
+  min-width: 0;
+}
+.form input, .form select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  font-size: 14px;
+}
+.actions {
+  align-self: start;
+  margin-top: 28px;
+  max-width: 100%;
+}
+@container conduct-categories (max-width: 70rem) {
+  .form {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .code { grid-column: 1; grid-row: 1; }
+  .score { grid-column: 2; grid-row: 1; }
+  .name { grid-column: 1; grid-row: 2; }
+  .parent { grid-column: 2; grid-row: 2; }
+  .actions { grid-column: 1 / -1; margin-top: 0; justify-self: end; }
+}
+@container conduct-categories (max-width: 36rem) {
+  .form { grid-template-columns: minmax(0, 1fr); }
+  .code, .score, .name, .parent { grid-column: 1; grid-row: auto; }
+  .form input, .form select { font-size: 16px; }
+}

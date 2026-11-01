@@ -58,7 +58,7 @@ export default function FacultyOfficerReviewCriteriaItem({
           filePath={filePath}
         />
       ) : (
-        <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800 ring-1 ring-amber-100">
+        <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800 ring-1 ring-amber-100 shadow-md shadow-slate-200/60">
           <div className="font-semibold">Không có tệp minh chứng riêng</div>
           <p className="mt-1">
             {autoMessage || "Tiêu chí thuộc hồ sơ đã nộp nhưng dữ liệu cũ chưa lưu chi tiết nguồn đáp ứng. Người duyệt cần đối chiếu điều kiện và lịch sử hoạt động trước khi kết luận."}

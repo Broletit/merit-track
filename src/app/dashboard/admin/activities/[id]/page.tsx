@@ -1,3 +1,6 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
+import ActivityScopeSummary from "@/components/shared/ActivityScopeSummary";
+import AdminActivityRegistrations from "@/components/admin/activities/AdminActivityRegistrations";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarCheck, CheckCircle2, Pencil, Star, Users } from "lucide-react";
@@ -6,33 +9,35 @@ import ActivityStatusActions from "@/components/admin/activities/ActivityStatusA
 import FacultyAttendanceImport from "@/components/admin/activities/FacultyAttendanceImport";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 type ActivityRow = {
+  max_registrations: number | null;
   id: number; title: string; description: string | null; audience_type: string; status: string;
   start_at: string; end_at: string; registration_start_at: string | null; registration_end_at: string | null;
-  conduct_score: number; qr_checkin_enabled: number; term_name: string; term_is_active: number;
+  conduct_score: number; absence_penalty: number; qr_checkin_enabled: number; term_name: string; term_is_active: number;
   organizer_level: string; participation_source: string;
   registration_locked: number;
   registrations: number; registration_records: number; attended: number; created_at: string; registration_phase: string;
 };
 
-export default async function AdminActivityDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminActivityDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ registrationPage?: string }> }) {
   await requireAdminContext();
   const { id } = await params;
-  const activityId = Number(id);
+  const requestedPage = (await searchParams)?.registrationPage;
+  const activityId = await getDatabase().resolveRouteRecordId(id);
   if (!Number.isFinite(activityId) || activityId <= 0) notFound();
 
-  const db = getDb();
-  const activity = db.prepare(`
+  const db = getDatabase();
+  const activity = (await db.first(`
     SELECT a.*, at.name AS term_name, at.is_active AS term_is_active,
       CASE
         WHEN a.status = 'draft' THEN 'draft'
         WHEN a.registration_locked = 1 THEN 'locked'
         WHEN a.registration_start_at IS NOT NULL
-          AND datetime('now') < datetime(a.registration_start_at) THEN 'upcoming'
+          AND CURRENT_TIMESTAMP(3) < CAST(a.registration_start_at AS DATETIME(3)) THEN 'upcoming'
         WHEN a.registration_end_at IS NOT NULL
-          AND datetime('now') > datetime(a.registration_end_at) THEN 'expired'
+          AND CURRENT_TIMESTAMP(3) > CAST(a.registration_end_at AS DATETIME(3)) THEN 'expired'
         ELSE 'open'
       END AS registration_phase,
       (SELECT COUNT(*) FROM activity_registrations ar
@@ -44,7 +49,7 @@ export default async function AdminActivityDetailPage({ params }: { params: Prom
     FROM activities a
     INNER JOIN academic_terms at ON at.id = a.term_id
     WHERE a.id = ? LIMIT 1
-  `).get(activityId) as ActivityRow | undefined;
+  `, [activityId])) as ActivityRow | undefined;
   if (!activity) notFound();
 
   const stats = [
@@ -55,7 +60,7 @@ export default async function AdminActivityDetailPage({ params }: { params: Prom
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-start gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15">
@@ -78,7 +83,7 @@ export default async function AdminActivityDetailPage({ params }: { params: Prom
           </div>
           <div className="flex shrink-0 flex-col gap-2">
             <div className="flex flex-nowrap items-center gap-2">
-            <Link href="/dashboard/admin/activities" className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/15 sm:px-4">
+            <Link href="/dashboard/admin/activities" className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/15 sm:px-4" data-back-link>
               <ArrowLeft size={16} />Quay về
             </Link>
             {Boolean(activity.term_is_active) ? (
@@ -96,7 +101,7 @@ export default async function AdminActivityDetailPage({ params }: { params: Prom
             )}
             </div>
             {Number(activity.registrations ?? 0) > 0 ? (
-              <a href={`/api/admin/activities/${activity.id}/export`} className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl bg-amber-300 px-3 text-sm font-medium text-amber-950 transition hover:bg-amber-200">Xuất danh sách tham gia</a>
+              <a href={`/api/admin/activities/${activity.id}/export`} className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl bg-amber-300 px-3 text-sm font-medium text-amber-950 transition hover:bg-amber-200">Xuất kết quả tham gia</a>
             ) : (
               <span
                 aria-disabled="true"
@@ -111,7 +116,7 @@ export default async function AdminActivityDetailPage({ params }: { params: Prom
       </section>
 
       {!activity.term_is_active ? (
-        <section className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-700 ring-1 ring-amber-100">
+        <section className="rounded-2xl bg-amber-50 px-5 py-4 text-sm text-amber-700 ring-1 ring-amber-100 shadow-md shadow-slate-200/60">
           Hoạt động thuộc học kỳ không hiện hành. Dữ liệu chỉ được xem lại và không thể chỉnh sửa trạng thái.
         </section>
       ) : null}
@@ -120,13 +125,13 @@ export default async function AdminActivityDetailPage({ params }: { params: Prom
         {stats.map((item) => {
           const Icon = item.icon;
           return (
-            <div key={item.label} className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+            <div key={item.label} className={[statCardStyles.card, "min-w-0"].join(" ")}>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-sm font-medium text-slate-500">{item.label}</div>
-                  <div className="mt-3 text-2xl font-bold text-slate-900">{item.value}</div>
+                  <div className={statCardStyles.label}>{item.label}</div>
+                  <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{item.value}</div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700"><Icon size={20} /></div>
+                <div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}><Icon size={20} /></div>
               </div>
             </div>
           );
@@ -134,19 +139,19 @@ export default async function AdminActivityDetailPage({ params }: { params: Prom
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
           <h2 className="text-lg font-semibold text-slate-900">Thông tin hoạt động</h2>
           <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <InfoItem label="Số lượng tối đa" value={activity.max_registrations===null?"Không giới hạn":`${activity.max_registrations} người`} />
             <InfoItem label="Thời gian đăng ký" value={formatRange(activity.registration_start_at, activity.registration_end_at)} />
             <InfoItem label="Thời gian hoạt động" value={formatRange(activity.start_at, activity.end_at)} />
             <InfoItem label="Đối tượng" value={getAudienceLabel(activity.audience_type)} />
             <InfoItem label="Hình thức điểm danh" value={activity.qr_checkin_enabled ? "Quét mã QR" : "Điểm danh thủ công"} />
             <InfoItem label="Cấp tổ chức" value={activity.organizer_level === "class" ? "Chi đoàn / lớp" : "Cấp khoa"} />
-            <InfoItem label="Nguồn đăng ký" value={activity.participation_source === "external" ? "Hệ thống của trường" : "Hệ thống của khoa"} />
           </div>
         </div>
 
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
           <h2 className="text-lg font-semibold text-slate-900">Trạng thái hoạt động</h2>
           <div className="mt-5">
             <div className="mb-4">
@@ -159,10 +164,12 @@ export default async function AdminActivityDetailPage({ params }: { params: Prom
               <p className="text-sm text-slate-500">Học kỳ đã kết thúc — chỉ được xem dữ liệu.</p>
             )}
           </div>
+          <ActivityScopeSummary activityId={activityId} compact />
         </div>
       </section>
 
       <FacultyAttendanceImport activityId={activity.id} />
+      <AdminActivityRegistrations activityId={activity.id} requestedPage={requestedPage}/>
     </main>
   );
 }
@@ -194,7 +201,7 @@ function RegistrationPhaseBadge({ activity }: { activity: ActivityRow }) {
 }
 
 function InfoItem({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4"><div className="text-sm font-medium text-slate-500">{label}</div><div className="mt-2 text-sm font-semibold text-slate-900">{value}</div></div>;
+  return <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 shadow-md shadow-slate-200/60"><div className="text-sm font-medium text-slate-500">{label}</div><div className="mt-2 text-sm font-semibold text-slate-900">{value}</div></div>;
 }
 
 function formatRange(start: string | null, end: string | null) {

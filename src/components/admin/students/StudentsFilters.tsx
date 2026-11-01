@@ -1,4 +1,6 @@
 "use client";
+import FilterRow from "@/components/shared/filters/FilterRow";
+import CohortFilter from "@/components/shared/CohortFilter";
 
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
@@ -23,20 +25,21 @@ export default function StudentsFilter({
     else params.delete(key);
 
     params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
   useEffect(() => {
+    if (keyword.trim() === (searchParams.get("keyword") ?? "").trim()) return;
     const timer = setTimeout(() => {
       updateParam("keyword", keyword.trim());
     }, 350);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keyword]);
+  }, [keyword, searchParams]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <FilterRow className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <div className="relative xl:col-span-2">
         <Search
           size={16}
@@ -49,9 +52,9 @@ export default function StudentsFilter({
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
+      <CohortFilter />
       <select
-        defaultValue={searchParams.get("classId") ?? ""}
+        value={classes.some(item=>String(item.id) === searchParams.get("classId")) ? searchParams.get("classId") ?? "" : ""}
         onChange={(event) => updateParam("classId", event.target.value)}
         className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
       >
@@ -59,11 +62,10 @@ export default function StudentsFilter({
         <option value="none">Chưa có lớp</option>
         {classes.map((item) => (
           <option key={item.id} value={item.id}>
-            {item.code} - {item.name}
+            {item.code}
           </option>
         ))}
       </select>
-
       <select
         defaultValue={searchParams.get("status") ?? ""}
         onChange={(event) => updateParam("status", event.target.value)}
@@ -73,6 +75,6 @@ export default function StudentsFilter({
         <option value="active">Đang hoạt động</option>
         <option value="inactive">Đã khóa</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

@@ -1,3 +1,4 @@
+import NumberedTable from "@/components/common/NumberedTable";
 import Link from "next/link";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import ReviewFilters from "@/components/shared/reviews/ReviewFilters";
@@ -12,6 +13,7 @@ export type ReviewRow = {
   classCode: string;
   status: string;
   submittedAt: string | null;
+  reviewRound: number;
 };
 
 export default function FacultyOfficerReviewsTable({
@@ -21,6 +23,7 @@ export default function FacultyOfficerReviewsTable({
   totalPages,
   classOptions,
   searchParams,
+  eventOptions,
 }: {
   items: ReviewRow[];
   totalResults: number;
@@ -28,37 +31,42 @@ export default function FacultyOfficerReviewsTable({
   totalPages: number;
   classOptions: string[];
   searchParams: Record<string, string | undefined>;
+  eventOptions: Array<{ id: number; title: string }>;
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <div>
+    <section className="flex flex-col rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <div className="order-2 mt-5">
+        <ReviewFilters classOptions={classOptions} showStatus showSort={false} eventOptions={eventOptions} />
+      </div>
+
+      <div className="order-1">
         <h2 className="text-xl font-semibold text-slate-900">
-          Hồ sơ chờ duyệt vòng 2
+          Danh sách hồ sơ
         </h2>
-        <div className="mt-1 text-sm text-slate-400">{totalResults} hồ sơ</div>
+        
       </div>
 
-      <div className="mt-5">
-        <ReviewFilters classOptions={classOptions} showStatus={false} />
-      </div>
-
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-        <table className="min-w-full table-fixed divide-y divide-slate-200">
+      <div data-table-frame className="order-3 mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<div className="overflow-x-auto rounded-none border border-slate-200">
+        <NumberedTable page={page} className="w-full min-w-0 table-fixed divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
-              <th className="w-[28%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th className="w-[24%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Đợt xét
               </th>
-              <th className="w-[22%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th className="w-[20%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Sinh viên
               </th>
-              <th className="w-[10%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="left" className="w-[10%] px-4 py-3  text-sm font-semibold text-slate-700 text-left">
                 Lớp
               </th>
-              <th className="w-[15%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th className="w-[11%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+                Vòng duyệt
+              </th>
+              <th className="w-[13%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Trạng thái
               </th>
-              <th className="w-[15%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th className="w-[12%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Cập nhật
               </th>
               <th className="w-[10%] px-4 py-3 text-center text-sm font-semibold text-slate-700">
@@ -84,12 +92,16 @@ export default function FacultyOfficerReviewsTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 align-top text-sm text-slate-700">
+                  <td data-column-align="left" className="px-4 py-4 align-top text-sm text-slate-700 text-left">
                     {item.classCode}
                   </td>
 
                   <td className="px-4 py-4 align-top">
-                    <SubmissionStatusBadge status={item.status} />
+                    <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Vòng {item.reviewRound}</span>
+                  </td>
+
+                  <td className="px-4 py-4 align-top">
+                    <SubmissionStatusBadge status={item.status} reviewRound={item.reviewRound} />
                   </td>
 
                   <td className="px-4 py-4 align-top text-sm text-slate-700">
@@ -97,37 +109,32 @@ export default function FacultyOfficerReviewsTable({
                   </td>
 
                   <td className="px-4 py-4 text-center align-top">
-                    <Link
-                      href={`/dashboard/faculty-officer/reviews/${item.id}`}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                    >
-                      Xem
-                    </Link>
+                    <div className="flex justify-center gap-2"><Link href={`/dashboard/faculty-officer/reviews/${item.id}?mode=view${searchParams.termId ? `&termId=${encodeURIComponent(searchParams.termId)}` : ""}`} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Xem</Link>{['submitted_v1','submitted_v2'].includes(item.status)?<Link href={`/dashboard/faculty-officer/reviews/${item.id}?mode=review${searchParams.termId ? `&termId=${encodeURIComponent(searchParams.termId)}` : ""}#review-panel`} className="inline-flex items-center rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">Duyệt</Link>:<button type="button" disabled className="inline-flex cursor-not-allowed items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-300 opacity-40">Duyệt</button>}</div>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-10 text-center text-sm text-slate-500"
                 >
-                  Không có hồ sơ chờ duyệt vòng 2.
+                  Không có hồ sơ phù hợp.
                 </td>
               </tr>
             )}
           </tbody>
-        </table>
+        </NumberedTable>
       </div>
-
-      <div className="mt-5">
-        <ReviewPagination
+<div className="mt-5">
+        <ReviewPagination totalResults={totalResults} resultLabel="hồ sơ"
           page={page}
           totalPages={totalPages}
           basePath="/dashboard/faculty-officer/reviews"
           searchParams={searchParams}
         />
       </div>
+</div>
     </section>
   );
 }

@@ -1,16 +1,16 @@
 "use server";
 
+import { assertActivityScope } from "@/server/activities/scopes";
 import { revalidatePath } from "next/cache";
 import { requireOfficerParticipantContext } from "@/server/auth/requireOfficerParticipantContext";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 export async function registerOfficerActivity(activityId: number) {
   const user = await requireOfficerParticipantContext();
-  const db = getDb();
+  const db = getDatabase();
+  return db.withTransaction(async () => {
 
-  const activity = db
-    .prepare(
-      `
+  const activity = (await db.first(`
       SELECT
         id,
         audience_type,
@@ -21,9 +21,7 @@ export async function registerOfficerActivity(activityId: number) {
       FROM activities
       WHERE id = ?
       LIMIT 1
-      `
-    )
-    .get(activityId) as
+      `, [activityId])) as
     | {
         id: number;
         audience_type: string;
@@ -56,27 +54,29 @@ export async function registerOfficerActivity(activityId: number) {
   if (now > regEnd) throw new Error("Đã hết thời gian đăng ký.");
 
   if (activity.participation_source === "external") throw new Error("Hoạt động cấp khoa đăng ký trên hệ thống của trường.");
-  const membership = db.prepare(`SELECT class_id FROM class_members WHERE user_id=? AND left_at IS NULL ORDER BY rowid DESC LIMIT 1`).get(user.id) as { class_id: number } | undefined;
+  const membership = (await db.first(`SELECT class_id FROM class_members WHERE user_id=? AND left_at IS NULL ORDER BY id DESC LIMIT 1`, [user.id])) as { class_id: number } | undefined;
   if (!membership) throw new Error("Tài khoản chưa được gán lớp.");
-  const hasScope = db.prepare(`SELECT 1 FROM activity_scopes WHERE activity_id=? LIMIT 1`).get(activityId);
-  if (hasScope && !db.prepare(`SELECT 1 FROM activity_scopes WHERE activity_id=? AND class_id=? LIMIT 1`).get(activityId, membership.class_id)) throw new Error("Hoạt động không dành cho chi đoàn của bạn.");
+  (await assertActivityScope(activityId, user.id));
 
-  const result = db.prepare(
-    `
-    INSERT OR IGNORE INTO activity_registrations (
+  const capacity = await db.first<{max_registrations:number|null}>("SELECT max_registrations FROM activities WHERE id=? FOR UPDATE", [activityId]);
+  const count = await db.first<{total:number}>("SELECT COUNT(*) total FROM activity_registrations WHERE activity_id=? AND status<>'cancelled'", [activityId]);
+  if (capacity?.max_registrations != null && Number(count?.total) >= capacity.max_registrations) throw new Error("Hoạt động đã đạt số lượng đăng ký tối đa");
+  const result = (await db.execute(`
+    INSERT IGNORE INTO activity_registrations (
       activity_id,
       user_id,
       class_id,
       status,
       registered_at
     )
-    VALUES (?, ?, ?, 'registered', datetime('now'))
-    `
-  ).run(activityId, user.id, membership.class_id);
+    VALUES (?, ?, ?, 'registered', CURRENT_TIMESTAMP(3))
+    `, [activityId, user.id, membership.class_id]));
 
   if (result.changes === 0) {
     throw new Error("Bạn đã đăng ký hoạt động này rồi.");
   }
+
+  (await db.execute("UPDATE activity_registrations SET role_context=? WHERE activity_id=? AND user_id=?", [user.loginContext ?? "class_officer", activityId, user.id]));
 
   revalidatePath("/dashboard/faculty-officer/officer-activities");
   revalidatePath(`/dashboard/faculty-officer/officer-activities/${activityId}`);
@@ -87,4 +87,5 @@ export async function registerOfficerActivity(activityId: number) {
     ok: true,
     message: "Đăng ký hoạt động thành công.",
   };
+  });
 }

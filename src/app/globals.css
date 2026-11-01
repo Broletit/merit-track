@@ -25,6 +25,428 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+@media (min-width: 768px) {
+  html:has(.dashboard-shell) { font-size: 90%; }
+  .dashboard-shell { width: 100%; height: 100dvh; }
+}
+
+/* Nhãn bộ lọc dùng chung: nội dung nằm rõ phía trên ô nhập. */
+.filter-field {
+  display: grid;
+  min-width: 0;
+  gap: .375rem;
+}
+.filter-field > label {
+  color: #64748b;
+  font-size: .75rem;
+  font-weight: 600;
+  line-height: 1rem;
+}
+.filter-field-label {
+  color: #64748b;
+  font-size: .75rem;
+  font-weight: 600;
+  line-height: 1rem;
+}
+.filter-field > :is(input, select) { min-width: 0; width: 100%; }
+
+.sidebar-navigation-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Dropdown dùng chung dấu chevron, không dùng mũi tên tam giác mặc định. */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right .75rem center;
+  background-repeat: no-repeat;
+  padding-right: 2.5rem;
+}
+
+select:open {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 15 6-6 6 6'/%3E%3C/svg%3E");
+}
+
+/* Dropdown dùng chung dấu chevron, không dùng mũi tên tam giác mặc định. */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right .75rem center;
+  background-repeat: no-repeat;
+  padding-right: 2.5rem;
+}
+
+select:open {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 15 6-6 6 6'/%3E%3C/svg%3E");
+}
+
+.filter-row {
+  display: grid !important;
+  align-items: end;
+  gap: .75rem;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+  overflow-x: visible;
+}
+
+.filter-row > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.filter-row > div:has(input[type="text"], input:not([type])) {
+  min-width: 0;
+}
+
+.filter-row > div:has(input[type="text"], input[type="search"], input:not([type])),
+.filter-row > input[type="text"],
+.filter-row > input[type="search"],
+.filter-row > input:not([type]) {
+  order: -1;
+}
+
+@media (max-width: 1023px) {
+  .filter-row > div:has(input[type="text"], input:not([type])),
+  .filter-row > input[type="text"],
+  .filter-row > input:not([type]) {
+    order: -1;
+    width: 100%;
+  }
+}
+
+.dashboard-shell [class*="rounded-full"] {
+  white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+  .filter-row > * { min-width: 0; }
+  .filter-row > div:has(input[type="text"], input:not([type])) { min-width: 0; }
+}
+
+.dashboard-shell > aside { height: 100dvh; }
+.dashboard-shell > aside { scrollbar-width: none; }
+.dashboard-shell > aside::-webkit-scrollbar { display: none; }
+body:has(.dashboard-shell) { overflow: hidden; }
+.dashboard-shell main main { min-width: 0; }
+
+.dashboard-shell fieldset {
+  min-inline-size: 0;
+  max-width: 100%;
+}
+
+.dashboard-shell form {
+  min-width: 0;
+}
+
+/* Bảng vừa khung; nội dung dài tự xuống hàng. */
+.dashboard-shell main div:has(> table) {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto !important;
+  overscroll-behavior-x: contain;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .9), 0 2px 5px rgb(15 23 42 / .08), 0 9px 20px rgb(15 23 42 / .06);
+  transition: box-shadow .2s ease;
+}
+
+.dashboard-shell main table {
+  width: 100%;
+  min-width: 0;
+  table-layout: auto !important;
+}
+
+.dashboard-shell main table td,
+.dashboard-shell main table td span,
+.dashboard-shell main table td div {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard-shell main table th {
+  width: auto !important;
+  white-space: nowrap !important;
+  overflow-wrap: normal;
+}
+
+.dashboard-shell main table th *,
+.dashboard-shell main table td :is(button, a, label, select),
+.dashboard-shell main table td :is(button, a, label) *,
+.dashboard-shell main table td span:is([class*="rounded-full"], [class*="inline-flex"]),
+.dashboard-shell main table td span:is([class*="rounded-full"], [class*="inline-flex"]) * {
+  white-space: nowrap !important;
+  overflow-wrap: normal;
+  word-break: normal;
+  flex-shrink: 0;
+}
+.dashboard-shell main table td :is(div, form):has(> :is(button, a, form)) {
+  flex-wrap: nowrap !important;
+}
+
+
+[data-table-frame] {
+  border: 0;
+}
+
+/* Khung danh sách ngoài cùng luôn bo góc; bảng con được chuẩn hóa riêng bên dưới. */
+/* Chỉ khung bao bên ngoài (chứa một section hoàn chỉnh) được bo góc.
+   data-table-frame chứa dữ liệu/bảng vẫn luôn vuông để không tách chân bảng. */
+[data-table-frame]:has(> section) {
+  border-radius: 1.5rem !important;
+  box-shadow: 0 8px 22px rgb(15 23 42 / .08);
+}
+
+.filter-row + [data-table-frame],
+div:has(> .filter-row) + [data-table-frame],
+.filter-row + div:has(table),
+div:has(> .filter-row) + div:has(table) {
+  margin-top: 1.25rem !important;
+}
+
+[data-table-title] + .filter-row,
+[data-table-title] + div:has(> .filter-row),
+.table-heading + .filter-row,
+.table-heading + div:has(> .filter-row) {
+  margin-top: 1.25rem;
+}
+
+/* Chuẩn khung dữ liệu: tiêu đề → bộ lọc → bảng; chỉ áp dụng khi cùng một section. */
+.dashboard-shell main section:has(> [data-table-frame]):has(> .filter-row, > div > .filter-row) {
+  display: flex;
+  flex-direction: column;
+}
+.dashboard-shell main section:has(> [data-table-frame]):has(> .filter-row, > div > .filter-row) > :is(h2, h3, [data-table-title], .table-heading) {
+  order: 1;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+.dashboard-shell main section:has(> [data-table-frame]):has(> .filter-row, > div > .filter-row) > :is(.filter-row, div:has(> .filter-row)) {
+  order: 2;
+  margin-top: 1.25rem;
+}
+.dashboard-shell main section:has(> [data-table-frame]):has(> .filter-row, > div > .filter-row) > [data-table-frame] {
+  order: 3;
+  margin-top: 1.25rem;
+}
+
+/* Khung ngoài bo góc; bảng và khung dữ liệu trực tiếp bên trong luôn vuông góc. */
+[data-table-frame] > div:has(> table),
+[data-table-frame] table {
+  border-radius: 0 !important;
+}
+
+/* Thứ tự thống nhất trong cùng một khung dữ liệu: tiêu đề → bộ lọc → bảng. */
+
+[data-table-frame] > div:has(> table) {
+  scroll-margin-top: 1rem;
+  margin-top: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 0;
+}
+
+[data-table-frame] > div:has([data-table-results-footer]) {
+  margin-top: 0 !important;
+}
+
+/* Phân trang và số bản ghi là phần chân của cùng một vùng dữ liệu,
+   không tạo một thẻ nổi/có khoảng trống riêng bên ngoài bảng. */
+[data-table-frame] > [data-table-results-footer],
+[data-table-frame] > div:has(> [data-table-results-footer]) {
+  margin-top: 0 !important;
+  border-radius: 0 !important;
+}
+
+[data-table-frame]:has(> section) > [data-table-results-footer] {
+  padding-inline: 1.5rem;
+}
+
+/* Tiêu đề bảng trong khung dữ liệu lồng nhau (như Nhật ký hệ thống). */
+.dashboard-shell main [data-table-frame] > section > :is(h2, h3, [data-table-title], .table-heading) {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+/* Chuẩn bảng dùng xuyên suốt mọi role: tiêu đề → bộ lọc → bảng.
+   Các phần tử trực tiếp được sắp lại độc lập với thứ tự JSX cũ, giữ nhịp 20px. */
+.dashboard-shell main section:has(.filter-row):has(table) {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-shell main section:has(.filter-row):has(table) > :is(h2, h3, [data-table-title], .table-heading),
+.dashboard-shell main section:has(.filter-row):has(table) > div:has(> :is(h2, h3, [data-table-title], .table-heading)):not(:has(.filter-row)):not(:has(table)) {
+  order: 1;
+  margin-top: 0 !important;
+}
+
+.dashboard-shell main section:has(.filter-row):has(table) > :is(h2, h3, [data-table-title], .table-heading),
+.dashboard-shell main section:has(.filter-row):has(table) > div:has(> :is(h2, h3, [data-table-title], .table-heading)):not(:has(.filter-row)):not(:has(table)) > :is(h2, h3, [data-table-title], .table-heading) {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.dashboard-shell main section:has(.filter-row):has(table) > :is(.filter-row, div:has(> .filter-row)) {
+  order: 2;
+  margin-top: 1.25rem !important;
+}
+
+/* Cấu trúc tab Danh sách của báo cáo Sinh viên: cùng nhịp với Báo cáo Cán bộ. */
+.dashboard-shell main section:has(.report-filter-spacious) > div:has(> .report-filter-spacious) {
+  margin-top: .75rem !important;
+}
+.report-student-table-filter-gap {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+.dashboard-shell main section:has(> .report-student-table-filter-gap) > .report-student-table-filter-gap {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.dashboard-shell main section:has(.filter-row):has(table) > :is([data-table-frame], div:has(> table)):not(:has(.filter-row)) {
+  order: 3;
+  margin-top: 1.25rem !important;
+}
+
+/* Nút xuất thuộc hàng tiêu đề; chân phân trang luôn nằm sau bảng. */
+.dashboard-shell main section:has(.filter-row):has(table) {
+  position: relative;
+}
+.dashboard-shell main section:has(.filter-row):has(table) > div.mt-5.flex.justify-end {
+  position: absolute !important;
+  top: 1rem !important;
+  right: 1.5rem !important;
+  z-index: 1;
+  margin: 0 !important;
+}
+.dashboard-shell main section:has(.filter-row):has(table) > [data-table-results-footer],
+.dashboard-shell main section:has(.filter-row):has(table) > div:has(> [data-table-results-footer]) {
+  order: 99 !important;
+  margin-top: 0 !important;
+}
+
+[data-table-frame] > section {
+  border-radius: 0;
+  box-shadow: none;
+  padding-bottom: 0;
+}
+
+[data-table-frame] > section div:has(> table) {
+  border: 1px solid #e2e8f0;
+  border-radius: 0;
+}
+
+[data-table-results-footer] a {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dashboard-shell main table td .line-clamp-2 {
+  max-width: 22rem;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1024px) {
+  .classes-filter-row > div:has(input) { flex-grow: 1; }
+  .classes-filter-row > select:last-child { flex-grow: 2; }
+}
+
+.dashboard-shell main table.academic-terms-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed !important;
+}
+
+.dashboard-shell main table.activity-registrations-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed !important;
+}
+
+table.activity-registrations-table thead tr::before,
+table.activity-registrations-table tbody tr::before,
+table.audit-logs-table thead tr::before,
+table.audit-logs-table tbody tr::before {
+  content: none !important;
+  display: none !important;
+}
+
+.audit-logs-page table.audit-logs-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed !important;
+}
+
+.audit-logs-page table.audit-logs-table td:not(:nth-child(2)),
+.audit-logs-page table.audit-logs-table td div {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.audit-logs-page form label,
+.audit-logs-page form input,
+.audit-logs-page form select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+table[data-no-row-number] thead tr::before,
+table[data-no-row-number] tbody tr::before {
+  content: none !important;
+  display: none !important;
+}
+
+@media (max-width: 639px) {
+  [data-table-results-footer] {
+    padding-left: .25rem;
+    padding-right: .25rem;
+    gap: .25rem;
+  }
+  [data-table-results-footer] p,
+  [data-table-results-footer] div,
+  [data-table-results-footer] span {
+    font-size: .6875rem;
+    white-space: nowrap;
+  }
+  [data-table-results-footer] a,
+  [data-table-results-footer] button {
+    width: 1.5rem;
+    min-width: 1.5rem;
+  }
+}
+
+.dashboard-shell main table.academic-terms-table th,
+.dashboard-shell main table.academic-terms-table td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.dashboard-shell > div > main { overflow-x: hidden; }
+
+/* Giữ bảng và các trường nhập trong khung trên điện thoại. */
+@media (max-width: 639px) {
+  .dashboard-shell main div:has(> table) {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .dashboard-shell main table {
+    min-width: 0;
+  }
+
+  .dashboard-shell main input,
+  .dashboard-shell main select,
+  .dashboard-shell main textarea {
+    max-width: 100%;
+    font-size: 1rem;
+  }
+}
+
 @keyframes loading-bar {
   0% { transform: translateX(-110%); }
   100% { transform: translateX(410%); }
@@ -64,9 +486,15 @@ textarea:user-invalid,
   box-shadow: 0 0 0 3px rgb(244 63 94 / 0.12);
 }
 
-[data-validation-valid="true"]:not([aria-invalid="true"]):not(:user-invalid) {
-  border-color: #22c55e !important;
-  box-shadow: 0 0 0 3px rgb(34 197 94 / 0.13);
+.required-field-control {
+  display: block;
+  min-width: 0;
+}
+.required-field-control > input,
+.required-field-control > select,
+.required-field-control > textarea {
+  width: 100%;
+  min-width: 0;
 }
 
 /* Chuẩn nút thao tác trong cột cuối của mọi bảng. */
@@ -113,7 +541,205 @@ table td:last-child button[class*="red"] {
   color: #be123c !important;
 }
 
+/* Đánh số thứ tự thống nhất cho các bảng dữ liệu trong toàn hệ thống. */
+table {
+  counter-reset: system-table-row;
+}
+
+table thead tr:first-child::before {
+  content: "STT";
+  display: table-cell;
+  width: 3.75rem;
+  padding: .75rem 1rem;
+  text-align: center;
+  vertical-align: middle;
+  color: #334155;
+  font-size: .875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+table tbody tr:not(:has(> td[colspan])) {
+  counter-increment: system-table-row;
+}
+
+table tbody tr:not(:has(> td[colspan]))::before {
+  content: counter(system-table-row);
+  display: table-cell;
+  width: 3.75rem;
+  padding: 1rem;
+  text-align: center;
+  vertical-align: middle;
+  color: #64748b;
+  font-size: .875rem;
+  white-space: nowrap;
+}
+
 table td:last-child a:hover,
 table td:last-child button:hover {
   background: #f8fafc !important;
 }
+
+/* Camera viewfinder: remain inline and keep native video controls hidden. */
+.qr-inline-camera video { display: block; width: 100% !important; max-width: 100%; pointer-events: none; }
+.qr-inline-camera video::-webkit-media-controls,
+.qr-inline-camera video::-webkit-media-controls-enclosure,
+.qr-inline-camera video::-webkit-media-controls-start-playback-button { display: none !important; }
+
+/* Shared table geometry and back-navigation typography. */
+.dashboard-shell main table th, .dashboard-shell main table td { font-size: .875rem; vertical-align: middle; text-align: center; }
+.dashboard-shell main table [data-column-align="center"] { text-align: center !important; }
+.dashboard-shell main table [data-column-align="left"] { text-align: left !important; }
+.dashboard-shell main table [data-column-align="right"] { text-align: right !important; }
+.dashboard-shell main table [data-column-align="right"] > .flex { justify-content: flex-end; }
+.dashboard-shell main table [data-column-align="center"] > .flex { justify-content: center; }
+[data-back-link] { display: inline-flex !important; align-items: center; gap: .5rem; font-size: .875rem !important; font-weight: 400 !important; }
+[data-back-link] > span { margin-left: 0; font-weight: inherit; }
+
+table.criteria-definition-table th:last-child,
+table.criteria-definition-table td:last-child {
+  text-align: left !important;
+}
+
+@media (max-width: 639px) {
+  table.criteria-detail-table,
+  table.criteria-detail-table tbody,
+  table.criteria-detail-table tr,
+  table.criteria-detail-table td {
+    display: block;
+    width: 100% !important;
+  }
+  table.criteria-detail-table thead,
+  table.criteria-detail-table tr::before {
+    display: none !important;
+    content: none !important;
+  }
+  table.criteria-detail-table tr {
+    border-bottom: 1px solid #cbd5e1;
+    padding: .5rem .75rem;
+  }
+  table.criteria-detail-table td {
+    padding: .5rem 0 !important;
+    text-align: left !important;
+  }
+  table.criteria-detail-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: .25rem;
+    color: #64748b;
+    font-size: .75rem;
+    font-weight: 600;
+  }
+  table.criteria-detail-table td:empty::before { display: none; }
+  table.criteria-detail-table td :is(a, button, span) { max-width: 100%; }
+}
+
+
+/* Consistent blue headings for every data table, including sticky headers and STT. */
+table thead,
+table thead tr,
+table thead th,
+table thead td,
+table thead tr:first-child::before {
+  background-color: #1e40af !important;
+  color: #fff !important;
+}
+table thead :is(th, td) :is(span, div, a, button, svg) {
+  color: inherit !important;
+}
+
+.dashboard-shell button {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+/* Không cho nội dung tương tác hoặc khung nhập tràn khỏi vùng hiển thị. */
+.dashboard-shell main :is(button, a[role="button"], input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard-shell main :is(button, a[role="button"]) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Textareas do not reserve an inline baseline below their content. */
+textarea { display: block; }
+
+/* Hiệu ứng thẻ dùng chung: viền sáng chuyển động và dải sáng lướt qua khi rê chuột. */
+.dashboard-shell main [data-card-effect] {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.dashboard-shell main [data-card-effect]::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  content: "";
+  opacity: 0;
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 96deg, rgb(56 189 248 / .9) 132deg, rgb(255 255 255 / .95) 160deg, rgb(37 99 235 / .9) 195deg, transparent 230deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.dashboard-shell main [data-card-effect]::after {
+  position: absolute;
+  z-index: 1;
+  top: -40%;
+  bottom: -40%;
+  left: -35%;
+  width: 22%;
+  pointer-events: none;
+  content: "";
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / .12), rgb(255 255 255 / .72), rgb(125 211 252 / .24), transparent);
+  transform: translateX(-240%) skewX(-18deg);
+}
+
+@media (hover: hover) {
+  .dashboard-shell main [data-card-effect]:hover::before {
+    opacity: 1;
+    animation: card-border-orbit 2.8s linear infinite;
+  }
+  .dashboard-shell main [data-card-effect]:hover::after {
+    opacity: 1;
+    animation: card-light-sweep .85s ease-out both;
+  }
+}
+
+@keyframes card-border-orbit { to { transform: rotate(1turn); } }
+@keyframes card-light-sweep { to { transform: translateX(650%) skewX(-18deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-shell main [data-card-effect]::before,
+  .dashboard-shell main [data-card-effect]::after { animation: none !important; }
+}
+
+@property --stat-card-led-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@media (hover: hover) {
+  .dashboard-shell main [class*="StatCard_card"]:hover {
+    border-color: transparent !important;
+    background:
+      linear-gradient(135deg, #f2f8ff 0%, #e4f1ff 58%, #eaf8ff 100%) padding-box,
+      conic-gradient(from var(--stat-card-led-angle), #2563eb, #38bdf8, #f8fafc, #22d3ee, #2563eb) border-box !important;
+    animation: stat-card-led-border 2.4s linear infinite;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .95), 0 0 0 1px rgb(56 189 248 / .22), 0 10px 24px rgb(37 99 235 / .18);
+  }
+}
+
+@keyframes stat-card-led-border { to { --stat-card-led-angle: 1turn; } }

@@ -13,7 +13,7 @@ export default function FacultyOfficerRecentActivities({
   items: FacultyOfficerActivityItem[];
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="min-w-0 rounded-3xl bg-linear-to-br from-white via-blue-50 to-sky-100 p-6 shadow-md ring-1 ring-blue-100 transition-all duration-200 motion-safe:hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-100/60">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
           Hoạt động gần đây
@@ -31,7 +31,7 @@ export default function FacultyOfficerRecentActivities({
           items.map((item) => (
             <div
               key={item.id}
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-md shadow-slate-200/60"
             >
               <div className="text-lg font-semibold text-slate-900">
                 {item.title}
@@ -45,7 +45,7 @@ export default function FacultyOfficerRecentActivities({
             </div>
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-500">
+          <div className="rounded-none border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-500">
             Chưa có hoạt động nào gần đây.
           </div>
         )}

@@ -1,6 +1,8 @@
+import ActivityScopeSummary from "@/components/shared/ActivityScopeSummary";
+import { activityVisibleSql } from "@/server/cohorts/sql";
 import { notFound } from "next/navigation";
 import { requireOfficerParticipantContext } from "@/server/auth/requireOfficerParticipantContext";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import OfficerActivityDetailHeader from "@/components/faculty-officer/officer-activities/OfficerActivityDetailHeader";
 import OfficerActivityDetailCard from "@/components/faculty-officer/officer-activities/OfficerActivityDetailCard";
 import type { OfficerActivityDetail } from "@/components/faculty-officer/officer-activities/types";
@@ -29,15 +31,13 @@ export default async function FacultyOfficerOfficerActivityDetailPage({
 }) {
   const user = await requireOfficerParticipantContext();
   const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const activityId = Number(id);
+  const activityId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(activityId) || activityId <= 0) notFound();
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const row = db
-    .prepare(
-      `
+  const row = (await db.first(`
       SELECT
         a.id,
         a.title,
@@ -58,10 +58,9 @@ export default async function FacultyOfficerOfficerActivityDetailPage({
       WHERE a.id = ?
         AND a.audience_type = 'officer'
         AND a.status = 'published'
+        AND ${activityVisibleSql("a",String(user.id))}
       LIMIT 1
-      `
-    )
-    .get(user.id, activityId) as Row | undefined;
+      `, [user.id, activityId])) as Row | undefined;
 
   if (!row) notFound();
 
@@ -95,6 +94,7 @@ export default async function FacultyOfficerOfficerActivityDetailPage({
   return (
     <main className="space-y-6">
       <OfficerActivityDetailHeader item={item} backHref={backHref} />
+      <ActivityScopeSummary activityId={activityId} />
       <OfficerActivityDetailCard item={item} />
     </main>
   );

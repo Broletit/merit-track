@@ -1,5 +1,5 @@
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import AcademicTermsHeader from "@/components/admin/academic-terms/AcademicTermsHeader";
 import AcademicTermCreateForm from "@/components/admin/academic-terms/AcademicTermCreateForm";
 import AcademicTermsTable from "@/components/admin/academic-terms/AcademicTermsTable";
@@ -18,11 +18,9 @@ type Row = {
 export default async function AdminAcademicTermsPage() {
   await requireAdminContext();
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         id,
         academic_year,
@@ -32,10 +30,8 @@ export default async function AdminAcademicTermsPage() {
         end_at,
         is_active
       FROM academic_terms
-      ORDER BY datetime(start_at) DESC, id DESC
-      `
-    )
-    .all() as Row[];
+      ORDER BY CAST(start_at AS DATETIME(3)) DESC, id DESC
+      `, [])) as Row[];
 
   const items: AcademicTermItem[] = rows.map((item) => ({
     id: Number(item.id),

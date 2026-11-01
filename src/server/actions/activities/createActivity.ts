@@ -1,8 +1,10 @@
 "use server";
+import { parseRegistrationCapacity } from "@/server/activities/registrationCapacity";
 
+import { readActivityScopes, saveActivityScopes } from "@/server/activities/scopes";
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { getRequiredActiveTerm } from "@/server/academic-terms/getRequiredActiveTerm";
 import { assertDateRangeInsideTerm } from "@/server/academic-terms/getAcademicTermForView";
 
@@ -13,8 +15,8 @@ function toIsoOrNull(value: FormDataEntryValue | null) {
 
 export async function createActivity(formData: FormData) {
   const user = await requireAdminContext();
-  const term = getRequiredActiveTerm();
-  const db = getDb();
+  const term = (await getRequiredActiveTerm());
+  const db = getDatabase();
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -22,9 +24,11 @@ export async function createActivity(formData: FormData) {
   const audienceType = requestedAudienceType === "all" ? "student" : requestedAudienceType;
   const status = String(formData.get("status") ?? "draft").trim();
   const conductScore = Number(formData.get("conductScore") ?? 0);
+  const absencePenalty = conductScore;
+  const maxRegistrations=parseRegistrationCapacity(formData.get("maxRegistrations"));
   const organizerLevel = String(formData.get("organizerLevel") ?? "class");
   const participationSource = organizerLevel === "class" ? "internal" : "external";
-  const selectedClassIds = formData.getAll("classIds").map(Number).filter((id) => Number.isInteger(id) && id > 0);
+  const {classIds: selectedClassIds, cohorts: selectedCohorts} = (await readActivityScopes(formData));
   const conductCategoryId = Number(formData.get("conductCategoryId") ?? 0) || null;
   const qrCheckinEnabled =
     String(formData.get("qrCheckinEnabled") ?? "") === "on" ? 1 : 0;
@@ -45,15 +49,19 @@ export async function createActivity(formData: FormData) {
   if (!Number.isFinite(conductScore) || conductScore < 0) {
     throw new Error("Điểm rèn luyện không hợp lệ.");
   }
+  if (audienceType === "student" && !conductCategoryId) {
+    throw new Error("Vui lòng chọn một mục cấp cuối trong Khung tiêu chuẩn ĐRL.");
+  }
   if (conductCategoryId) {
-    const category=db.prepare(`SELECT score_max FROM conduct_score_categories WHERE id=? AND term_id=?`).get(conductCategoryId,term.id) as {score_max:number}|undefined;
+    const category=(await db.first(`SELECT score_max,EXISTS(SELECT 1 FROM conduct_score_categories child WHERE child.parent_id=conduct_score_categories.id) has_children FROM conduct_score_categories WHERE id=? AND term_id=?`, [conductCategoryId, term.id])) as {score_max:number;has_children:number}|undefined;
     if(!category) throw new Error("Mục trong Khung tiêu chuẩn ĐRL không hợp lệ.");
+    if(Number(category.has_children)===1) throw new Error("Không thể gắn hoạt động vào mục cha. Vui lòng chọn một mục cấp cuối cụ thể trong Khung tiêu chuẩn ĐRL.");
     if(conductScore>Number(category.score_max)) throw new Error("Điểm của hoạt động không được lớn hơn điểm tối đa của mục đã chọn.");
   }
-  const duplicateActivity=db.prepare(`SELECT a.id,c.code category_code,c.name category_name,at.name term_name FROM activities a LEFT JOIN conduct_score_categories c ON c.id=a.conduct_category_id LEFT JOIN academic_terms at ON at.id=a.term_id WHERE a.term_id=? AND LOWER(TRIM(a.title))=LOWER(TRIM(?)) LIMIT 1`).get(term.id,title) as {id:number;category_code:string|null;category_name:string|null;term_name:string|null}|undefined;
+  const duplicateActivity=(await db.first(`SELECT a.id,c.code category_code,c.name category_name,at.name term_name FROM activities a LEFT JOIN conduct_score_categories c ON c.id=a.conduct_category_id LEFT JOIN academic_terms at ON at.id=a.term_id WHERE a.term_id=? AND LOWER(TRIM(a.title))=LOWER(TRIM(?)) LIMIT 1`, [term.id, title])) as {id:number;category_code:string|null;category_name:string|null;term_name:string|null}|undefined;
   if(duplicateActivity){const category=duplicateActivity.category_name?`mục “${duplicateActivity.category_code}. ${duplicateActivity.category_name}”`:"hoạt động không thuộc mục điểm";throw new Error(`Tên hoạt động đã tồn tại trong học kỳ ${duplicateActivity.term_name??term.name}, tại ${category}. Tên hoạt động không được trùng trong cùng học kỳ.`);}
   if (!["class", "faculty"].includes(organizerLevel)) throw new Error("Cấp tổ chức không hợp lệ.");
-  if (organizerLevel === "class" && selectedClassIds.length !== 1) throw new Error("Vui lòng chọn đúng một chi đoàn tổ chức hoạt động.");
+  if (organizerLevel === "class" && selectedClassIds.length + selectedCohorts.length === 0) throw new Error("Vui lòng chọn ít nhất một lớp hoặc khóa tham gia.");
   if (!startAt || !endAt || !registrationStartAt || !registrationEndAt) {
     throw new Error("Vui lòng nhập đầy đủ thời gian.");
   }
@@ -105,53 +113,35 @@ export async function createActivity(formData: FormData) {
     label: "Thời gian diễn ra hoạt động",
   });
 
-  const tx = db.transaction(() => {
-  const created = db.prepare(
-    `
+  let activityId = 0;
+  const tx = (async () => (await db.withTransaction(async () => {
+  const created = (await db.execute(`
     INSERT INTO activities (
       title, description, audience_type, status,
       start_at, end_at, registration_start_at, registration_end_at,
       checkin_start_at, checkin_end_at,
-      conduct_score, attendance_mode, qr_checkin_enabled,
+      conduct_score, absence_penalty, attendance_mode, qr_checkin_enabled,
       created_by, created_at, published_at, term_id, organizer_level, participation_source, conduct_category_id
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'qr', ?, ?, datetime('now'),
-      CASE WHEN ? = 'published' THEN datetime('now') ELSE NULL END,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'qr', ?, ?, CURRENT_TIMESTAMP(3),
+      CASE WHEN ? = 'published' THEN CURRENT_TIMESTAMP(3) ELSE NULL END,
       ?, ?, ?, ?
     )
-    `
-  ).run(
-    title,
-    description,
-    audienceType,
-    status,
-    startAt,
-    endAt,
-    registrationStartAt,
-    registrationEndAt,
-    startAt,
-    endAt,
-    conductScore,
-    qrCheckinEnabled,
-    user.id,
-    status,
-    term.id,
-    organizerLevel,
-    participationSource,
-    conductCategoryId
-  );
-  const activityId = Number(created.lastInsertRowid);
+    `, [title, description, audienceType, status, startAt, endAt, registrationStartAt, registrationEndAt, startAt, endAt, conductScore, absencePenalty, qrCheckinEnabled, user.id, status, term.id, organizerLevel, participationSource, conductCategoryId]));
+  activityId = Number(created.insertId);
+  (await db.execute('UPDATE activities SET max_registrations=? WHERE id=?', [maxRegistrations, activityId]));
   if (organizerLevel === "class") {
-    db.prepare(`INSERT INTO activity_scopes(activity_id,class_id) VALUES(?,?)`).run(activityId, selectedClassIds[0]);
+    (await saveActivityScopes(activityId, selectedClassIds, selectedCohorts));
   }
-  });
-  tx();
+  })));
+  (await tx());
 
   revalidatePath("/dashboard/admin/activities");
   revalidatePath("/dashboard/admin/activities/create");
 
   return {
     ok: true,
+    id: activityId,
     message: `Tạo hoạt động thành công cho ${term.name}.`,
   };
 }

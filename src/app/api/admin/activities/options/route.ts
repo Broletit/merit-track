@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { requireAdminContext } from "@/server/auth/guards";
+import { getDatabase } from "@/server/db/mysql";
 
 export async function GET() {
-  await requireAdmin();
-  const db = getDb();
+  await requireAdminContext();
+  const db = getDatabase();
 
-  const items = db.prepare(`
+  const items = (await db.rows(`
     SELECT id, title, conduct_score, status
     FROM activities
-    ORDER BY datetime(created_at) DESC, id DESC
-  `).all();
+    ORDER BY CAST(created_at AS DATETIME(3)) DESC, id DESC
+  `, []));
 
   return NextResponse.json({ items });
 }

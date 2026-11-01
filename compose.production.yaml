@@ -1,0 +1,45 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DB_HOST: ${DB_HOST:?Set production DB_HOST}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:?Set production DB_NAME}
+      DB_USER: ${DB_USER:?Set production DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD:?Set production DB_PASSWORD}
+      DB_CONNECTION_LIMIT: ${DB_CONNECTION_LIMIT:-10}
+      DB_SSL: ${DB_SSL:-true}
+      DB_SSL_CA: ${DB_SSL_CA:-}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:?Set STORAGE_PROVIDER}
+      LOCAL_STORAGE_ROOT: /app/storage
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      MICROSOFT_SITE_ID: ${MICROSOFT_SITE_ID:-}
+      MICROSOFT_DRIVE_ID: ${MICROSOFT_DRIVE_ID:-}
+      MICROSOFT_STORAGE_ROOT: ${MICROSOFT_STORAGE_ROOT:-MeritTrack/evidence}
+      QR_SIGN_SECRET: ${QR_SIGN_SECRET:?Set QR_SIGN_SECRET}
+      PASSWORD_RESET_SECRET: ${PASSWORD_RESET_SECRET:?Set PASSWORD_RESET_SECRET}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-resend}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+    volumes:
+      - private_storage:/app/storage
+    expose: ["3000"]
+  https:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN to your public domain}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - https_data:/data
+      - https_config:/config
+    depends_on: [app]
+volumes:
+  private_storage:
+  https_data:
+  https_config:

@@ -1,8 +1,9 @@
 "use server";
 
+import { syncGroupMinimum } from "@/server/criteria-templates/groupRequirements";
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { assertCriteriaTemplateMutable } from "@/server/criteria-templates/assertCriteriaTemplateMutable";
 
 export async function updateCriteriaItem(
@@ -12,8 +13,8 @@ export async function updateCriteriaItem(
 ) {
   await requireAdminContext();
 
-  const db = getDb();
-  assertCriteriaTemplateMutable(db, templateId);
+  const db = getDatabase();
+  (await assertCriteriaTemplateMutable(db, templateId));
 
   const code = String(criteriaCode ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
@@ -34,22 +35,17 @@ export async function updateCriteriaItem(
     throw new Error("Điểm tối đa không hợp lệ.");
   }
 
-  const found = db
-    .prepare(
-      `
+  const found = (await db.first(`
       SELECT id
       FROM criteria_template_items
       WHERE template_id = ? AND code = ?
       LIMIT 1
-      `
-    )
-    .get(templateId, code) as { id: number } | undefined;
+      `, [templateId, code])) as { id: number } | undefined;
 
   if (!found) throw new Error("Tiêu chí không tồn tại.");
 
-  const tx = db.transaction(() => {
-    db.prepare(
-      `
+  const tx = (async () => (await db.withTransaction(async () => {
+    (await db.execute(`
       UPDATE criteria_template_items
       SET
         title = ?,
@@ -58,39 +54,28 @@ export async function updateCriteriaItem(
         evidence_type = ?,
         is_required = ?
       WHERE template_id = ? AND code = ?
-      `
-    ).run(
-      title,
-      description || null,
-      scoreMax,
-      evidenceType,
-      isRequired ? 1 : 0,
-      templateId,
-      code
-    );
+      `, [title, description || null, scoreMax, evidenceType, isRequired ? 1 : 0, templateId, code]));
 
-    db.prepare(
-      `
+    (await db.execute(`
       DELETE FROM criteria_activity_rules
       WHERE template_id = ? AND criteria_code = ?
-      `
-    ).run(templateId, code);
+      `, [templateId, code]));
+
+    (await syncGroupMinimum(db, templateId));
 
     for (const activityId of activityIds) {
-      db.prepare(
-        `
-        INSERT OR IGNORE INTO criteria_activity_rules (
+      (await db.execute(`
+        INSERT IGNORE INTO criteria_activity_rules (
           template_id,
           criteria_code,
           activity_id
         )
         VALUES (?, ?, ?)
-        `
-      ).run(templateId, code, activityId);
+        `, [templateId, code, activityId]));
     }
-  });
+  })));
 
-  tx();
+  (await tx());
 
   revalidatePath(`/dashboard/admin/criteria-templates/${templateId}/configure`);
 

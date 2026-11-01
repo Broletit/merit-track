@@ -1,44 +1,7 @@
+import SubmissionStatusBadge from "@/components/shared/submissions/SubmissionStatusBadge";
+import PaginatedTable from "@/components/common/PaginatedTable";
 import Link from "next/link";
 import type { AdminSubmissionListItem } from "./types";
-
-function mapStatusLabel(status: string) {
-  switch (status) {
-    case "draft":
-      return "Nháp";
-    case "submitted_v1":
-      return "Chờ duyệt vòng 1";
-    case "needs_revision_v1":
-      return "Cần bổ sung";
-    case "submitted_v2":
-      return "Chờ duyệt vòng 2";
-    case "passed":
-      return "Đạt";
-    case "failed":
-      return "Không đạt";
-    case "closed":
-      return "Đã đóng";
-    default:
-      return status;
-  }
-}
-
-function getStatusClassName(status: string) {
-  switch (status) {
-    case "submitted_v1":
-    case "submitted_v2":
-      return "bg-blue-50 text-blue-700";
-    case "needs_revision_v1":
-      return "bg-amber-50 text-amber-700";
-    case "passed":
-      return "bg-emerald-50 text-emerald-700";
-    case "failed":
-      return "bg-rose-50 text-rose-700";
-    case "closed":
-      return "bg-slate-100 text-slate-700";
-    default:
-      return "bg-slate-100 text-slate-700";
-  }
-}
 
 export default function SubmissionsList({
   items,
@@ -46,15 +9,14 @@ export default function SubmissionsList({
   items: AdminSubmissionListItem[];
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <div className="overflow-hidden rounded-2xl border border-slate-200">
-        <table className="min-w-full divide-y divide-slate-200">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <PaginatedTable className="min-w-full divide-y divide-slate-200" containerClassName="overflow-hidden rounded-none border border-slate-200" resultLabel="bản ghi">
           <thead className="bg-slate-50">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Sinh viên
               </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="left" className="px-4 py-3  text-sm font-semibold text-slate-700 text-left">
                 Lớp
               </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -79,20 +41,14 @@ export default function SubmissionsList({
                   <td className="px-4 py-4 text-sm text-slate-800">
                     {item.studentName}
                   </td>
-                  <td className="px-4 py-4 text-sm text-slate-600">
+                  <td data-column-align="left" className="px-4 py-4 text-sm text-slate-600 text-left">
                     {item.classCode} - {item.className}
                   </td>
                   <td className="px-4 py-4 text-sm text-slate-600">
                     {item.eventTitle}
                   </td>
                   <td className="px-4 py-4">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClassName(
-                        item.status
-                      )}`}
-                    >
-                      {mapStatusLabel(item.status)}
-                    </span>
+                    <SubmissionStatusBadge status={item.status} />
                   </td>
                   <td className="px-4 py-4 text-sm text-slate-500">
                     {item.submittedAt || "-"}
@@ -118,8 +74,7 @@ export default function SubmissionsList({
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+        </PaginatedTable>
     </section>
   );
 }

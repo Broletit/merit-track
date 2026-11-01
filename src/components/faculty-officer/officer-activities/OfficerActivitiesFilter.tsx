@@ -1,8 +1,10 @@
 "use client";
+import CohortFilter from "@/components/shared/CohortFilter";
 
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 export default function OfficerActivitiesFilter() {
   const router = useRouter();
@@ -31,7 +33,7 @@ export default function OfficerActivitiesFilter() {
   }, [keyword]);
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(320px,2fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(280px,2fr)_repeat(3,minmax(170px,1fr))]">
       <div className="relative">
         <Search
           size={16}
@@ -45,7 +47,7 @@ export default function OfficerActivitiesFilter() {
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
+      <CohortFilter />
       <select
         defaultValue={searchParams.get("status") ?? ""}
         onChange={(event) => updateParam("status", event.target.value)}
@@ -57,7 +59,6 @@ export default function OfficerActivitiesFilter() {
         <option value="attended">Đã tham gia</option>
         <option value="expired">Hết hạn đăng ký</option>
       </select>
-
       <select
         defaultValue={searchParams.get("time") ?? ""}
         onChange={(event) => updateParam("time", event.target.value)}
@@ -68,6 +69,6 @@ export default function OfficerActivitiesFilter() {
         <option value="ongoing">Đang diễn ra</option>
         <option value="ended">Đã kết thúc</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

@@ -1,14 +1,14 @@
-import type Database from "better-sqlite3";
+import type { Database } from "@/server/db/mysql";
 
-export function assertCriteriaTemplateMutable(
-  db: Database.Database,
+export async function assertCriteriaTemplateMutable(
+  db: Database,
   templateId: number,
 ) {
-  const usage = db.prepare(`
+  const usage = (await db.first(`
     SELECT COUNT(*) AS total
     FROM events
     WHERE criteria_template_id = ?
-  `).get(templateId) as { total: number };
+  `, [templateId])) as { total: number };
 
   if (Number(usage.total ?? 0) > 0) {
     throw new Error(
@@ -17,15 +17,15 @@ export function assertCriteriaTemplateMutable(
   }
 }
 
-export function isCriteriaTemplateInUse(
-  db: Database.Database,
+export async function isCriteriaTemplateInUse(
+  db: Database,
   templateId: number,
 ) {
-  const usage = db.prepare(`
+  const usage = (await db.first(`
     SELECT COUNT(*) AS total
     FROM events
     WHERE criteria_template_id = ?
-  `).get(templateId) as { total: number };
+  `, [templateId])) as { total: number };
 
   return Number(usage.total ?? 0) > 0;
 }

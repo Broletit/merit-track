@@ -1,11 +1,15 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
+import ProfileEmailForm from "./ProfileEmailForm";
+import PaginatedTable from "@/components/common/PaginatedTable";
 import { redirect } from "next/navigation";
 import { requireLogin } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { getUiLabelByLoginContext } from "@/server/auth/role-context";
 import StudentQrCard from "@/components/student/qr/StudentQrCard";
 import { createStudentQrPayload, encodeStudentQr } from "@/server/auth/qr";
 
 type ClassRow = {
+  id: number;
   code: string;
   name: string;
 };
@@ -24,34 +28,34 @@ export default async function ProfileContent() {
     redirect("/dashboard/admin");
   }
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const classes = db
-    .prepare(
-      `
-      SELECT DISTINCT c.code, c.name
+  const classes = (await db.rows(`
+      SELECT DISTINCT c.id, c.code, c.name
       FROM class_members cm
       INNER JOIN classes c ON c.id = cm.class_id
       WHERE cm.user_id = ?
         AND cm.left_at IS NULL
       ORDER BY c.name ASC, c.id ASC
-      `
-    )
-    .all(user.id) as ClassRow[];
+      `, [user.id])) as ClassRow[];
+  const context = user.loginContext ?? user.role;
+  const managedClasses = context === "faculty_officer"
+    ? (await db.rows(`SELECT DISTINCT c.id,c.code,c.name FROM faculty_class_assignments fa JOIN classes c ON c.id=fa.class_id WHERE fa.faculty_officer_id=? AND c.is_active=1 ORDER BY c.code`, [user.id])) as ClassRow[]
+    : context === "class_officer" ? classes : [];
   const qrPayload = encodeStudentQr(
     createStudentQrPayload(Number(user.id), String(user.mssv))
   );
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <h1 className="text-2xl font-semibold">Thông tin cá nhân</h1>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+      <section className="min-w-0 rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-900 text-2xl font-semibold text-white">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-blue-900 text-2xl font-bold text-white shadow-md shadow-blue-900/20">
               {user.full_name.charAt(0).toUpperCase()}
             </div>
 
@@ -59,7 +63,7 @@ export default async function ProfileContent() {
               <h2 className="text-xl font-semibold text-slate-900">
                 {user.full_name}
               </h2>
-              <p className="mt-1 text-sm text-slate-500">{user.mssv}</p>
+              <p className={[statCardStyles.label, "mt-1"].join(" ")}>{user.mssv}</p>
             </div>
           </div>
           <StudentQrCard
@@ -69,14 +73,13 @@ export default async function ProfileContent() {
           />
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
           <Info label="Họ tên" value={user.full_name} />
-          <Info label="MSSV / Mã tài khoản" value={user.mssv} />
-          <Info label="Email" value={user.email || "Chưa cập nhật"} />
+          <Info label="MSSV" value={user.mssv} />
           <Info label="Trạng thái" value={user.is_active ? "Đang hoạt động" : "Bị khóa"} />
         </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
           <Info label="Vai trò tài khoản" value={roleLabel(user.role)} />
           <Info
             label="Giao diện đang dùng"
@@ -86,41 +89,37 @@ export default async function ProfileContent() {
             label="Lớp"
             value={
               classes.length > 0
-                ? classes.map((item) => item.code).join(", ")
+                ? classes.map((item) => `${item.code} — ${item.name}`).join(", ")
                 : "Chưa gán lớp"
             }
           />
-          <Info
-            label="Số lớp liên kết"
-            value={String(classes.length)}
-          />
         </div>
+        <ProfileEmailForm email={user.email}/>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <h2 className="text-xl font-semibold text-slate-900">Lớp liên kết</h2>
+      {context === "faculty_officer" || context === "class_officer" ? <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+        <h2 className="text-xl font-semibold text-slate-900">{context === "faculty_officer" ? "Lớp được phân công quản lý" : "Chi đoàn phụ trách"}</h2>
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-          <table className="min-w-full table-fixed divide-y divide-slate-200">
+        <PaginatedTable className="min-w-full table-fixed divide-y divide-slate-200" containerClassName="mt-5 overflow-hidden rounded-none border border-slate-200" resultLabel="bản ghi">
             <thead className="bg-slate-50">
               <tr>
-                <th className="w-[30%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+                <th data-column-align="left" className="w-[30%] px-4 py-3  text-sm font-semibold text-slate-700 text-left">
                   Mã lớp
                 </th>
-                <th className="w-[70%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+                <th data-column-align="left" className="w-[70%] px-4 py-3  text-sm font-semibold text-slate-700 text-left">
                   Tên lớp
                 </th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100 bg-white">
-              {classes.length > 0 ? (
-                classes.map((item) => (
-                  <tr key={item.code}>
-                    <td className="px-4 py-4 text-sm font-semibold text-slate-900">
+              {managedClasses.length > 0 ? (
+                managedClasses.map((item) => (
+                  <tr key={item.id}>
+                    <td data-column-align="left" className="px-4 py-4 text-sm font-semibold text-slate-900 text-left">
                       {item.code}
                     </td>
-                    <td className="px-4 py-4 text-sm text-slate-700">
+                    <td data-column-align="left" className="px-4 py-4 text-sm text-slate-700 text-left">
                       {item.name}
                     </td>
                   </tr>
@@ -131,21 +130,20 @@ export default async function ProfileContent() {
                     colSpan={2}
                     className="px-4 py-10 text-center text-sm text-slate-500"
                   >
-                    Chưa có lớp liên kết.
+                    Chưa được phân công lớp quản lý.
                   </td>
                 </tr>
               )}
             </tbody>
-          </table>
-        </div>
-      </section>
+          </PaginatedTable>
+      </section> : null}
     </main>
   );
 }
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
       <div className="text-sm text-slate-500">{label}</div>
       <div className="mt-1 text-sm font-medium text-slate-900">{value}</div>
     </div>

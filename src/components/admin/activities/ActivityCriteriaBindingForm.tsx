@@ -8,7 +8,7 @@ export default function ActivityCriteriaBindingForm({
   defaultSelectedBindings?: string[];
 }) {
   return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <h2 className="text-lg font-semibold text-slate-900">
         Gắn tiêu chí tự động
       </h2>
@@ -42,7 +42,7 @@ export default function ActivityCriteriaBindingForm({
             );
           })
         ) : (
-          <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500 ring-1 ring-slate-200">
+          <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
             Chưa có tiêu chí nào để gắn.
           </div>
         )}

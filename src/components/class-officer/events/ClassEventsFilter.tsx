@@ -1,4 +1,5 @@
 "use client";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -12,10 +13,11 @@ export default function ClassEventsFilter() {
 
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("cohort");
     if (value) params.set(key, value);
     else params.delete(key);
     params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`, {scroll:false});
   }
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function ClassEventsFilter() {
   }, [keyword]);
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(320px,2fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(320px,2fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
       <div className="relative">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
@@ -35,7 +37,6 @@ export default function ClassEventsFilter() {
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
       <select
         defaultValue={searchParams.get("status") ?? ""}
         onChange={(event) => updateParam("status", event.target.value)}
@@ -48,18 +49,16 @@ export default function ClassEventsFilter() {
         <option value="passed">Đạt</option>
         <option value="failed">Không đạt</option>
       </select>
-
       <select
         defaultValue={searchParams.get("phase") ?? ""}
         onChange={(event) => updateParam("phase", event.target.value)}
         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
       >
-        <option value="">Tất cả tình trạng nhận</option>
-        <option value="not_open">Chưa mở nộp</option>
+        <option value="">Tất cả trạng thái tiếp nhận</option>
+        <option value="not_open">Chưa mở nhận hồ sơ</option>
         <option value="accepting">Đang nhận hồ sơ</option>
-        <option value="late_allowed">Đang nhận hồ sơ trễ</option>
-        <option value="expired">Đã hết hạn nộp</option>
+        <option value="expired">Đã hết hạn</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

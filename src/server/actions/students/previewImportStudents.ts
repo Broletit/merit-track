@@ -1,6 +1,9 @@
 "use server";
 
-import { getDb } from "@/server/db/sqlite";
+import { classDraftErrors } from "@/lib/classes/classDraft";
+import { assertImportCohort } from "@/lib/cohorts/cohorts";
+import { getDatabase } from "@/server/db/mysql";
+import { requireAdminContext } from "@/server/auth/guards";
 import type {
   ImportPreviewResult,
   ParsedImportStudentRow,
@@ -8,18 +11,18 @@ import type {
 
 type PreviewPayload = {
   classMode: "existing" | "new";
+  cohort: number;
   classId?: number | null;
   newClassCode?: string;
   newClassName?: string;
   newClassFaculty?: string;
-  newClassIntakeYear?: number | null;
   allowUpdateExisting?: boolean;
   allowTransferClass?: boolean;
   rows: ParsedImportStudentRow[];
 };
 
-function resolvePreviewTargetClass(payload: PreviewPayload) {
-  const db = getDb();
+async function resolvePreviewTargetClass(payload: PreviewPayload) {
+  const db = getDatabase();
 
   if (payload.classMode === "existing") {
     const classId = Number(payload.classId ?? 0);
@@ -28,21 +31,18 @@ function resolvePreviewTargetClass(payload: PreviewPayload) {
       throw new Error("Vui lòng chọn lớp có sẵn.");
     }
 
-    const found = db
-      .prepare(
-        `
-        SELECT id, code, name
+    const found = (await db.first(`
+        SELECT id, code, name, cohort
         FROM classes
         WHERE id = ?
         LIMIT 1
-        `
-      )
-      .get(classId) as { id: number; code: string; name: string } | undefined;
+        `, [classId])) as { id: number; code: string; name: string; cohort: number | null } | undefined;
 
     if (!found) {
       throw new Error("Lớp đã chọn không tồn tại.");
     }
 
+    if (found.cohort && found.cohort !== payload.cohort) throw new Error("Lớp đã chọn thuộc khóa khác.");
     return {
       id: Number(found.id),
       label: `${found.code} - ${found.name}`,
@@ -52,34 +52,15 @@ function resolvePreviewTargetClass(payload: PreviewPayload) {
 
   const code = String(payload.newClassCode ?? "").trim();
   const name = String(payload.newClassName ?? "").trim();
-  const intakeYear = Number(payload.newClassIntakeYear ?? 0);
 
   if (!code || !name) {
     throw new Error("Vui lòng nhập mã lớp và tên lớp mới.");
   }
 
-  if (!Number.isFinite(intakeYear) || intakeYear <= 0) {
-    throw new Error("Vui lòng nhập khóa hợp lệ cho lớp mới.");
-  }
 
-  const existed = db
-    .prepare(
-      `
-      SELECT id, code, name
-      FROM classes
-      WHERE code = ?
-      LIMIT 1
-      `
-    )
-    .get(code) as { id: number; code: string; name: string } | undefined;
-
-  if (existed) {
-    return {
-      id: Number(existed.id),
-      label: `${existed.code} - ${existed.name}`,
-      exists: true,
-    };
-  }
+  const errors=classDraftErrors((await db.rows("SELECT code,name FROM classes", [])) as Array<{code:string;name:string}>,code,name,String(payload.newClassFaculty??""));
+  const error=Object.values(errors).filter(Boolean).join("\n");
+  if(error) throw new Error(error);
 
   return {
     id: null,
@@ -91,12 +72,14 @@ function resolvePreviewTargetClass(payload: PreviewPayload) {
 export async function previewImportStudents(
   payload: PreviewPayload
 ): Promise<ImportPreviewResult> {
+  await requireAdminContext();
   if (!payload.rows || payload.rows.length === 0) {
     throw new Error("Không có dữ liệu sinh viên để kiểm tra.");
   }
 
-  const db = getDb();
-  const targetClass = resolvePreviewTargetClass(payload);
+  assertImportCohort(payload.cohort, payload.rows);
+  const db = getDatabase();
+  const targetClass = (await resolvePreviewTargetClass(payload));
 
   const seenMssv = new Set<string>();
   const rows = [];
@@ -142,17 +125,13 @@ export async function previewImportStudents(
 
     seenMssv.add(mssv);
 
-    const existingUser = db
-      .prepare(
-        `
-        SELECT id, full_name, email, role
+    const existingUser = (await db.first(`
+        SELECT id, full_name, email, role, cohort
         FROM users
         WHERE mssv = ?
         LIMIT 1
-        `
-      )
-      .get(mssv) as
-      | { id: number; full_name: string; email: string | null; role: string }
+        `, [mssv])) as
+      | { id: number; full_name: string; email: string | null; role: string; cohort: number | null }
       | undefined;
 
     if (!existingUser) {
@@ -166,6 +145,13 @@ export async function previewImportStudents(
         status: "create" as const,
         message: "Sẽ tạo mới tài khoản và gán vào lớp.",
       });
+      continue;
+    }
+
+    if (existingUser.cohort != null && existingUser.cohort !== payload.cohort) {
+      invalid += 1;
+      rows.push({rowNumber:row.rowNumber,mssv,full_name:fullName,email,currentClass:null,status:"invalid" as const,
+        message:`MSSV đang được lưu ở Khóa ${existingUser.cohort}, không khớp Khóa ${payload.cohort}. Cần kiểm tra dữ liệu trước khi import.`});
       continue;
     }
 
@@ -183,21 +169,17 @@ export async function previewImportStudents(
       continue;
     }
 
-    const membership = db
-      .prepare(
-        `
+    const membership = (await db.first(`
         SELECT
           cm.class_id,
           c.code AS class_code,
           c.name AS class_name
         FROM class_members cm
         INNER JOIN classes c ON c.id = cm.class_id
-        WHERE cm.user_id = ?
-        ORDER BY cm.rowid DESC
+        WHERE cm.user_id = ? AND cm.left_at IS NULL
+        ORDER BY cm.id DESC
         LIMIT 1
-        `
-      )
-      .get(existingUser.id) as
+        `, [existingUser.id])) as
       | { class_id: number; class_code: string; class_name: string }
       | undefined;
 

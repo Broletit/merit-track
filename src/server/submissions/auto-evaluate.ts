@@ -1,4 +1,4 @@
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 type SubmissionBaseRow = {
   id: number;
@@ -18,6 +18,7 @@ type EventCriteriaItemRow = {
 };
 
 type ActivityRuleRow = {
+  activity_title: string;
   criteria_code: string;
   activity_id: number;
 };
@@ -40,66 +41,52 @@ type AutoEvaluationResult = {
   message: string;
 };
 
-function getCurrentConductPeriodId(): number | null {
-  const db = getDb();
+async function getCurrentConductPeriodId(): Promise<number | null> {
+  const db = getDatabase();
 
-  const row = db
-    .prepare(
-      `
+  const row = (await db.first(`
       SELECT id
       FROM conduct_periods
       WHERE is_active = 1
-      ORDER BY datetime(created_at) DESC, id DESC
+      ORDER BY CAST(created_at AS DATETIME(3)) DESC, id DESC
       LIMIT 1
-      `
-    )
-    .get() as ConductPeriodRow | undefined;
+      `, [])) as ConductPeriodRow | undefined;
 
   return row ? Number(row.id) : null;
 }
 
-function hasAttendedActivity(userId: number, activityId: number) {
-  const db = getDb();
+async function hasAttendedActivity(userId: number, activityId: number) {
+  const db = getDatabase();
 
-  const row = db
-    .prepare(
-      `
+  const row = (await db.first(`
       SELECT id
       FROM activity_registrations
       WHERE user_id = ?
         AND activity_id = ?
         AND status IN ('attended')
       LIMIT 1
-      `
-    )
-    .get(userId, activityId) as { id: number } | undefined;
+      `, [userId, activityId])) as { id: number } | undefined;
 
   return Boolean(row);
 }
 
-function getConductScoreTotal(userId: number, periodId: number) {
-  const db = getDb();
+async function getConductScoreTotal(userId: number, periodId: number) {
+  const db = getDatabase();
 
-  const row = db
-    .prepare(
-      `
+  const row = (await db.first(`
       SELECT COALESCE(SUM(score_value), 0) AS total_score
       FROM conduct_scores
       WHERE user_id = ?
         AND period_id = ?
-      `
-    )
-    .get(userId, periodId) as { total_score: number } | undefined;
+      `, [userId, periodId])) as { total_score: number } | undefined;
 
   return Number(row?.total_score ?? 0);
 }
 
-export function evaluateSubmissionAutoResults(submissionId: number) {
-  const db = getDb();
+export async function evaluateSubmissionAutoResults(submissionId: number) {
+  const db = getDatabase();
 
-  const submission = db
-    .prepare(
-      `
+  const submission = (await db.first(`
       SELECT
         s.id,
         s.user_id,
@@ -111,9 +98,7 @@ export function evaluateSubmissionAutoResults(submissionId: number) {
       INNER JOIN events e ON e.id = s.event_id
       WHERE s.id = ?
       LIMIT 1
-      `
-    )
-    .get(submissionId) as SubmissionBaseRow | undefined;
+      `, [submissionId])) as SubmissionBaseRow | undefined;
 
   if (!submission) {
     throw new Error("Không tìm thấy hồ sơ.");
@@ -126,9 +111,7 @@ export function evaluateSubmissionAutoResults(submissionId: number) {
     };
   }
 
-  const eventItems = db
-    .prepare(
-      `
+  const eventItems = (await db.rows(`
       SELECT
         code,
         title,
@@ -138,29 +121,19 @@ export function evaluateSubmissionAutoResults(submissionId: number) {
       FROM event_criteria_items
       WHERE event_id = ?
       ORDER BY group_code ASC, sort_order ASC, id ASC
-      `
-    )
-    .all(submission.event_id) as EventCriteriaItemRow[];
+      `, [submission.event_id])) as EventCriteriaItemRow[];
 
-  const activityRules = db
-    .prepare(
-      `
-      SELECT criteria_code, activity_id
-      FROM criteria_activity_rules
-      WHERE template_id = ?
-      `
-    )
-    .all(submission.criteria_template_id) as ActivityRuleRow[];
+  const activityRules = (await db.rows(`
+      SELECT rule.criteria_code, rule.activity_id, activity.title activity_title
+      FROM criteria_activity_rules rule JOIN activities activity ON activity.id=rule.activity_id
+      WHERE rule.template_id = ?
+      `, [submission.criteria_template_id])) as ActivityRuleRow[];
 
-  const conductRules = db
-    .prepare(
-      `
+  const conductRules = (await db.rows(`
       SELECT criteria_code, min_score, period_scope
       FROM criteria_conduct_rules
       WHERE template_id = ?
-      `
-    )
-    .all(submission.criteria_template_id) as ConductRuleRow[];
+      `, [submission.criteria_template_id])) as ConductRuleRow[];
 
   const activityRuleMap = new Map<string, ActivityRuleRow[]>();
   for (const rule of activityRules) {
@@ -176,7 +149,7 @@ export function evaluateSubmissionAutoResults(submissionId: number) {
     conductRuleMap.set(rule.criteria_code, list);
   }
 
-  const currentPeriodId = getCurrentConductPeriodId();
+  const currentPeriodId = (await getCurrentConductPeriodId());
   const results: AutoEvaluationResult[] = [];
 
   for (const item of eventItems) {
@@ -184,7 +157,7 @@ export function evaluateSubmissionAutoResults(submissionId: number) {
     const conductMatches = conductRuleMap.get(item.code) ?? [];
 
     for (const rule of activityMatches) {
-      const passed = hasAttendedActivity(submission.user_id, rule.activity_id);
+      const passed = (await hasAttendedActivity(submission.user_id, rule.activity_id));
 
       results.push({
         criteriaCode: item.code,
@@ -192,7 +165,7 @@ export function evaluateSubmissionAutoResults(submissionId: number) {
         sourceType: "activity",
         sourceId: Number(rule.activity_id),
         message: passed
-          ? `Đạt tự động từ hoạt động #${rule.activity_id}.`
+          ? `Đạt tự động từ hoạt động: ${rule.activity_title}`
           : `Chưa đạt hoạt động yêu cầu #${rule.activity_id}.`,
       });
     }
@@ -200,7 +173,7 @@ export function evaluateSubmissionAutoResults(submissionId: number) {
     for (const rule of conductMatches) {
       const periodId = currentPeriodId;
       const totalScore = periodId
-        ? getConductScoreTotal(submission.user_id, periodId)
+        ? (await getConductScoreTotal(submission.user_id, periodId))
         : 0;
       const passed = totalScore >= Number(rule.min_score);
 
@@ -218,16 +191,16 @@ export function evaluateSubmissionAutoResults(submissionId: number) {
     }
   }
 
-  const tx = db.transaction(() => {
-    db.prepare(
-      `
+  const tx = (async () => (await db.withTransaction(async () => {
+    (await db.execute(`
       DELETE FROM submission_auto_results
       WHERE submission_id = ?
-      `
-    ).run(submissionId);
+      `, [submissionId]));
 
-    const insertStmt = db.prepare(
-      `
+    
+
+    for (const result of results) {
+      (await db.execute(`
       INSERT INTO submission_auto_results (
         submission_id,
         criteria_code,
@@ -237,23 +210,12 @@ export function evaluateSubmissionAutoResults(submissionId: number) {
         message,
         evaluated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-      `
-    );
-
-    for (const result of results) {
-      insertStmt.run(
-        submissionId,
-        result.criteriaCode,
-        result.sourceType,
-        result.sourceId,
-        result.passed ? 1 : 0,
-        result.message
-      );
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))
+      `, [submissionId, result.criteriaCode, result.sourceType, result.sourceId, result.passed ? 1 : 0, result.message]));
     }
-  });
+  })));
 
-  tx();
+  (await tx());
 
   return {
     ok: true,

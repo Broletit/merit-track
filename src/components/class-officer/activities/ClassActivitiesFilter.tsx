@@ -1,4 +1,6 @@
 "use client";
+import CohortFilter from "@/components/shared/CohortFilter";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -15,17 +17,18 @@ export default function ClassActivitiesFilter() {
     if (value) params.set(key, value);
     else params.delete(key);
     params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
   useEffect(() => {
+    if (keyword.trim() === (searchParams.get("keyword") ?? "").trim()) return;
     const timer = setTimeout(() => updateParam("keyword", keyword.trim()), 350);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyword]);
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(320px,2fr)_minmax(200px,1fr)_minmax(220px,1fr)]">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(280px,2fr)_repeat(3,minmax(170px,1fr))]">
       <div className="relative">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
@@ -35,7 +38,7 @@ export default function ClassActivitiesFilter() {
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
+      <CohortFilter />
       <select
         defaultValue={searchParams.get("level") ?? ""}
         onChange={(event) => updateParam("level", event.target.value)}
@@ -45,7 +48,6 @@ export default function ClassActivitiesFilter() {
         <option value="class">Hoạt động cấp lớp</option>
         <option value="faculty">Hoạt động cấp khoa</option>
       </select>
-
       <select
         defaultValue={searchParams.get("attendance") ?? ""}
         onChange={(event) => updateParam("attendance", event.target.value)}
@@ -55,6 +57,6 @@ export default function ClassActivitiesFilter() {
         <option value="joined">Có sinh viên đăng ký</option>
         <option value="attended">Có sinh viên tham gia</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

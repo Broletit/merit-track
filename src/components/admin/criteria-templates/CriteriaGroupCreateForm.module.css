@@ -1,0 +1,85 @@
+.panel {
+  container-type: inline-size;
+  container-name: criteria-group;
+  padding: 16px 16px 12px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.form {
+  display: grid;
+  row-gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem 7rem auto;
+  align-items: start;
+  gap: 12px;
+}
+.studentFields {
+  grid-template-columns: minmax(0, 1fr) 8rem auto;
+}
+.field {
+  min-width: 0;
+}
+.label {
+  display: block;
+  margin: 0 0 4px;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: normal;
+}
+.control {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+.submit {
+  display: flex;
+  align-items: flex-start;
+  margin: 24px 0 0;
+}
+.description {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.description textarea {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+@container criteria-group (width < 36rem) {
+  .fields {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+  .studentFields {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .nameField {
+    grid-column: 1 / -1;
+  }
+  .numberLabel {
+    display: flex;
+    min-height: 40px;
+    align-items: flex-end;
+  }
+  .submit {
+    margin-top: 44px;
+  }
+  .control,
+  .description textarea {
+    font-size: 16px;
+  }
+}

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 export async function assignFacultyOfficerClasses(
   facultyOfficerId: number,
@@ -10,23 +10,19 @@ export async function assignFacultyOfficerClasses(
 ) {
   await requireAdminContext();
 
-  const db = getDb();
+  const db = getDatabase();
 
   const selected = [...new Set(formData
     .getAll("classIds")
     .map((item) => Number(item))
     .filter((item) => Number.isFinite(item) && item > 0))];
 
-  const officer = db
-    .prepare(
-      `
+  const officer = (await db.first(`
       SELECT id, role, full_name
       FROM users
       WHERE id = ?
       LIMIT 1
-      `
-    )
-    .get(facultyOfficerId) as
+      `, [facultyOfficerId])) as
     | {
         id: number;
         role: string;
@@ -43,16 +39,14 @@ export async function assignFacultyOfficerClasses(
   }
 
   const validClassIds = selected.length
-    ? (db.prepare(`SELECT id FROM classes WHERE is_active=1 AND id IN (${selected.map(() => "?").join(",")})`).all(...selected) as Array<{ id: number }>).map((item) => Number(item.id))
+    ? ((await db.rows(`SELECT id FROM classes WHERE is_active=1 AND id IN (${selected.map(() => "?").join(",")})`, [...selected])) as Array<{ id: number }>).map((item) => Number(item.id))
     : [];
 
   if (validClassIds.length !== selected.length) {
     throw new Error("Danh sách lớp phân công có lớp không hợp lệ hoặc đã ngừng hoạt động.");
   }
 
-  const currentClassIds = (db.prepare(
-    `SELECT class_id FROM faculty_class_assignments WHERE faculty_officer_id=? ORDER BY class_id`
-  ).all(facultyOfficerId) as Array<{ class_id: number }>).map((item) => Number(item.class_id));
+  const currentClassIds = ((await db.rows(`SELECT class_id FROM faculty_class_assignments WHERE faculty_officer_id=? ORDER BY class_id`, [facultyOfficerId])) as Array<{ class_id: number }>).map((item) => Number(item.class_id));
   const nextClassIds = [...validClassIds].sort((a, b) => a - b);
   const unchanged = currentClassIds.length === nextClassIds.length
     && currentClassIds.every((id, index) => id === nextClassIds[index]);
@@ -65,31 +59,27 @@ export async function assignFacultyOfficerClasses(
     };
   }
 
-  const tx = db.transaction(() => {
-    db.prepare(
-      `
+  const tx = (async () => (await db.withTransaction(async () => {
+    (await db.execute(`
       DELETE FROM faculty_class_assignments
       WHERE faculty_officer_id = ?
-      `
-    ).run(facultyOfficerId);
+      `, [facultyOfficerId]));
 
-    const stmt = db.prepare(
-      `
+    
+
+    for (const classId of validClassIds) {
+      (await db.execute(`
       INSERT INTO faculty_class_assignments (
         faculty_officer_id,
         class_id,
         assigned_at
       )
-      VALUES (?, ?, datetime('now'))
-      `
-    );
-
-    for (const classId of validClassIds) {
-      stmt.run(facultyOfficerId, classId);
+      VALUES (?, ?, CURRENT_TIMESTAMP(3))
+      `, [facultyOfficerId, classId]));
     }
-  });
+  })));
 
-  tx();
+  (await tx());
 
   revalidatePath(`/dashboard/admin/users/${facultyOfficerId}`);
   revalidatePath("/dashboard/admin/users");

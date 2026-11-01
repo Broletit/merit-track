@@ -1,0 +1,21 @@
+.table.table.table tr > th,
+.table.table.table tr > td {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.table.table.table tr > :is(th, td):first-child:not([colspan]),
+.table.table.table tbody tr > td:first-child:not([colspan]) > div {
+  text-align: left !important;
+}
+
+.table.table.table tbody tr > td:last-child > div {
+  justify-content: center !important;
+  width: 100%;
+}
+
+.table.table.table thead tr:first-child::before,
+.table.table.table tbody tr::before {
+  text-align: center !important;
+  vertical-align: middle !important;
+}

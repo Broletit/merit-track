@@ -1,4 +1,4 @@
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { getSessionUser } from "@/server/auth/getSessionUser";
 
 export type ClassOption = {
@@ -24,18 +24,14 @@ export async function getUserClassScope(): Promise<UserClassScope> {
     };
   }
 
-  const db = getDb();
+  const db = getDatabase();
 
   if (user.loginContext === "admin") {
-    const rows = db
-      .prepare(
-        `
+    const rows = (await db.rows(`
         SELECT id, code, name
         FROM classes
         ORDER BY name ASC, id ASC
-        `
-      )
-      .all() as Array<{ id: number; code: string; name: string }>;
+        `, [])) as Array<{ id: number; code: string; name: string }>;
 
     return {
       mode: "all",
@@ -49,17 +45,13 @@ export async function getUserClassScope(): Promise<UserClassScope> {
   }
 
  if (user.loginContext === "faculty_officer") {
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT DISTINCT c.id, c.code, c.name
       FROM faculty_class_assignments fca
       INNER JOIN classes c ON c.id = fca.class_id
       WHERE fca.faculty_officer_id = ?
       ORDER BY c.name ASC, c.id ASC
-      `
-    )
-    .all(user.id) as Array<{ id: number; code: string; name: string }>;
+      `, [user.id])) as Array<{ id: number; code: string; name: string }>;
 
   return {
     mode: "multi_class",
@@ -72,17 +64,13 @@ export async function getUserClassScope(): Promise<UserClassScope> {
   };
 }
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT DISTINCT c.id, c.code, c.name
       FROM class_members cm
       INNER JOIN classes c ON c.id = cm.class_id
       WHERE cm.user_id = ?
       ORDER BY c.name ASC, c.id ASC
-      `
-    )
-    .all(user.id) as Array<{ id: number; code: string; name: string }>;
+      `, [user.id])) as Array<{ id: number; code: string; name: string }>;
 
   return {
     mode: "self_class",

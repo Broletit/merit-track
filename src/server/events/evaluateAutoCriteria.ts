@@ -1,4 +1,4 @@
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 export type AutoCriteriaResult = {
   criteriaCode: string;
@@ -22,25 +22,21 @@ type MatchRow = {
   activity_title: string;
 };
 
-export function evaluateAutoCriteria({
+export async function evaluateAutoCriteria({
   eventId,
   userId,
 }: {
   eventId: number;
   userId: number;
-}): AutoCriteriaResult[] {
-  const db = getDb();
+}): Promise<AutoCriteriaResult[]> {
+  const db = getDatabase();
 
-  const event = db
-    .prepare(
-      `
+  const event = (await db.first(`
       SELECT id, criteria_template_id, term_id
       FROM events
       WHERE id = ?
       LIMIT 1
-      `
-    )
-    .get(eventId) as
+      `, [eventId])) as
     | {
         id: number;
         criteria_template_id: number | null;
@@ -52,22 +48,16 @@ export function evaluateAutoCriteria({
     return [];
   }
 
-  const criteriaRows = db
-    .prepare(
-      `
+  const criteriaRows = (await db.rows(`
       SELECT code, evidence_type
       FROM event_criteria_items
       WHERE event_id = ?
         AND evidence_type IN ('auto', 'both')
       ORDER BY sort_order ASC, code ASC
-      `
-    )
-    .all(eventId) as CriteriaRow[];
+      `, [eventId])) as CriteriaRow[];
 
-  return criteriaRows.map((criteria) => {
-    const matches = db
-      .prepare(
-        `
+  return (await Promise.all(criteriaRows.map(async (criteria) => {
+    const matches = (await db.rows(`
         SELECT
           a.id AS activity_id,
           a.title AS activity_title
@@ -79,32 +69,20 @@ export function evaluateAutoCriteria({
          AND ar.status = 'attended'
         WHERE r.template_id = ?
           AND r.criteria_code = ?
-        ORDER BY datetime(a.start_at) DESC, a.id DESC
-        `
-      )
-      .all(
-        userId,
-        event.criteria_template_id,
-        criteria.code
-      ) as MatchRow[];
+        ORDER BY CAST(a.start_at AS DATETIME(3)) DESC, a.id DESC
+        `, [userId, event.criteria_template_id, criteria.code])) as MatchRow[];
 
-    const conductRule = db
-      .prepare(
-        `
+    const conductRule = (await db.first(`
         SELECT min_score, period_scope
         FROM criteria_conduct_rules
         WHERE template_id = ?
           AND criteria_code = ?
         LIMIT 1
-        `
-      )
-      .get(event.criteria_template_id, criteria.code) as ConductRuleRow | undefined;
+        `, [event.criteria_template_id, criteria.code])) as ConductRuleRow | undefined;
 
     let conductPassed = false;
     if (conductRule) {
-      const scoreRow = db
-        .prepare(
-          `
+      const scoreRow = (await db.first(`
           SELECT COALESCE(MAX(period_total), 0) AS total_score
           FROM (
             SELECT cs.period_id, SUM(cs.score_value) AS period_total
@@ -117,9 +95,7 @@ export function evaluateAutoCriteria({
               AND (? = 'any' OR term.id = ?)
             GROUP BY cs.period_id
           ) totals
-          `
-        )
-        .get(userId, conductRule.period_scope, event.term_id) as
+          `, [userId, conductRule.period_scope, event.term_id])) as
         | { total_score: number }
         | undefined;
 
@@ -134,5 +110,5 @@ export function evaluateAutoCriteria({
         String(item.activity_title ?? "")
       ),
     };
-  });
+  })));
 }

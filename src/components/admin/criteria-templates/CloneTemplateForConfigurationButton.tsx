@@ -37,7 +37,7 @@ export default function CloneTemplateForConfigurationButton({
       type="button"
       onClick={clone}
       disabled={pending}
-      className="inline-flex h-10 items-center gap-2 rounded-xl bg-amber-500 px-4 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex min-h-10 h-auto items-center gap-2 rounded-xl bg-amber-500 px-4 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60 py-2 max-w-full break-words"
     >
       <Copy size={16} />
       {pending ? "Đang tạo bản sao..." : "Tạo bản sao để cấu hình"}

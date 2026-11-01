@@ -1,4 +1,6 @@
 "use client";
+import RequiredMark from "@/components/common/RequiredMark";
+
 
 import { useActionState } from "react";
 import { createAcademicTerm } from "@/server/actions/academic-terms/createAcademicTerm";
@@ -30,16 +32,16 @@ export default function AcademicTermCreateForm() {
   const [state, formAction, pending] = useActionState(action, initialState);
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <h2 className="text-xl font-semibold text-slate-900">Thêm học kỳ</h2>
 
       <form action={formAction} className="mt-5 space-y-4">
         <ActionFeedback pending={pending} message={state.message} ok={state.ok} />
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Năm học
-            </label>
+            <RequiredMark required={true}/></label>
             <input
               name="academicYear"
               required
@@ -51,7 +53,7 @@ export default function AcademicTermCreateForm() {
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Học kỳ
-            </label>
+            <RequiredMark required={true}/></label>
             <input
               name="semester"
               required
@@ -60,10 +62,10 @@ export default function AcademicTermCreateForm() {
             />
           </div>
 
-          <div className="md:col-span-2">
+          <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Tên hiển thị
-            </label>
+            <RequiredMark required={true}/></label>
             <input
               name="name"
               required
@@ -77,7 +79,7 @@ export default function AcademicTermCreateForm() {
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Ngày bắt đầu
-            </label>
+            <RequiredMark required={true}/></label>
             <input
               type="datetime-local"
               name="startAt"
@@ -89,7 +91,7 @@ export default function AcademicTermCreateForm() {
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-600">
               Ngày kết thúc
-            </label>
+            <RequiredMark required={true}/></label>
             <input
               type="datetime-local"
               name="endAt"
@@ -98,10 +100,10 @@ export default function AcademicTermCreateForm() {
             />
           </div>
 
-          <div className="flex items-end">
+          <div className="flex items-start md:pt-7">
             <button
               disabled={pending}
-              className="h-11 w-full rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+              className="min-h-11 h-auto w-full rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60 py-2 max-w-full break-words"
             >
               {pending ? "Đang tạo..." : "Thêm học kỳ"}
             </button>

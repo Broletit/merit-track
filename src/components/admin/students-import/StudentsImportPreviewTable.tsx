@@ -1,4 +1,5 @@
-type PreviewRow = Record<string, string>;
+import PaginatedTable from "@/components/common/PaginatedTable";
+type PreviewRow = string[];
 
 export default function StudentsImportPreviewTable({
   headers,
@@ -11,24 +12,26 @@ export default function StudentsImportPreviewTable({
     return null;
   }
 
+  const columns = headers.map((header, columnIndex) => ({ header, columnIndex })).filter(({ header }) => {
+    const label = header.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+    return !["stt", "sothutu"].includes(label);
+  });
+
   return (
-    <div className="mt-5 rounded-2xl border border-slate-200">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+    <div className="mt-5">
+      <div className="mb-3">
         <h3 className="text-sm font-semibold text-slate-800">
           Preview dữ liệu từ file
         </h3>
-        <p className="mt-1 text-xs text-slate-500">
-          Hiển thị tối đa 5 dòng đầu trong file CSV
-        </p>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200">
+      <PaginatedTable data-no-row-number className="min-w-full text-sm" containerClassName="max-h-96 overflow-auto" resultLabel="dòng dữ liệu">
           <thead className="bg-white">
             <tr>
-              {headers.map((header) => (
+              {columns.map(({ header, columnIndex }) => (
                 <th
-                  key={header}
+                  key={columnIndex}
                   className="border-b border-slate-200 px-4 py-3 text-left font-semibold text-slate-700"
                 >
                   {header}
@@ -40,18 +43,18 @@ export default function StudentsImportPreviewTable({
           <tbody>
             {rows.map((row, index) => (
               <tr key={index} className="border-b border-slate-100 last:border-b-0">
-                {headers.map((header) => (
+                {columns.map(({ columnIndex }) => (
                   <td
-                    key={`${index}-${header}`}
+                    key={`${index}-${columnIndex}`}
                     className="px-4 py-3 text-slate-600"
                   >
-                    {row[header] ?? ""}
+                    {row[columnIndex] ?? ""}
                   </td>
                 ))}
               </tr>
             ))}
           </tbody>
-        </table>
+        </PaginatedTable>
       </div>
     </div>
   );

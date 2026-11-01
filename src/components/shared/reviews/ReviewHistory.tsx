@@ -1,8 +1,12 @@
+import PaginatedTable from "@/components/common/PaginatedTable";
+import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
+
 type ReviewItem = {
   round: number;
   decision: string;
   note: string | null;
   reviewerName: string | null;
+  createdAt?: string | null;
 };
 
 export type SubmissionTimelineItem = {
@@ -15,15 +19,23 @@ export type SubmissionTimelineItem = {
   createdAt: string;
 };
 
-function reviewLabel(item: ReviewItem) {
+function reviewLabel(item: ReviewItem, singleStage = false) {
+  if (singleStage) {
+    if (item.decision === "pass") return "Đã duyệt đạt";
+    if (item.decision === "fail") return "Đã đóng hồ sơ";
+    return "Trả về chỉnh sửa";
+  }
   if (item.decision === "pass") return `Vòng ${item.round} — Đạt`;
   if (item.decision === "fail") return `Vòng ${item.round} — Không đạt`;
   return `Vòng ${item.round} — Trả về chỉnh sửa`;
 }
 
-function timelineLabel(item: SubmissionTimelineItem, submitIndex: number) {
+function timelineLabel(item: SubmissionTimelineItem, submitIndex: number, singleStage = false) {
+  if (item.action === "reopen_deadline") return "Gia hạn đợt xét — Mở lại hồ sơ";
+  if (item.action === 'finalize') return "Chốt hồ sơ khi kết thúc đợt xét — Không đạt";
   if (item.action === "create_draft") return "Khởi tạo hồ sơ";
   if (item.action === "submit") return submitIndex > 1 ? `Nộp lại hồ sơ lần ${submitIndex}` : "Nộp hồ sơ lần đầu";
+  if (singleStage && item.toStatus?.includes("revision")) return "Trả hồ sơ để chỉnh sửa";
   if (item.toStatus === "submitted_v2") return "Hoàn thành duyệt vòng 1";
   if (item.fromStatus === "submitted_v2" && item.toStatus?.includes("revision")) return "Vòng 2 trả hồ sơ để bổ sung";
   if (item.fromStatus === "submitted_v1" && item.toStatus?.includes("revision")) return "Vòng 1 trả hồ sơ để bổ sung";
@@ -32,8 +44,9 @@ function timelineLabel(item: SubmissionTimelineItem, submitIndex: number) {
   return "Cập nhật xét duyệt";
 }
 
-function timelineActorLabel(item: SubmissionTimelineItem) {
+function timelineActorLabel(item: SubmissionTimelineItem, singleStage = false) {
   if (!item.actorName) return null;
+  if (singleStage) return `Người xét duyệt: ${item.actorName}`;
 
   const isRoundOneReview =
     item.toStatus === "submitted_v2" ||
@@ -54,103 +67,71 @@ export default function ReviewHistory({
   title = "Hành trình xét duyệt",
   emptyMessage,
   resultsOnly = false,
+  singleStage = false,
 }: {
   items: ReviewItem[];
   timeline?: SubmissionTimelineItem[];
   title?: string;
   emptyMessage?: string;
   resultsOnly?: boolean;
+  singleStage?: boolean;
 }) {
   if (items.length === 0 && timeline.length === 0 && !emptyMessage) return null;
 
-  const submissionCount = timeline.filter((item) => item.action === "submit").length;
-  const revisionCount = timeline.filter((item) => item.toStatus?.includes("revision")).length;
-  const completedRounds = new Set(
-    timeline
-      .filter((item) => item.toStatus === "submitted_v2" || ["passed", "failed"].includes(item.toStatus ?? ""))
-      .map((item) => (item.toStatus === "submitted_v2" ? 1 : 2)),
-  ).size;
+  const timestamp = (value?: string | null) => {
+    const parsed = value ? Date.parse(value) : NaN;
+    return Number.isFinite(parsed) ? parsed : Infinity;
+  };
+  const orderedTimeline = [...timeline].sort((a, b) =>
+    timestamp(a.createdAt) - timestamp(b.createdAt) || a.id - b.id
+  );
+  const orderedReviews = [...items].sort((a, b) =>
+    timestamp(a.createdAt) - timestamp(b.createdAt) || a.round - b.round
+  );
+
+  const rows = !resultsOnly && timeline.length > 0
+    ? orderedTimeline.map((item, index) => ({
+        key: `timeline-${item.id}`,
+        title: timelineLabel(item, orderedTimeline.slice(0, index + 1).filter(entry => entry.action === "submit").length, singleStage),
+        time: formatDateTimeVN(item.createdAt),
+        actor: timelineActorLabel(item, singleStage) || "—",
+        note: ["review", "finalize"].includes(item.action) && item.message !== "Cập nhật trạng thái xét duyệt." ? item.message : null,
+      }))
+    : orderedReviews.map((item, index) => ({
+        key: `review-${item.round}-${index}`,
+        title: reviewLabel(item, singleStage),
+        time: item.createdAt ? formatDateTimeVN(item.createdAt) : "—",
+        actor: item.reviewerName ? `${singleStage ? "Người xét duyệt" : `Cán bộ xét vòng ${item.round}`}: ${item.reviewerName}` : "—",
+        note: item.note,
+      }));
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
-      </div>
-
-      {items.length === 0 && timeline.length === 0 ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-slate-300 px-5 py-8 text-center text-sm text-slate-500">
-          {emptyMessage}
+    <section className={`min-w-0 rounded-3xl bg-white p-4 shadow-md ring-1 ring-slate-100 shadow-slate-200/60 ${singleStage ? "sm:p-5" : "sm:p-6"}`}>
+      <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+      {rows.length ? (
+        <PaginatedTable containerClassName="mt-5" resultLabel="bản ghi" showResultCount={!singleStage} paginate={!singleStage}
+          className="w-full! min-w-0! table-fixed! [&_tr::before]:px-1! [&_th]:whitespace-nowrap! [&_td]:whitespace-normal! [&_td_div]:whitespace-normal!  [&_td]:[overflow-wrap:anywhere]">
+          <colgroup><col style={{width:"5%"}}/><col style={{width:singleStage?"35%":"28%"}}/><col style={{width:singleStage?"22%":"19%"}}/>{!singleStage ? <col style={{width:"21%"}}/> : null}<col style={{width:singleStage?"38%":"27%"}}/></colgroup>
+          <thead className="bg-blue-800 text-white"><tr>
+            <th data-column-align="left" className="px-2 py-3 text-sm">Giai đoạn</th>
+            <th className="px-2 py-3 text-sm">Thời gian</th>
+            {!singleStage ? <th className="px-2 py-3 text-sm">Người thực hiện</th> : null}
+            <th data-column-align="left" className="px-2 py-3 text-sm">Nội dung phản hồi</th>
+          </tr></thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map(row => <tr key={row.key} className="even:bg-slate-50/60 hover:bg-blue-50/50">
+              <td data-column-align="left" className="px-2 py-3 text-sm font-medium text-slate-900">{row.title}</td>
+              <td className="px-2 py-3 text-sm text-slate-700">{row.time}</td>
+              {!singleStage ? <td className="px-2 py-3 text-sm text-slate-700">{row.actor}</td> : null}
+              <td data-column-align="left" className="whitespace-pre-line! px-2 py-3 text-sm text-slate-700">{row.note || "—"}</td>
+            </tr>)}
+          </tbody>
+        </PaginatedTable>
+      ) : (
+        <div className="mt-5 rounded-none border border-dashed border-slate-300 px-4 py-5 text-center text-sm text-slate-500">
+          {emptyMessage || "Chưa có kết quả xét duyệt."}
         </div>
-      ) : null}
-
-      {!resultsOnly && timeline.length > 0 ? (
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <Summary label="Số lần nộp" value={submissionCount} />
-          <Summary label="Số lần yêu cầu bổ sung" value={revisionCount} />
-          <Summary label="Vòng đã hoàn tất" value={`${completedRounds}/2`} />
-        </div>
-      ) : null}
-
-      {resultsOnly && items.length > 0 ? (
-        <div className="mt-6">
-          <h3 className="text-sm font-semibold text-slate-900">Kết quả từng vòng</h3>
-          <div className="mt-3 space-y-3">
-            {items.map((item, index) => (
-              <div key={`${item.round}-${index}`} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                <div className="text-sm font-semibold text-slate-900">{reviewLabel(item)}</div>
-                <p className="mt-2 text-sm text-slate-700">
-                  {item.note || "Kết quả đã được ghi nhận nhưng không có ghi chú chi tiết."}
-                </p>
-                {item.reviewerName ? <div className="mt-2 text-xs text-slate-500">Người duyệt: {item.reviewerName}</div> : null}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : resultsOnly && timeline.length > 0 ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-slate-300 px-5 py-8 text-center text-sm text-slate-500">
-          {emptyMessage || "Chưa có kết quả xét duyệt từng vòng."}
-        </div>
-      ) : null}
-
-      {!resultsOnly && timeline.length > 0 ? (
-        <div className="mt-5 space-y-3">
-          {timeline.map((item, index) => {
-            const currentSubmitIndex = timeline
-              .slice(0, index + 1)
-              .filter((timelineItem) => timelineItem.action === "submit").length;
-            const itemTitle = timelineLabel(item, currentSubmitIndex);
-            const actorLabel = timelineActorLabel(item);
-            return (
-              <div key={item.id} className="relative rounded-2xl bg-slate-50 p-4 pl-11 ring-1 ring-slate-200">
-                <div className="absolute left-4 top-5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">
-                  {index + 1}
-                </div>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">{itemTitle}</div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      {formatDateTimeVN(item.createdAt)}
-                      {actorLabel ? ` · ${actorLabel}` : ""}
-                    </div>
-                  </div>
-                  {item.toStatus ? <SubmissionStatusBadge status={item.toStatus} /> : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
+      )}
     </section>
   );
 }
-
-function Summary({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-2xl bg-blue-50 px-4 py-3 ring-1 ring-blue-100">
-      <div className="text-xs font-medium text-blue-600">{label}</div>
-      <div className="mt-1 text-lg font-bold text-blue-900">{value}</div>
-    </div>
-  );
-}
-import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
-import SubmissionStatusBadge from "@/components/shared/submissions/SubmissionStatusBadge";

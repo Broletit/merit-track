@@ -1,19 +1,18 @@
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import type { AutoCriteriaResult } from "./evaluateAutoCriteria";
 
-export function saveAutoCriteriaResults({
+export async function saveAutoCriteriaResults({
   submissionId,
   results,
 }: {
   submissionId: number;
   results: AutoCriteriaResult[];
 }) {
-  const db = getDb();
+  const db = getDatabase();
 
-  const tx = db.transaction(() => {
+  const tx = (async () => (await db.withTransaction(async () => {
     for (const item of results) {
-      db.prepare(
-        `
+      (await db.execute(`
         INSERT INTO submission_auto_results (
           submission_id,
           criteria_code,
@@ -22,23 +21,15 @@ export function saveAutoCriteriaResults({
           matched_activity_titles,
           evaluated_at
         )
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
-        ON CONFLICT(submission_id, criteria_code)
-        DO UPDATE SET
-          passed = excluded.passed,
-          matched_activity_ids = excluded.matched_activity_ids,
-          matched_activity_titles = excluded.matched_activity_titles,
-          evaluated_at = excluded.evaluated_at
-        `
-      ).run(
-        submissionId,
-        item.criteriaCode,
-        item.passed ? 1 : 0,
-        JSON.stringify(item.matchedActivityIds),
-        JSON.stringify(item.matchedActivityTitles)
-      );
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))
+        ON DUPLICATE KEY UPDATE
+          passed = VALUES(passed),
+          matched_activity_ids = VALUES(matched_activity_ids),
+          matched_activity_titles = VALUES(matched_activity_titles),
+          evaluated_at = VALUES(evaluated_at)
+        `, [submissionId, item.criteriaCode, item.passed ? 1 : 0, JSON.stringify(item.matchedActivityIds), JSON.stringify(item.matchedActivityTitles)]));
     }
-  });
+  })));
 
-  tx();
+  (await tx());
 }

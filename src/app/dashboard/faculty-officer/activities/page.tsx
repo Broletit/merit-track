@@ -1,12 +1,15 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
+import { activityCohortSql } from "@/server/cohorts/sql";
+import { parseCohort } from "@/lib/cohorts/cohorts";
 import { Activity, CalendarClock, CheckCircle2, Users } from "lucide-react";
 import { requireFacultyOfficerContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import FacultyOfficerActivitiesTable from "@/components/faculty-officer/activities/FacultyOfficerActivitiesTable";
 import type { FacultyOfficerActivityItem } from "@/components/faculty-officer/activities/types";
 import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
 import { getAcademicTermForView, getAcademicTermsForSelect } from "@/server/academic-terms/getAcademicTermForView";
 
-type SearchParams = Promise<{
+type SearchParams = Promise<{ cohort?: string;
   keyword?: string;
   status?: string;
   time?: string;
@@ -38,7 +41,7 @@ export default async function FacultyOfficerActivitiesPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const officer = await requireFacultyOfficerContext();
+  await requireFacultyOfficerContext();
 
   const params = await searchParams;
   const keyword = String(params.keyword ?? "").trim();
@@ -46,26 +49,23 @@ export default async function FacultyOfficerActivitiesPage({
   const time = String(params.time ?? "").trim();
   const page = Math.max(1, Number(params.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
-  const terms = getAcademicTermsForSelect();
-  const selectedTerm = getAcademicTermForView(params.termId);
+  const terms = (await getAcademicTermsForSelect());
+  const selectedTerm = (await getAcademicTermForView(params.termId));
 
-  const db = getDb();
+  const db = getDatabase();
 
   const where: string[] = [
     "a.term_id = ?",
     "a.audience_type = 'student'",
-    `(NOT EXISTS (SELECT 1 FROM activity_scopes axs WHERE axs.activity_id=a.id)
-      OR EXISTS (
-        SELECT 1 FROM activity_scopes axs
-        INNER JOIN faculty_class_assignments fca ON fca.class_id=axs.class_id
-        WHERE axs.activity_id=a.id AND fca.faculty_officer_id=?
-      ))`,
   ];
-  const values: unknown[] = [selectedTerm.id, officer.id];
+  const values: unknown[] = [selectedTerm.id];
+  const cohort = parseCohort(params.cohort);
+  if (params.cohort && !cohort) where.push("0=1");
+  if (cohort) { where.push(`(${activityCohortSql("a")})`); values.push(cohort,cohort); }
 
   if (keyword) {
-    where.push("(a.title LIKE ? OR a.description LIKE ?)");
-    values.push(`%${keyword}%`, `%${keyword}%`);
+    where.push("a.title LIKE ?");
+    values.push(`%${keyword}%`);
   }
 
   if (status) {
@@ -74,34 +74,28 @@ export default async function FacultyOfficerActivitiesPage({
   }
 
   if (time === "upcoming") {
-    where.push("datetime(a.start_at) > datetime('now')");
+    where.push("CAST(a.start_at AS DATETIME(3)) > CURRENT_TIMESTAMP(3)");
   }
 
   if (time === "ongoing") {
     where.push(
-      "datetime(a.start_at) <= datetime('now') AND datetime(a.end_at) >= datetime('now')"
+      "CAST(a.start_at AS DATETIME(3)) <= CURRENT_TIMESTAMP(3) AND CAST(a.end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)"
     );
   }
 
   if (time === "ended") {
-    where.push("datetime(a.end_at) < datetime('now')");
+    where.push("CAST(a.end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)");
   }
 
   const whereSql = `WHERE ${where.join(" AND ")}`;
 
-  const total = db
-    .prepare(
-      `
+  const total = (await db.first(`
       SELECT COUNT(*) AS total
       FROM activities a
       ${whereSql}
-      `
-    )
-    .get(...values) as { total: number };
+      `, [...values])) as { total: number };
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         a.id,
         a.title,
@@ -119,32 +113,25 @@ export default async function FacultyOfficerActivitiesPage({
         (
           SELECT COUNT(*)
           FROM activity_registrations ar
-          INNER JOIN class_members cm ON cm.user_id=ar.user_id AND cm.left_at IS NULL
-          INNER JOIN faculty_class_assignments fca ON fca.class_id=cm.class_id
-          WHERE ar.activity_id = a.id AND fca.faculty_officer_id = ?
+          WHERE ar.activity_id = a.id AND ar.status != 'cancelled'
         ) AS participants,
 
         (
           SELECT COUNT(*)
           FROM activity_registrations ar
-          INNER JOIN class_members cm ON cm.user_id=ar.user_id AND cm.left_at IS NULL
-          INNER JOIN faculty_class_assignments fca ON fca.class_id=cm.class_id
-          WHERE ar.activity_id = a.id AND fca.faculty_officer_id = ?
-            AND ar.status = 'attended'
+          WHERE ar.activity_id = a.id AND ar.status = 'attended'
         ) AS attended
 
       FROM activities a
       ${whereSql}
-      ORDER BY datetime(a.start_at) DESC, a.id DESC
+      ORDER BY CAST(a.start_at AS DATETIME(3)) DESC, a.id DESC
       LIMIT ?
       OFFSET ?
-      `
-    )
-    .all(officer.id, officer.id, ...values, PAGE_SIZE, offset) as Row[];
+      `, [...values, PAGE_SIZE, offset])) as Row[];
 
   const totalPages = Math.max(1, Math.ceil(Number(total.total ?? 0) / PAGE_SIZE));
-  const upcoming = db.prepare(`SELECT COUNT(*) total FROM activities a ${whereSql} AND datetime(a.start_at)>datetime('now')`).get(...values) as {total:number};
-  const participation = db.prepare(`SELECT COUNT(DISTINCT CASE WHEN ar.status IN ('registered','attended') THEN ar.user_id END) registered,COUNT(DISTINCT CASE WHEN ar.status='attended' THEN ar.user_id END) attended FROM activity_registrations ar INNER JOIN activities a ON a.id=ar.activity_id INNER JOIN class_members cm ON cm.user_id=ar.user_id AND cm.left_at IS NULL INNER JOIN faculty_class_assignments fca ON fca.class_id=cm.class_id WHERE fca.faculty_officer_id=? AND a.term_id=? AND a.audience_type='student'`).get(officer.id,selectedTerm.id) as {registered:number;attended:number};
+  const upcoming = (await db.first(`SELECT COUNT(*) total FROM activities a ${whereSql} AND CAST(a.start_at AS DATETIME(3))>CURRENT_TIMESTAMP(3)`, [...values])) as {total:number};
+  const participation = (await db.first(`SELECT COUNT(DISTINCT CASE WHEN ar.status IN ('registered','attended','absent') THEN ar.user_id END) registered,COUNT(DISTINCT CASE WHEN ar.status='attended' THEN ar.user_id END) attended FROM activity_registrations ar INNER JOIN activities a ON a.id=ar.activity_id WHERE a.term_id=? AND a.audience_type='student'`, [selectedTerm.id])) as {registered:number;attended:number};
   const attendanceRate=participation.registered?Math.round(participation.attended/participation.registered*100):0;
 
   const items: FacultyOfficerActivityItem[] = rows.map((item) => ({
@@ -166,7 +153,7 @@ export default async function FacultyOfficerActivitiesPage({
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15"><Activity size={22}/></div><h1 className="text-2xl font-semibold">Hoạt động</h1></div>
           <AcademicTermSelect variant="header" terms={terms} selectedTermId={selectedTerm.id} />
@@ -174,10 +161,10 @@ export default async function FacultyOfficerActivitiesPage({
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard icon={<Activity size={20}/>} label="Tất cả hoạt động" value={Number(total.total??0)} tone="blue"/>
-        <SummaryCard icon={<CalendarClock size={20}/>} label="Hoạt động sắp diễn ra" value={Number(upcoming.total??0)} tone="amber"/>
-        <SummaryCard icon={<Users size={20}/>} label="Sinh viên đã đăng ký" value={Number(participation.registered??0)} tone="sky"/>
-        <SummaryCard icon={<CheckCircle2 size={20}/>} label="Tham gia trên đăng ký" value={`${attendanceRate}%`} tone="emerald"/>
+        <SummaryCard icon={<Activity size={20}/>} label="Tất cả hoạt động" value={Number(total.total??0)}/>
+        <SummaryCard icon={<CalendarClock size={20}/>} label="Hoạt động sắp diễn ra" value={Number(upcoming.total??0)}/>
+        <SummaryCard icon={<Users size={20}/>} label="Sinh viên đã đăng ký" value={Number(participation.registered??0)}/>
+        <SummaryCard icon={<CheckCircle2 size={20}/>} label="Tham gia trên đăng ký" value={`${attendanceRate}%`}/>
       </section>
 
       <FacultyOfficerActivitiesTable
@@ -185,7 +172,7 @@ export default async function FacultyOfficerActivitiesPage({
         page={page}
         totalPages={totalPages}
         totalResults={Number(total.total ?? 0)}
-        searchParams={{
+        searchParams={{ cohort: params.cohort,
           keyword,
           status,
           time,
@@ -196,4 +183,4 @@ export default async function FacultyOfficerActivitiesPage({
   );
 }
 
-function SummaryCard({icon,label,value,tone}:{icon:React.ReactNode;label:string;value:number|string;tone:"blue"|"amber"|"sky"|"emerald"}){const tones={blue:"bg-blue-50 text-blue-700 ring-blue-100",amber:"bg-amber-50 text-amber-700 ring-amber-100",sky:"bg-sky-50 text-sky-700 ring-sky-100",emerald:"bg-emerald-50 text-emerald-700 ring-emerald-100"};return <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100"><div className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ${tones[tone]}`}>{icon}</div><div className="mt-4 text-2xl font-semibold text-slate-900">{value}</div><div className="mt-1 text-sm text-slate-500">{label}</div></div>}
+function SummaryCard({icon,label,value }:{icon:React.ReactNode;label:string;value:number|string;}){return <div className={[statCardStyles.card, "min-w-0"].join(" ")}><div className="flex items-center justify-between gap-3"><span className={statCardStyles.label}>{label}</span><span className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</span></div><div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div></div>}

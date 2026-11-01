@@ -1,51 +1,46 @@
-import { getDb } from "@/server/db/sqlite";
+import { assertTemplateReady } from "@/server/criteria-templates/groupRequirements";
+import { getDatabase } from "@/server/db/mysql";
 
-export function cloneCriteriaTemplateToEvent({
+export async function cloneCriteriaTemplateToEvent({
   eventId,
   templateId,
 }: {
   eventId: number;
   templateId: number;
 }) {
-  const db = getDb();
+  const db = getDatabase();
 
-  const submissionCount = db
-    .prepare(
-      `
+  const submissionCount = (await db.first(`
       SELECT COUNT(*) AS total
       FROM submissions
       WHERE event_id = ?
-      `
-    )
-    .get(eventId) as { total: number };
+      `, [eventId])) as { total: number };
 
   if (Number(submissionCount.total ?? 0) > 0) {
     throw new Error("Không thể đồng bộ tiêu chuẩn vì đợt xét đã có hồ sơ nộp.");
   }
 
-  const tx = db.transaction(() => {
-    db.prepare(
-      `
+  (await assertTemplateReady(db,templateId));
+
+  const tx = (async () => (await db.withTransaction(async () => {
+    (await db.execute(`
       DELETE FROM event_criteria_items
       WHERE event_id = ?
-      `
-    ).run(eventId);
+      `, [eventId]));
 
-    db.prepare(
-      `
+    (await db.execute(`
       DELETE FROM event_criteria_groups
       WHERE event_id = ?
-      `
-    ).run(eventId);
+      `, [eventId]));
 
-    db.prepare(
-      `
+    (await db.execute(`
       INSERT INTO event_criteria_groups (
         event_id,
         code,
         title,
         description,
         min_required,
+        score_max,
         sort_order
       )
       SELECT
@@ -53,16 +48,15 @@ export function cloneCriteriaTemplateToEvent({
         code,
         title,
         description,
-        min_required,
+        GREATEST(min_required, (SELECT COUNT(*) FROM criteria_template_items required WHERE required.template_id=criteria_template_groups.template_id AND required.group_code=criteria_template_groups.code AND required.is_required=1)),
+        score_max,
         sort_order
       FROM criteria_template_groups
       WHERE template_id = ?
       ORDER BY sort_order ASC, code ASC
-      `
-    ).run(eventId, templateId);
+      `, [eventId, templateId]));
 
-    db.prepare(
-      `
+    (await db.execute(`
       INSERT INTO event_criteria_items (
         event_id,
         group_code,
@@ -87,11 +81,10 @@ export function cloneCriteriaTemplateToEvent({
       FROM criteria_template_items
       WHERE template_id = ?
       ORDER BY sort_order ASC, code ASC
-      `
-    ).run(eventId, templateId);
-  });
+      `, [eventId, templateId]));
+  })));
 
-  tx();
+  (await tx());
 
   return {
     ok: true,

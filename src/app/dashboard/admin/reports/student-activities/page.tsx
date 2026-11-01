@@ -1,6 +1,8 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
+import { cohortClause } from "@/server/cohorts/sql";
 import { Activity, PieChart, Users } from "lucide-react";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import {
   getAcademicTermForView,
   getAcademicTermsForSelect,
@@ -11,10 +13,9 @@ import ReportProgressBar from "@/components/admin/reports/ReportProgressBar";
 import StudentActivityReportFilter from "@/components/admin/reports/StudentActivityReportFilter";
 import ActivityAttendanceRateChart from "@/components/admin/reports/ActivityAttendanceRateChart";
 import ClassParticipationLineChart from "@/components/admin/reports/ClassParticipationLineChart";
-import DonutChart from "@/components/admin/reports/DonutChart";
 import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
 
-type SearchParams = Promise<{
+type SearchParams = Promise<{ cohort?: string;
   termId?: string;
   activityId?: string;
   classId?: string;
@@ -39,36 +40,28 @@ export default async function StudentActivitiesReportPage({
   await requireAdminContext();
 
   const params = await searchParams;
-  const db = getDb();
-  ensureActivityConductScores();
+  const db = getDatabase();
+  (await ensureActivityConductScores());
   
-  const terms = getAcademicTermsForSelect();
-  const selectedTerm = getAcademicTermForView(params.termId);
+  const terms = (await getAcademicTermsForSelect());
+  const selectedTerm = (await getAcademicTermForView(params.termId));
 
   const activityId = Number(params.activityId ?? 0);
   const classId = Number(params.classId ?? 0);
 
-  const classes = db
-    .prepare(
-      `
+  const classes = (await db.rows(`
       SELECT id, code, name
       FROM classes
-      WHERE is_active = 1
+      WHERE is_active = 1 AND ${cohortClause(params.cohort, "cohort")}
       ORDER BY code ASC
-      `
-    )
-    .all() as ClassRow[];
+      `, [])) as ClassRow[];
 
-  const activities = db
-    .prepare(
-      `
+  const activities = (await db.rows(`
       SELECT id, title
       FROM activities
       WHERE term_id = ? AND audience_type = 'student' AND status = 'published'
-      ORDER BY datetime(start_at) DESC, id DESC
-      `
-    )
-    .all(selectedTerm.id) as ActivityRow[];
+      ORDER BY CAST(start_at AS DATETIME(3)) DESC, id DESC
+      `, [selectedTerm.id])) as ActivityRow[];
 
   const activityFilter = activityId > 0 ? "AND a.id = ?" : "";
   const classFilter = classId > 0 ? "AND cm.class_id = ?" : "";
@@ -78,9 +71,7 @@ export default async function StudentActivitiesReportPage({
     ...(classId > 0 ? [classId] : []),
   ];
 
-  const summary = db
-    .prepare(
-      `
+  const summary = (await db.first(`
       SELECT
         COUNT(ar.id) AS registrations,
         SUM(CASE WHEN ar.status = 'attended' THEN 1 ELSE 0 END) AS attended,
@@ -97,18 +88,15 @@ export default async function StudentActivitiesReportPage({
         AND (ar.id IS NULL OR ar.status != 'cancelled')
         ${activityFilter}
         ${classFilter}
-      `
-    )
-    .get(...filterValues) as {
+        AND ${cohortClause(params.cohort,"u.cohort")}
+      `, [...filterValues])) as {
     registrations: number;
     attended: number;
     activities: number;
     students: number;
   };
 
-  const classChart = db
-    .prepare(
-      `
+  const classChart = (await db.rows(`
       SELECT
         c.code AS label,
         COUNT(DISTINCT CASE WHEN a.id IS NOT NULL THEN u.id END) AS attended,
@@ -126,21 +114,14 @@ export default async function StudentActivitiesReportPage({
        AND a.term_id = ? AND a.audience_type='student' AND a.status='published'
        ${activityId > 0 ? "AND a.id = ?" : ""}
       WHERE c.is_active = 1
+        AND ${cohortClause(params.cohort,"u.cohort")}
         ${classId > 0 ? "AND c.id = ?" : ""}
       GROUP BY c.id
       HAVING total > 0
       ORDER BY c.code ASC
-      `
-    )
-    .all(
-      selectedTerm.id,
-      ...(activityId > 0 ? [activityId] : []),
-      ...(classId > 0 ? [classId] : [])
-    ) as Array<{ label: string; attended: number; total: number; value: number }>;
+      `, [selectedTerm.id, ...(activityId > 0 ? [activityId] : []), ...(classId > 0 ? [classId] : [])])) as Array<{ label: string; attended: number; total: number; value: number }>;
 
-  const activityComparison = db
-    .prepare(
-      `
+  const activityComparison = (await db.rows(`
       SELECT
         a.title AS label,
         COUNT(CASE WHEN ar.status != 'cancelled' THEN 1 END) AS registrations,
@@ -151,20 +132,15 @@ export default async function StudentActivitiesReportPage({
       WHERE a.term_id = ?
         AND a.audience_type='student'
         AND a.status='published'
+        AND ${cohortClause(params.cohort,"(SELECT cohort FROM users WHERE id=ar.user_id)")}
         ${activityId > 0 ? "AND a.id = ?" : ""}
         ${classId > 0 ? "AND EXISTS (SELECT 1 FROM class_members cm WHERE cm.user_id=ar.user_id AND cm.class_id=? AND cm.left_at IS NULL)" : ""}
       GROUP BY a.id
       HAVING registrations > 0
       ORDER BY registrations DESC, a.title ASC
-      `
-    )
-    .all(
-      selectedTerm.id,
-      ...(activityId > 0 ? [activityId] : []),
-      ...(classId > 0 ? [classId] : [])
-    ) as Array<{ label: string; registrations: number; attended: number }>;
+      `, [selectedTerm.id, ...(activityId > 0 ? [activityId] : []), ...(classId > 0 ? [classId] : [])])) as Array<{ label: string; registrations: number; attended: number }>;
 
-  const organizerDistribution = db.prepare(`
+  const organizerDistribution = (await db.rows(`
     SELECT
       CASE WHEN a.organizer_level = 'class' THEN 'Cấp lớp' ELSE 'Cấp khoa' END AS label,
       COUNT(DISTINCT a.id) AS value
@@ -174,13 +150,10 @@ export default async function StudentActivitiesReportPage({
       AND a.status = 'published'
       ${activityId > 0 ? "AND a.id = ?" : ""}
       ${classId > 0 ? "AND EXISTS (SELECT 1 FROM activity_registrations ar INNER JOIN class_members cm ON cm.user_id = ar.user_id AND cm.left_at IS NULL WHERE ar.activity_id = a.id AND ar.status != 'cancelled' AND cm.class_id = ?)" : ""}
+      AND ${params.cohort ? `EXISTS(SELECT 1 FROM activity_registrations cohort_ar JOIN users cohort_u ON cohort_u.id=cohort_ar.user_id WHERE cohort_ar.activity_id=a.id AND ${cohortClause(params.cohort,"cohort_u.cohort")})` : "1=1"}
     GROUP BY a.organizer_level
     ORDER BY a.organizer_level ASC
-  `).all(
-    selectedTerm.id,
-    ...(activityId > 0 ? [activityId] : []),
-    ...(classId > 0 ? [classId] : [])
-  ) as Array<{ label: string; value: number }>;
+  `, [selectedTerm.id, ...(activityId > 0 ? [activityId] : []), ...(classId > 0 ? [classId] : [])])) as Array<{ label: string; value: number }>;
 
   const attendedRate =
     Number(summary.registrations ?? 0) > 0
@@ -198,15 +171,13 @@ export default async function StudentActivitiesReportPage({
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Hoạt động trong kỳ" value={summary.activities ?? 0} />
-        <Stat label="Sinh viên có dữ liệu" value={summary.students ?? 0} />
-        <Stat label="Lượt đăng ký" value={summary.registrations ?? 0} />
+        <Stat icon={<Activity size={20} />} label="Hoạt động trong kỳ" value={summary.activities ?? 0} />
+        <Stat icon={<Users size={20} />} label="Sinh viên có dữ liệu" value={summary.students ?? 0} />
+        <Stat icon={<PieChart size={20} />} label="Lượt đăng ký" value={summary.registrations ?? 0} />
 
-        <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
-          <div className="text-sm font-medium text-slate-500">
-            Tỉ lệ điểm danh
-          </div>
-          <div className="mt-3 text-3xl font-bold text-slate-900">
+        <div className={[statCardStyles.card, "min-w-0"].join(" ")}>
+          <div className="flex items-center justify-between gap-3"><div className={statCardStyles.label}>Tỉ lệ điểm danh</div><div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}><PieChart size={20} /></div></div>
+          <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>
             {attendedRate}%
           </div>
           <div className="mt-4">
@@ -215,24 +186,11 @@ export default async function StudentActivitiesReportPage({
         </div>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <h2 className="text-xl font-semibold text-slate-900">Bộ lọc báo cáo</h2>
-        <div className="mt-5"><StudentActivityReportFilter activities={activities} classes={classes} /></div>
-      </section>
-
       <section className="space-y-6">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
           <ReportCard icon={<Activity size={20} />} title="Hiệu quả tham dự theo hoạt động">
+            <div className="mb-6"><StudentActivityReportFilter activities={activities} classes={classes} /></div>
             <ActivityAttendanceRateChart items={activityComparison.map((item)=>({label:item.label,registrations:Number(item.registrations??0),attended:Number(item.attended??0)}))} />
           </ReportCard>
-          <ReportCard icon={<PieChart size={20} />} title="Cơ cấu cấp tổ chức">
-            <DonutChart centerLabel="hoạt động" items={organizerDistribution.map((item) => ({
-              label: item.label,
-              value: Number(item.value ?? 0),
-              className: item.label === "Cấp khoa" ? "#2563eb" : "#16a34a",
-            }))} />
-          </ReportCard>
-        </div>
         <ReportCard
           icon={<Users size={20} />}
           title="Tỷ lệ sinh viên tham gia theo lớp"
@@ -245,16 +203,18 @@ export default async function StudentActivitiesReportPage({
 }
 
 function Stat({
+  icon,
   label,
   value,
 }: {
+  icon: React.ReactNode;
   label: string;
   value: string | number;
 }) {
   return (
-    <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
-      <div className="text-sm font-medium text-slate-500">{label}</div>
-      <div className="mt-3 text-3xl font-bold text-slate-900">{value}</div>
+    <div className={[statCardStyles.card, "min-w-0"].join(" ")}>
+      <div className="flex items-center justify-between gap-3"><div className={statCardStyles.label}>{label}</div><div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</div></div>
+      <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div>
     </div>
   );
 }
@@ -269,7 +229,7 @@ function ReportCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div className="flex items-start gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
           {icon}

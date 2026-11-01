@@ -1,4 +1,4 @@
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { getActiveAcademicTerm } from "./getActiveAcademicTerm";
 
 export type AcademicTermView = {
@@ -48,18 +48,14 @@ export function assertDateRangeInsideTerm({
   }
 }
 
-export function getAcademicTermsForSelect(): AcademicTermView[] {
-  const db = getDb();
+export async function getAcademicTermsForSelect(): Promise<AcademicTermView[]> {
+  const db = getDatabase();
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT id, academic_year, semester, name, start_at, end_at, is_active
       FROM academic_terms
-      ORDER BY datetime(start_at) DESC, id DESC
-      `
-    )
-    .all() as Row[];
+      ORDER BY CAST(start_at AS DATETIME(3)) DESC, id DESC
+      `, [])) as Row[];
 
   return rows.map((item) => ({
     id: Number(item.id),
@@ -72,22 +68,18 @@ export function getAcademicTermsForSelect(): AcademicTermView[] {
   }));
 }
 
-export function getAcademicTermForView(termId?: string | number | null) {
-  const db = getDb();
+export async function getAcademicTermForView(termId?: string | number | null) {
+  const db = getDatabase();
 
   const id = Number(termId ?? 0);
 
   if (Number.isFinite(id) && id > 0) {
-    const row = db
-      .prepare(
-        `
+    const row = (await db.first(`
         SELECT id, academic_year, semester, name, start_at, end_at, is_active
         FROM academic_terms
         WHERE id = ?
         LIMIT 1
-        `
-      )
-      .get(id) as Row | undefined;
+        `, [id])) as Row | undefined;
 
     if (row) {
       return {
@@ -102,7 +94,7 @@ export function getAcademicTermForView(termId?: string | number | null) {
     }
   }
 
-  const active = getActiveAcademicTerm();
+  const active = (await getActiveAcademicTerm());
 
   if (!active) {
     throw new Error("Chưa có học kỳ đang áp dụng.");

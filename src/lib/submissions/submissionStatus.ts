@@ -1,11 +1,16 @@
+import { canSubmitToEvent, type EventSubmissionState } from "@/lib/events/eventSubmissionPhase";
+
 export function getSubmissionStatusLabel(status: string) {
   switch (status) {
+    case "support": return "Cần hỗ trợ";
+    case "none": return "Chưa tạo hồ sơ";
+    case "closed": return "Đã đóng";
     case "draft":
-      return "Đang soạn hồ sơ";
+      return "Chưa hoàn tất";
     case "submitted_v1":
-      return "Chờ cán bộ lớp duyệt";
+      return "Chờ duyệt vòng 1";
     case "submitted_v2":
-      return "Chờ cán bộ khoa duyệt";
+      return "Chờ duyệt vòng 2";
     case "needs_revision_v1":
     case "needs_revision_v2":
     case "rejected_v1":
@@ -13,7 +18,7 @@ export function getSubmissionStatusLabel(status: string) {
       return "Cần chỉnh sửa";
     case "passed":
     case "approved":
-      return "Đã đạt";
+      return "Đạt";
     case "failed":
     case "rejected":
       return "Không đạt";
@@ -22,12 +27,12 @@ export function getSubmissionStatusLabel(status: string) {
   }
 }
 
-export function canEditSubmission(status: string) {
+export function canEditSubmission(status: string, event?: EventSubmissionState) {
   return [
     "draft",
     "needs_revision_v1",
     "needs_revision_v2",
     "rejected_v1",
     "rejected_v2",
-  ].includes(status);
+  ].includes(status) && (!event || canSubmitToEvent(event));
 }

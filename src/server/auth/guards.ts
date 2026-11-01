@@ -26,12 +26,13 @@ export async function requireLogin() {
   if (!user.is_active) {
     redirect("/login");
   }
+  if (Number(user.must_change_pw) === 1) redirect("/change-password");
 
   return user;
 }
 
 export async function requireAuth() {
-  return requireLogin();
+  return (await requireLogin());
 }
 
 export async function requireAdmin() {
@@ -79,7 +80,7 @@ export async function requireLoginContext(expected: LoginRoleContext) {
 }
 
 export async function requireStudentContext() {
-  return requireLoginContext("student");
+  return (await requireLoginContext("student"));
 }
 
 export async function requireAdminContext() {

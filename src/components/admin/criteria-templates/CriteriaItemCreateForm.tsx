@@ -1,4 +1,6 @@
 "use client";
+import RequiredMark from "@/components/common/RequiredMark";
+
 
 import { useActionState } from "react";
 import { createCriteriaItem } from "@/server/actions/criteria-templates/createCriteriaItem";
@@ -47,7 +49,7 @@ export default function CriteriaItemCreateForm({
   return (
     <>
       <ActionFeedback pending={pending} message={state.message} ok={state.ok} />
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <h2 className="text-xl font-semibold text-slate-900">Thêm tiêu chí</h2>
       <p className="mt-1 text-sm text-slate-500">
         Sinh viên chỉ xét đạt/không đạt. Cán bộ mới có điểm.
@@ -57,7 +59,7 @@ export default function CriteriaItemCreateForm({
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600">
             Thuộc tiêu chuẩn
-          </label>
+          <RequiredMark required={true}/></label>
           <select
             name="groupCode"
             required
@@ -75,7 +77,7 @@ export default function CriteriaItemCreateForm({
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-600">
             Mã tiêu chí
-          </label>
+          <RequiredMark required={true}/></label>
           <input
             name="code"
             placeholder="Ví dụ: A1"
@@ -87,7 +89,7 @@ export default function CriteriaItemCreateForm({
         <div className="md:col-span-2">
           <label className="mb-2 block text-sm font-medium text-slate-600">
             Tên tiêu chí
-          </label>
+          <RequiredMark required={true}/></label>
           <input
             name="title"
             placeholder="Ví dụ: Tham gia hoạt động tình nguyện"
@@ -163,7 +165,7 @@ export default function CriteriaItemCreateForm({
           />
         </div>
 
-        <div className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800 ring-1 ring-blue-100 md:col-span-4">
+        <div className="rounded-none bg-blue-50 px-4 py-3 text-sm text-blue-800 ring-1 ring-blue-100 md:col-span-4 shadow-md shadow-slate-200/60">
           Với tiêu chí tự động, admin chỉ cần gắn hoạt động phù hợp ở danh sách
           bên dưới. Hệ thống sẽ tự kiểm tra người nộp có tham gia hoạt động đó
           hay không để tự động pass.

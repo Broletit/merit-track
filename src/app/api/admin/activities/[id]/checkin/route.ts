@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/server/auth/guards";
+import { requireAdminContext } from "@/server/auth/guards";
 import { scanActivityQr } from "@/server/actions/activities/scanActivityQr";
 
 function parseId(value: string) {
@@ -11,7 +11,7 @@ export async function POST(
   req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  await requireAdmin();
+  await requireAdminContext();
   const { id: rawId } = await context.params;
   const activityId = parseId(rawId);
 

@@ -22,7 +22,7 @@ export default function OfficerActivityDetailCard({
   item: OfficerActivityDetail;
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-slate-900">
           Thông tin hoạt động
@@ -47,7 +47,7 @@ export default function OfficerActivityDetailCard({
         <Info label="Kết thúc hoạt động" value={formatDateTimeVN(item.endAt)} />
       </div>
 
-      <div className="mt-5 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+      <div className="mt-5 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
         <div className="text-sm font-medium text-slate-900">Mô tả</div>
         <div className="mt-2 whitespace-pre-wrap text-sm text-slate-600">
           {item.description || "Chưa có mô tả"}
@@ -59,7 +59,7 @@ export default function OfficerActivityDetailCard({
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
       <div className="text-sm text-slate-500">{label}</div>
       <div className="mt-1 text-sm font-medium text-slate-900">{value}</div>
     </div>

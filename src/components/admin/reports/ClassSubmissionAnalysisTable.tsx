@@ -1,3 +1,4 @@
+import PaginatedTable from "@/components/common/PaginatedTable";
 type SubmissionRow = {
   id: number;
   studentCode: string;
@@ -30,8 +31,7 @@ const decisionLabels: Record<string, string> = {
 
 export default function ClassSubmissionAnalysisTable({ items }: { items: SubmissionRow[] }) {
   return (
-    <div className="max-h-[560px] overflow-auto rounded-2xl border border-slate-200">
-      <table className="w-full min-w-[1220px] table-fixed divide-y divide-slate-200">
+    <PaginatedTable className="w-full min-w-0 table-fixed divide-y divide-slate-200" containerClassName="max-h-[560px] overflow-auto rounded-none border border-slate-200" resultLabel="bản ghi">
         <thead className="sticky top-0 z-10 bg-slate-50">
           <tr>
             <th className="w-[17%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Sinh viên</th>
@@ -68,8 +68,7 @@ export default function ClassSubmissionAnalysisTable({ items }: { items: Submiss
             <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">Không có hồ sơ phù hợp.</td></tr>
           )}
         </tbody>
-      </table>
-    </div>
+      </PaginatedTable>
   );
 }
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";

@@ -50,7 +50,7 @@ export default function AdminQuickActions() {
   ];
 
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.08)]">
+    <section className="rounded-2xl bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.08)] shadow-slate-200/60">
       <div className="text-xl font-semibold text-slate-900">Truy cập nhanh</div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

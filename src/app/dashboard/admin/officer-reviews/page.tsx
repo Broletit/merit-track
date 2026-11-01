@@ -1,5 +1,5 @@
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import Pagination from "@/components/common/Pagination";
 import AdminOfficerReviewsTable from "@/components/admin/officer-reviews/AdminOfficerReviewsTable";
 import type { AdminOfficerReviewRow } from "@/components/admin/officer-reviews/AdminOfficerReviewsTable";
@@ -9,19 +9,14 @@ import {
   getAcademicTermsForSelect,
 } from "@/server/academic-terms/getAcademicTermForView";
 
-type SearchParams = Promise<{
+type SearchParams = Promise<{ cohort?: string;
   page?: string;
   keyword?: string;
   termId?: string;
   eventId?: string;
-  queue?: string;
+  status?: string;
   sort?: string;
 }>;
-
-type EventOptionRow = {
-  id: number;
-  title: string;
-};
 
 type Row = {
   id: number;
@@ -30,6 +25,7 @@ type Row = {
   officer_code: string;
   class_code: string;
   score_total: number;
+  event_score_max: number | null;
   status: string;
   updated_at: string | null;
   submitted_at: string | null;
@@ -51,105 +47,85 @@ export default async function AdminOfficerReviewsPage({
   await requireAdminContext();
 
   const params = await searchParams;
-  const db = getDb();
+  const db = getDatabase();
+  
 
-  const terms = getAcademicTermsForSelect();
-  const selectedTerm = getAcademicTermForView(params.termId);
+  const terms = (await getAcademicTermsForSelect());
+  const selectedTerm = (await getAcademicTermForView(params.termId));
   const selectedTermId = selectedTerm.id;
-
-  const eventOptionRows = db
-    .prepare(
-      `
-      SELECT id, title
-      FROM events
-      WHERE type = 'officer'
-        AND term_id = ?
-      ORDER BY datetime(start_at) DESC, id DESC
-      `
-    )
-    .all(selectedTermId) as EventOptionRow[];
 
   const page = Math.max(1, Number(params.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
 
   const keyword = String(params.keyword ?? "").trim();
-  const eventId = Number(params.eventId ?? 0);
-  const queue = String(params.queue ?? "").trim();
+  const status = String(params.status ?? "").trim();
   const sort = String(params.sort ?? "priority").trim();
 
-  const where: string[] = [`e.type = 'officer'`, `e.term_id = ?`];
+  const where: string[] = [`e.type = 'officer'`, `e.term_id = ?`, `s.status <> 'draft'`, `s.submitted_at IS NOT NULL`];
   const values: unknown[] = [selectedTermId];
 
-  if (Number.isFinite(eventId) && eventId > 0) {
-    where.push(`e.id = ?`);
-    values.push(eventId);
-  }
-
   if (keyword) {
-    where.push(`(u.full_name LIKE ? OR u.mssv LIKE ?)`);
-    values.push(`%${keyword}%`, `%${keyword}%`);
+    where.push(`((LOCATE(LOWER(?), LOWER(u.full_name)) > 0) OR (LOCATE(LOWER(?), LOWER(u.mssv)) > 0) OR (LOCATE(LOWER(?), LOWER(e.title)) > 0))`);
+    values.push(keyword, keyword, keyword);
   }
 
-  if (queue === "need_action") {
-    where.push(`
-      s.status = 'submitted_v1'
-      AND datetime(e.end_at) >= datetime('now')
-    `);
-  } else if (queue === "waiting_update") {
-    where.push(`s.status = 'needs_revision_v1'`);
-  } else if (queue === "overdue") {
-    where.push(`
-      s.status = 'submitted_v1'
-      AND datetime(e.end_at) < datetime('now')
-    `);
-  } else {
-    where.push(`s.status IN ('submitted_v1', 'needs_revision_v1')`);
-  }
+  if (status) { where.push(`s.status = ?`); values.push(status); }
 
   const whereSql = `WHERE ${where.join(" AND ")}`;
 
   const orderSql =
-    sort === "oldest"
-      ? `datetime(s.updated_at) ASC, s.id ASC`
+    sort === "score_desc"
+      ? `s.score_total DESC, CAST(s.updated_at AS DATETIME(3)) DESC, s.id DESC`
+      : sort === "score_asc"
+        ? `s.score_total ASC, CAST(s.updated_at AS DATETIME(3)) DESC, s.id DESC`
+        : sort === "oldest"
+      ? `CAST(s.updated_at AS DATETIME(3)) ASC, s.id ASC`
       : sort === "latest"
-        ? `datetime(s.updated_at) DESC, s.id DESC`
+        ? `CAST(s.updated_at AS DATETIME(3)) DESC, s.id DESC`
         : `
           CASE
             WHEN s.status = 'submitted_v1'
-              AND datetime(e.end_at) >= datetime('now') THEN 0
+              AND CAST(e.end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3) THEN 0
             WHEN s.status = 'submitted_v1'
-              AND datetime(e.end_at) < datetime('now') THEN 1
+              AND CAST(e.end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3) THEN 1
             WHEN s.status = 'needs_revision_v1' THEN 2
             ELSE 3
           END ASC,
-          datetime(e.end_at) ASC,
-          datetime(s.updated_at) ASC,
+          CAST(e.end_at AS DATETIME(3)) ASC,
+          CAST(s.updated_at AS DATETIME(3)) ASC,
           s.id ASC
         `;
 
-  const totalRow = db
-    .prepare(
-      `
+  const totalRow = (await db.first(`
       SELECT COUNT(*) AS total
       FROM submissions s
       INNER JOIN events e ON e.id = s.event_id
       INNER JOIN users u ON u.id = s.user_id
-      INNER JOIN classes c ON c.id = s.class_id
+      LEFT JOIN classes c ON c.id = s.class_id
       ${whereSql}
-      `
-    )
-    .get(...values) as { total: number };
+      `, [...values])) as { total: number };
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         s.id,
         e.title AS event_title,
         u.full_name AS officer_name,
         u.mssv AS officer_code,
-        c.code AS class_code,
+        COALESCE(
+          c.code,
+          (
+            SELECT member_class.code
+            FROM class_members membership
+            INNER JOIN classes member_class ON member_class.id = membership.class_id
+            WHERE membership.user_id = s.user_id
+              AND membership.left_at IS NULL
+            ORDER BY CAST(membership.joined_at AS DATETIME(3)) DESC, membership.id DESC
+            LIMIT 1
+          ),
+          '—'
+        ) AS class_code,
         s.score_total,
+        e.score_max AS event_score_max,
         s.status,
         s.updated_at,
         s.submitted_at,
@@ -160,7 +136,7 @@ export default async function AdminOfficerReviewsPage({
           FROM reviews r
           LEFT JOIN users ru ON ru.id = r.reviewer_id
           WHERE r.submission_id = s.id
-          ORDER BY datetime(r.created_at) DESC, r.id DESC
+          ORDER BY CAST(r.created_at AS DATETIME(3)) DESC, r.id DESC
           LIMIT 1
         ) AS reviewer_name,
 
@@ -168,7 +144,7 @@ export default async function AdminOfficerReviewsPage({
           SELECT r.note
           FROM reviews r
           WHERE r.submission_id = s.id
-          ORDER BY datetime(r.created_at) DESC, r.id DESC
+          ORDER BY CAST(r.created_at AS DATETIME(3)) DESC, r.id DESC
           LIMIT 1
         ) AS last_review_note,
 
@@ -208,7 +184,7 @@ export default async function AdminOfficerReviewsPage({
               )
               OR EXISTS (
                 SELECT 1
-                FROM submission_files sf
+                FROM submission_ready_files sf
                 WHERE sf.submission_id = s.id
                   AND sf.criteria_code = cti.code
               )
@@ -218,13 +194,11 @@ export default async function AdminOfficerReviewsPage({
       FROM submissions s
       INNER JOIN events e ON e.id = s.event_id
       INNER JOIN users u ON u.id = s.user_id
-      INNER JOIN classes c ON c.id = s.class_id
+      LEFT JOIN classes c ON c.id = s.class_id
       ${whereSql}
       ORDER BY ${orderSql}
       LIMIT ? OFFSET ?
-      `
-    )
-    .all(...values, PAGE_SIZE, offset) as Row[];
+      `, [...values, PAGE_SIZE, offset])) as Row[];
 
   const items: AdminOfficerReviewRow[] = rows.map((item) => ({
     id: Number(item.id),
@@ -233,6 +207,7 @@ export default async function AdminOfficerReviewsPage({
     officerCode: String(item.officer_code ?? ""),
     classCode: String(item.class_code ?? ""),
     scoreTotal: Number(item.score_total ?? 0),
+    scoreMax: Number(item.event_score_max ?? 0),
     status: String(item.status ?? ""),
     updatedAt: item.updated_at ? String(item.updated_at) : null,
     submittedAt: item.submitted_at ? String(item.submitted_at) : null,
@@ -251,32 +226,28 @@ export default async function AdminOfficerReviewsPage({
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold">Duyệt hồ sơ cán bộ</h1>
           <AcademicTermSelect variant="header" terms={terms} selectedTermId={selectedTermId} />
         </div>
       </section>
 
-      <AdminOfficerReviewsTable
+      <div data-table-frame className="min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<AdminOfficerReviewsTable page={page}
         items={items}
-        eventOptions={eventOptionRows.map((item) => ({
-          id: Number(item.id),
-          title: String(item.title ?? ""),
-        }))}
       />
-
-      <Pagination
+<Pagination totalResults={total} resultLabel="hồ sơ"
         page={page}
         totalPages={totalPages}
         searchParams={{
           keyword,
           termId: String(selectedTermId),
-          eventId: Number.isFinite(eventId) && eventId > 0 ? String(eventId) : "",
-          queue,
+          status,
           sort,
         }}
       />
+</div>
     </main>
   );
 }

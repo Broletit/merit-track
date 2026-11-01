@@ -1,0 +1,14 @@
+node_modules
+.next
+.next-build
+.git
+.env*
+data
+public/uploads
+uploads
+tmp
+tests
+*.log
+*.tsbuildinfo
+
+storage

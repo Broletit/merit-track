@@ -1,3 +1,4 @@
+import NumberedTable from "@/components/common/NumberedTable";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import FacultyOfficerActivityRegistrationsFilter from "./FacultyOfficerActivityRegistrationsFilter";
 import type {
@@ -7,41 +8,43 @@ import type {
 
 function mapStatusLabel(value: string) {
   if (value === "attended") return "Đã điểm danh";
+  if (value === "absent") return "Không tham gia";
   return "Đã đăng ký";
 }
 
 function getStatusClass(value: string) {
   if (value === "attended") return "bg-emerald-50 text-emerald-700";
+  if (value === "absent") return "bg-rose-50 text-rose-700";
   return "bg-blue-50 text-blue-700";
 }
 
-export default function FacultyOfficerActivityRegistrationsTable({
+export default function FacultyOfficerActivityRegistrationsTable({ page = 1,
   items,
   classes,
-}: {
+}: { page?: number;
   items: FacultyOfficerActivityRegistrationItem[];
   classes: FacultyOfficerActivityClassOption[];
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900">
-          Sinh viên các lớp tham gia
-        </h2>
-      </div>
-
-      <div className="mt-5">
+    <section className="flex flex-col rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <div className="order-2 mt-5">
         <FacultyOfficerActivityRegistrationsFilter classes={classes} />
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-        <table className="min-w-full table-fixed divide-y divide-slate-200">
+      <div className="order-1">
+        <h2 className="text-xl font-semibold text-slate-900">
+          Sinh viên toàn khoa đăng ký
+        </h2>
+      </div>
+
+      <div className="order-3 mt-5 overflow-hidden rounded-none border border-slate-200">
+        <NumberedTable page={page} className="min-w-full table-fixed divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
-              <th className="w-[34%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="left" className="w-[34%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Người tham gia
               </th>
-              <th className="w-[20%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="left" className="w-[20%] whitespace-nowrap px-4 py-3  text-sm font-semibold text-slate-700 text-left">
                 Lớp
               </th>
               <th className="w-[16%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -60,7 +63,7 @@ export default function FacultyOfficerActivityRegistrationsTable({
             {items.length > 0 ? (
               items.map((item) => (
                 <tr key={item.id}>
-                  <td className="px-4 py-4 align-top">
+                  <td data-column-align="left" className="px-4 py-4 align-top text-left">
                     <div className="text-sm font-semibold text-slate-900">
                       {item.fullName}
                     </div>
@@ -69,7 +72,7 @@ export default function FacultyOfficerActivityRegistrationsTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 align-top text-sm text-slate-700">
+                  <td data-column-align="left" className="px-4 py-4 align-top text-sm text-slate-700 text-left">
                     {item.classCode ? (
                       <>
                         <div className="font-medium">{item.classCode}</div>
@@ -112,7 +115,7 @@ export default function FacultyOfficerActivityRegistrationsTable({
               </tr>
             )}
           </tbody>
-        </table>
+        </NumberedTable>
       </div>
     </section>
   );

@@ -40,7 +40,7 @@ export default function ReviewDecisionActions({
   }
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <ActionFeedback pending={pending} message={feedback.message} ok={feedback.ok} />
       <h2 className="text-xl font-semibold text-slate-900">Thao tác duyệt</h2>
 

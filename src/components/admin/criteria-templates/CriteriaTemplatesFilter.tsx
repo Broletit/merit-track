@@ -1,4 +1,5 @@
 "use client";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
@@ -37,7 +38,7 @@ export default function CriteriaTemplatesFilter() {
   }, [keyword]);
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-4">
       <div className="relative min-w-0 xl:col-span-2">
         <Search
           size={16}
@@ -74,6 +75,6 @@ export default function CriteriaTemplatesFilter() {
         <option value="latest">Thời gian tạo gần nhất</option>
         <option value="oldest">Thời gian tạo xa nhất</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

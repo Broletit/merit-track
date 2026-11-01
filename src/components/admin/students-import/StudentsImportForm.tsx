@@ -1,14 +1,17 @@
 "use client";
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+import { ArrowRightLeft, CircleAlert, Link2, MinusCircle, RefreshCw, Rows3, UserPlus } from "lucide-react";
+import { assertImportCohort } from "@/lib/cohorts/cohorts";
 import { importStudents } from "@/server/actions/students/importStudents";
 import { previewImportStudents } from "@/server/actions/students/previewImportStudents";
 import ActionFeedback from "@/components/shared/ActionFeedback";
 import StudentsImportClassForm from "./StudentsImportClassForm";
 import StudentsImportFileUploader from "./StudentsImportFileUploader";
 import StudentsImportOptionsForm from "./StudentsImportOptionsForm";
-import StudentsImportValidationSummary from "./StudentsImportValidationSummary";
-import StudentsImportValidationTable from "./StudentsImportValidationTable";
 import type {
   ImportClassOption,
   ImportPreviewResult,
@@ -50,8 +53,10 @@ export default function StudentsImportForm({
 }: {
   classes: ImportClassOption[];
 }) {
-  const messageRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter();
+  const [formRevision, setFormRevision] = useState(0);
 
+  const [classReady, setClassReady] = useState(false);
   const [parsedRows, setParsedRows] = useState<ParsedImportStudentRow[]>([]);
   const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
   const [result, setResult] = useState<ImportResultState>(initialResult);
@@ -65,7 +70,7 @@ export default function StudentsImportForm({
   const hasSameClassExistingRows = useMemo(() => {
     return Boolean(
       preview?.rows.some((item) =>
-        ["same_class", "same_class_diff_info"].includes(item.status)
+        ["same_class_unchanged", "same_class_diff_info"].includes(item.status)
       )
     );
   }, [preview]);
@@ -76,7 +81,6 @@ export default function StudentsImportForm({
     );
   }, [preview]);
 
-  const hasExistingRows = hasSameClassExistingRows || hasDifferentClassRows;
 
   const hasBlockingRows = useMemo(() => {
     return Boolean(
@@ -93,12 +97,6 @@ export default function StudentsImportForm({
       message,
     });
 
-    window.setTimeout(() => {
-      messageRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 50);
   }
 
   useEffect(() => {
@@ -126,12 +124,11 @@ export default function StudentsImportForm({
       classMode: String(formData.get("classMode") ?? "existing") as
         | "existing"
         | "new",
+      cohort: Number(formData.get("cohort") ?? 0),
       classId: Number(formData.get("classId") ?? 0) || null,
       newClassCode: String(formData.get("newClassCode") ?? ""),
       newClassName: String(formData.get("newClassName") ?? ""),
       newClassFaculty: String(formData.get("newClassFaculty") ?? ""),
-      newClassIntakeYear:
-        Number(formData.get("newClassIntakeYear") ?? 0) || null,
       allowUpdateExisting,
       allowTransferClass,
       rows: parsedRows,
@@ -143,13 +140,24 @@ export default function StudentsImportForm({
 
     setResult(initialResult);
 
+    setAllowUpdateExisting(false);
+    setAllowTransferClass(false);
     const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     const payload = readPayloadFromForm(form);
+    if (payload.classMode === "existing" ? !classes.some((item) => item.id === payload.classId) : !payload.newClassCode.trim() || !payload.newClassName.trim()) {
+      showMessage("Vui lòng chọn lớp hoặc nhập đầy đủ mã lớp và tên lớp mới.");
+      return;
+    }
 
     if (payload.rows.length === 0) {
       const message = "Vui lòng chọn file CSV/XLSX trước khi kiểm tra.";
-      setPreview(emptyPreview(message));
       showMessage(message);
+      return;
+    }
+
+    try { assertImportCohort(payload.cohort, payload.rows); } catch (error) {
+      showMessage(error instanceof Error ? error.message : "Khóa không hợp lệ.");
       return;
     }
 
@@ -190,10 +198,6 @@ export default function StudentsImportForm({
     return "File còn dòng lỗi hoặc trùng trong file. Vui lòng xử lý trước khi import.";
   }
 
-  if (hasSameClassExistingRows && allowTransferClass) {
-    return "Sinh viên trong file đã thuộc đúng lớp đang import. Không cần chọn “Cho phép chuyển lớp”, vui lòng chọn “Cập nhật thông tin sinh viên đã tồn tại”.";
-  }
-
   if (hasSameClassExistingRows && !allowUpdateExisting) {
     return "Danh sách có sinh viên đã tồn tại đúng lớp. Vui lòng chọn “Cập nhật thông tin sinh viên đã tồn tại” trước khi import.";
   }
@@ -213,7 +217,7 @@ export default function StudentsImportForm({
     event.preventDefault();
 
     const form = event.currentTarget.form;
-    if (!form) return;
+    if (!form || !form.reportValidity()) return;
 
     const validationError = validateBeforeImport();
 
@@ -231,32 +235,15 @@ export default function StudentsImportForm({
           previewRows: preview!.rows,
         });
 
-        setResult({
-          ok: true,
-          message: importResult.message,
-          inserted: Number(importResult.inserted ?? 0),
-          updated: Number(importResult.updated ?? 0),
-          attachedToClass: Number(importResult.attachedToClass ?? 0),
-          transferred: Number(importResult.transferred ?? 0),
-          skippedExisting: Number(importResult.skippedExisting ?? 0),
-          conflicts: Number(importResult.conflicts ?? 0),
-          total: Number(importResult.total ?? 0),
-          conflictMessages: Array.isArray(importResult.conflictMessages)
-            ? importResult.conflictMessages
-            : [],
-        });
-
-        window.setTimeout(() => {
-          messageRef.current?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-        }, 50);
-
+        toast.success(importResult.message, { id: 'students-import-success' });
+        setResult(initialResult);
+        setClassReady(false);
         setPreview(null);
         setParsedRows([]);
         setAllowUpdateExisting(false);
         setAllowTransferClass(false);
+        setFormRevision(revision => revision + 1);
+        router.refresh();
       } catch (error) {
         showMessage(
           error instanceof Error ? error.message : "Xác nhận import thất bại."
@@ -268,43 +255,53 @@ export default function StudentsImportForm({
   const warningMessage = preview ? validateBeforeImport() : "";
 
   return (
-    <form onSubmit={handlePreview} className="space-y-6">
+    <form key={formRevision} onSubmit={handlePreview} className="space-y-6">
       <ActionFeedback pending={previewPending || importPending} message={result.message} ok={result.ok} />
-      <div ref={messageRef} />
 
       {result.message ? (
-        <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <section className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
           {result.ok ? (
             <div className="mt-4 grid gap-4 md:grid-cols-4 xl:grid-cols-7">
-              <StatCard label="Tổng dòng" value={result.total} />
-              <StatCard label="Tạo mới" value={result.inserted} />
-              <StatCard label="Cập nhật" value={result.updated} />
-              <StatCard label="Gán lớp" value={result.attachedToClass} />
-              <StatCard label="Chuyển lớp" value={result.transferred} />
-              <StatCard label="Bỏ qua" value={result.skippedExisting} />
-              <StatCard label="Xung đột" value={result.conflicts} />
+              <StatCard icon={<Rows3 size={18} />} label="Tổng dòng" value={result.total} />
+              <StatCard icon={<UserPlus size={18} />} label="Tạo mới" value={result.inserted} />
+              <StatCard icon={<RefreshCw size={18} />} label="Cập nhật" value={result.updated} />
+              <StatCard icon={<Link2 size={18} />} label="Gán lớp" value={result.attachedToClass} />
+              <StatCard icon={<ArrowRightLeft size={18} />} label="Chuyển lớp" value={result.transferred} />
+              <StatCard icon={<MinusCircle size={18} />} label="Bỏ qua" value={result.skippedExisting} />
+              <StatCard icon={<CircleAlert size={18} />} label="Xung đột" value={result.conflicts} />
             </div>
           ) : null}
         </section>
       ) : null}
 
-      <StudentsImportClassForm classes={classes} />
+      <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <fieldset disabled={previewPending || importPending} className="min-w-0">
+        <StudentsImportClassForm classes={classes} onSelectionChange={(ready) => {
+          setClassReady(ready);
+          setAllowUpdateExisting(false);
+          setAllowTransferClass(false);
+          setPreview(null);
+          setResult(initialResult);
+        }} />
+      </fieldset>
 
       <StudentsImportOptionsForm
+        updateDisabled={!preview?.ok || previewPending || importPending || hasBlockingRows || !hasSameClassExistingRows}
+        transferDisabled={!preview?.ok || previewPending || importPending || hasBlockingRows || !hasDifferentClassRows}
         allowUpdateExisting={allowUpdateExisting}
         allowTransferClass={allowTransferClass}
         onAllowUpdateExistingChange={setAllowUpdateExisting}
         onAllowTransferClassChange={setAllowTransferClass}
-        hasExistingRows={hasExistingRows}
-        hasDifferentClassRows={hasDifferentClassRows}
       />
+      </div>
 
-      <StudentsImportFileUploader onParsedRowsChange={resetAfterFileChanged} />
-
+      <StudentsImportFileUploader
+        onParsedRowsChange={resetAfterFileChanged}
+        actions={
       <div className="flex flex-wrap justify-end gap-3">
         <button
           type="submit"
-          disabled={previewPending || importPending}
+          disabled={previewPending || importPending || !classReady || parsedRows.length === 0}
           className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {previewPending ? "Đang kiểm tra..." : "Kiểm tra dữ liệu"}
@@ -313,30 +310,31 @@ export default function StudentsImportForm({
         <button
           type="button"
           onClick={handleConfirmImport}
-          disabled={previewPending || importPending}
+          disabled={previewPending || importPending || !classReady || !preview || Boolean(warningMessage)}
           className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {importPending ? "Đang import..." : "Xác nhận import"}
         </button>
       </div>
 
-      {warningMessage ? (
-        <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-amber-100">
-          {warningMessage}
-        </div>
-      ) : null}
+        }
+        warningMessage={warningMessage}
+        validationPreview={preview}
+        checking={previewPending}
+        disabled={previewPending || importPending}
+      />
 
-      {preview ? <StudentsImportValidationSummary preview={preview} /> : null}
-      {preview ? <StudentsImportValidationTable preview={preview} /> : null}
+
+
     </form>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-slate-900">{value}</div>
+    <div className={[statCardStyles.card, "min-w-0"].join(" ")}>
+      <div className="flex items-center justify-between gap-3"><div className={statCardStyles.label}>{label}</div><div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</div></div>
+      <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div>
     </div>
   );
 }

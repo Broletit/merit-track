@@ -1,3 +1,4 @@
+import NumberedTable from "@/components/common/NumberedTable";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import TableActionLink from "@/components/shared/TableActionLink";
 import FacultyOfficerActivitiesFilter from "./FacultyOfficerActivitiesFilters";
@@ -18,26 +19,30 @@ export default function FacultyOfficerActivitiesTable({
   searchParams: Record<string, string | undefined>;
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900">
-          Danh sách hoạt động
-        </h2>
-        <p className="mt-1 text-sm text-slate-400">{totalResults} hoạt động</p>
-      </div>
-
-      <div className="mt-5">
+    <section className="flex flex-col rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <div className="order-2 mt-5">
         <FacultyOfficerActivitiesFilter />
       </div>
 
-      <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
-        <table className="w-full min-w-[820px] table-fixed divide-y divide-slate-200">
+      <div className="order-1">
+        <h2 className="text-xl font-semibold text-slate-900">
+          Danh sách hoạt động
+        </h2>
+        
+      </div>
+
+      <div data-table-frame className="order-3 mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<div className="overflow-x-auto rounded-none border border-slate-200">
+        <NumberedTable page={page} className="w-full min-w-0 table-fixed divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
-              <th className="w-[38%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th className="w-[30%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Hoạt động
               </th>
-              <th className="w-[24%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th className="w-[12%] px-4 py-3 text-center text-sm font-semibold text-slate-700">
+                Cấp tổ chức
+              </th>
+              <th className="w-[20%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Thời gian
               </th>
               <th className="w-[14%] px-4 py-3 text-center text-sm font-semibold text-slate-700">
@@ -57,7 +62,6 @@ export default function FacultyOfficerActivitiesTable({
               items.map((item) => (
                 <tr key={item.id} className="transition hover:bg-slate-50/70">
                   <td className="px-4 py-4 align-top">
-                    <div className="mb-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.organizerLevel === "class" ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}>{item.organizerLevel === "class" ? "Cấp lớp" : "Cấp khoa"}</span></div>
                     <div className="text-sm font-semibold text-slate-900">
                       {item.title}
                     </div>
@@ -65,6 +69,8 @@ export default function FacultyOfficerActivitiesTable({
                       {item.description || "Chưa có mô tả"}
                     </div>
                   </td>
+
+                  <td className="px-4 py-4 text-center align-top"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${item.organizerLevel === "class" ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}>{item.organizerLevel === "class" ? "Chi đoàn" : "Cấp khoa"}</span></td>
 
                   <td className="px-4 py-4 align-top text-sm text-slate-700">
                     {formatDateTimeVN(item.startAt)}
@@ -88,7 +94,7 @@ export default function FacultyOfficerActivitiesTable({
             ) : (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-4 py-10 text-center text-sm text-slate-500"
                 >
                   Không có hoạt động phù hợp.
@@ -96,17 +102,17 @@ export default function FacultyOfficerActivitiesTable({
               </tr>
             )}
           </tbody>
-        </table>
+        </NumberedTable>
       </div>
-
-      <div className="mt-5">
-        <ReviewPagination
+<div className="mt-5">
+        <ReviewPagination totalResults={totalResults} resultLabel="hoạt động"
           page={page}
           totalPages={totalPages}
           basePath="/dashboard/faculty-officer/activities"
           searchParams={searchParams}
         />
       </div>
+</div>
     </section>
   );
 }

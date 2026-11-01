@@ -1,4 +1,6 @@
 "use client";
+import CohortFilter from "@/components/shared/CohortFilter";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
@@ -18,10 +20,11 @@ export default function StudentActivitiesFilter() {
     else params.delete(key);
 
     params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
   useEffect(() => {
+    if (keyword.trim() === (searchParams.get("keyword") ?? "").trim()) return;
     const timer = setTimeout(() => {
       updateParam("keyword", keyword.trim());
     }, 350);
@@ -31,8 +34,8 @@ export default function StudentActivitiesFilter() {
   }, [keyword]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <div className="relative xl:col-span-2">
+    <FilterRow className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(260px,2fr)_repeat(3,minmax(150px,1fr))]">
+      <div className="relative">
         <Search
           size={16}
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -44,7 +47,7 @@ export default function StudentActivitiesFilter() {
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
+      <CohortFilter />
       <select
         defaultValue={searchParams.get("status") ?? ""}
         onChange={(event) => updateParam("status", event.target.value)}
@@ -56,7 +59,6 @@ export default function StudentActivitiesFilter() {
         <option value="attended">Đã tham gia</option>
         <option value="expired">Hết hạn đăng ký</option>
       </select>
-
       <select
         defaultValue={searchParams.get("time") ?? ""}
         onChange={(event) => updateParam("time", event.target.value)}
@@ -67,6 +69,6 @@ export default function StudentActivitiesFilter() {
         <option value="ongoing">Đang diễn ra</option>
         <option value="ended">Đã kết thúc</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

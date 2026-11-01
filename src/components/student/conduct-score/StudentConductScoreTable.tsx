@@ -1,3 +1,4 @@
+import PaginatedTable from "@/components/common/PaginatedTable";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import type { StudentConductScoreItem } from "./types";
 import StudentConductScoreFilter from "./StudentConductScoreFilter";
@@ -8,19 +9,19 @@ export default function StudentConductScoreTable({
   items: StudentConductScoreItem[];
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section>
       <div>
+                 <StudentConductScoreFilter />
+        </div>
+
+      <div className="mt-5">
         <h2 className="text-xl font-semibold text-slate-900">
           Lịch sử hoạt động và điểm
         </h2>
       </div>
-      
-        <div className="mt-5">
-                 <StudentConductScoreFilter />
-        </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-        <table className="min-w-full table-fixed divide-y divide-slate-200">
+      <div data-table-frame className="mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<PaginatedTable className="min-w-full table-fixed divide-y divide-slate-200" containerClassName="overflow-hidden rounded-none border border-slate-200" resultLabel="bản ghi">
           <thead className="bg-slate-50">
             <tr>
               <th className="w-[38%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -33,7 +34,7 @@ export default function StudentConductScoreTable({
                 Điểm danh
               </th>
               <th className="w-[14%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                Điểm hoạt động
+                Mức điểm
               </th>
               <th className="w-[14%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Trạng thái điểm
@@ -56,10 +57,8 @@ export default function StudentConductScoreTable({
                   </td>
 
                   <td className="px-4 py-4 align-top">
-                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                      {item.registrationStatus === "attended"
-                        ? "Đã tham gia"
-                        : "Đã đăng ký"}
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.registrationStatus === "attended" ? "bg-emerald-50 text-emerald-700" : item.registrationStatus === "absent" ? "bg-rose-50 text-rose-700" : "bg-blue-50 text-blue-700"}`}>
+                      {item.registrationStatus === "attended" ? "Đã tham gia" : item.registrationStatus === "absent" ? "Vắng" : "Đã đăng ký"}
                     </span>
                   </td>
 
@@ -68,21 +67,17 @@ export default function StudentConductScoreTable({
                   </td>
 
                   <td className="px-4 py-4 align-top text-sm text-slate-700">
-                    {item.conductScore}
+                    {item.registrationStatus === "attended" ? <span className="font-semibold text-emerald-700">+{item.conductScore}</span> : item.registrationStatus === "absent" ? <span className="font-semibold text-rose-700">−{item.conductScore}</span> : <span className="text-slate-400">Chưa xác nhận</span>}
                   </td>
 
                   <td className="px-4 py-4 align-top">
-                    {item.scoreAdded ? (
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        Đã cộng {item.scoreValue ?? item.conductScore} điểm
-                      </span>
-                    ) : item.registrationStatus === "attended" ? (
-                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                        Chờ cộng điểm
-                      </span>
+                    {item.scoreValue !== null && item.scoreValue < 0 ? (
+                      <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">Đã trừ {Math.abs(item.scoreValue)} điểm</span>
+                    ) : item.scoreAdded ? (
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Đã cộng {item.scoreValue ?? item.conductScore} điểm</span>
                     ) : (
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        Chưa tham gia
+                        Chưa xác nhận
                       </span>
                     )}
                   </td>
@@ -99,8 +94,9 @@ export default function StudentConductScoreTable({
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+        </PaginatedTable>
+
+</div>
     </section>
   );
 }

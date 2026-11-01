@@ -1,6 +1,10 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
+import { cohortClause } from "@/server/cohorts/sql";
+import { addCohortFilter } from "@/server/cohorts/sql";
 import { notFound } from "next/navigation";
+import { Percent, UserCheck, Users } from "lucide-react";
 import { requireFacultyOfficerContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import Pagination from "@/components/common/Pagination";
 import FacultyOfficerActivityDetailHeader from "@/components/faculty-officer/activities/FacultyOfficerActivityDetailHeader";
 import FacultyOfficerActivityDetailCard from "@/components/faculty-officer/activities/FacultyOfficerActivityDetailCard";
@@ -10,8 +14,9 @@ import type {
   FacultyOfficerActivityDetail,
   FacultyOfficerActivityRegistrationItem,
 } from "@/components/faculty-officer/activities/types";
+import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
 
-type SearchParams = Promise<{
+type SearchParams = Promise<{ cohort?: string;
   page?: string;
   keyword?: string;
   status?: string;
@@ -57,20 +62,21 @@ export default async function FacultyOfficerActivityDetailPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ cohort?: string; id: string }>;
   searchParams: SearchParams;
 }) {
-  const officer = await requireFacultyOfficerContext();
+  await requireFacultyOfficerContext();
 
   const { id } = await params;
-  const activityId = Number(id);
+  const activityId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(activityId) || activityId <= 0) {
     notFound();
   }
 
   const sp = await searchParams;
-  const db = getDb();
+  const db = getDatabase();
+  (await ensureActivityConductScores());
 
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
   const pageSize = 10;
@@ -80,9 +86,7 @@ export default async function FacultyOfficerActivityDetailPage({
   const status = String(sp.status ?? "").trim();
   const classId = Number(sp.classId ?? 0);
 
-  const activityRow = db
-    .prepare(
-      `
+  const activityRow = (await db.first(`
       SELECT
         a.id,
         a.title,
@@ -99,49 +103,40 @@ export default async function FacultyOfficerActivityDetailPage({
         (
           SELECT COUNT(*)
           FROM activity_registrations ar
-          INNER JOIN faculty_class_assignments fca ON fca.class_id=ar.class_id
-          WHERE ar.activity_id = a.id AND fca.faculty_officer_id=?
+          WHERE ar.activity_id = a.id AND ar.status != 'cancelled'
         ) AS participants,
         (
           SELECT COUNT(*)
           FROM activity_registrations ar
-          INNER JOIN faculty_class_assignments fca ON fca.class_id=ar.class_id
-          WHERE ar.activity_id = a.id AND fca.faculty_officer_id=?
-            AND ar.status = 'attended'
+          WHERE ar.activity_id = a.id AND ar.status = 'attended'
         ) AS attended
       FROM activities a
       WHERE a.id = ?
         AND a.audience_type = 'student'
-        AND EXISTS (SELECT 1 FROM faculty_class_assignments fca WHERE fca.faculty_officer_id=?)
-        AND (NOT EXISTS (SELECT 1 FROM activity_scopes axs WHERE axs.activity_id=a.id)
-          OR EXISTS (SELECT 1 FROM activity_scopes axs INNER JOIN faculty_class_assignments fca ON fca.class_id=axs.class_id WHERE axs.activity_id=a.id AND fca.faculty_officer_id=?))
       LIMIT 1
-      `
-    )
-    .get(officer.id, officer.id, activityId, officer.id, officer.id) as ActivityRow | undefined;
+      `, [activityId])) as ActivityRow | undefined;
 
   if (!activityRow) {
     notFound();
   }
 
-  const classRows = db
-    .prepare(
-      `
+  const classRows = (await db.rows(`
       SELECT DISTINCT
         c.id,
         c.code,
         c.name
       FROM activity_registrations ar
-      INNER JOIN classes c ON c.id = ar.class_id
-      INNER JOIN faculty_class_assignments fca ON fca.class_id=c.id
-      WHERE ar.activity_id = ? AND fca.faculty_officer_id=?
+      INNER JOIN classes c ON c.id = COALESCE(
+        ar.class_id,
+        (SELECT membership.class_id FROM class_members membership WHERE membership.user_id=ar.user_id AND membership.left_at IS NULL ORDER BY CAST(membership.joined_at AS DATETIME(3)) DESC,membership.id DESC LIMIT 1)
+      )
+      WHERE ar.activity_id = ? AND ar.status != 'cancelled' AND ${cohortClause(sp.cohort, 'c.cohort')}
       ORDER BY c.code ASC, c.name ASC
-      `
-    )
-    .all(activityId, officer.id) as ClassRow[];
+      `, [activityId])) as ClassRow[];
 
-  const where: string[] = [`ar.activity_id = ?`, `EXISTS (SELECT 1 FROM faculty_class_assignments fca WHERE fca.faculty_officer_id=? AND fca.class_id=ar.class_id)`];
-  const values: unknown[] = [activityId, officer.id];
+  const where: string[] = [`ar.activity_id = ?`, `ar.status != 'cancelled'`];
+  const values: unknown[] = [activityId];
+  addCohortFilter(where,values,sp.cohort,"u.cohort");
 
   if (keyword) {
     where.push(`(u.full_name LIKE ? OR u.mssv LIKE ?)`);
@@ -154,27 +149,24 @@ export default async function FacultyOfficerActivityDetailPage({
   }
 
   if (Number.isFinite(classId) && classId > 0) {
-    where.push(`ar.class_id = ?`);
+    where.push(`COALESCE(ar.class_id,(SELECT membership.class_id FROM class_members membership WHERE membership.user_id=ar.user_id AND membership.left_at IS NULL ORDER BY CAST(membership.joined_at AS DATETIME(3)) DESC,membership.id DESC LIMIT 1)) = ?`);
     values.push(classId);
   }
 
   const whereSql = `WHERE ${where.join(" AND ")}`;
 
-  const totalRow = db
-    .prepare(
-      `
+  const totalRow = (await db.first(`
       SELECT COUNT(*) AS total
       FROM activity_registrations ar
       INNER JOIN users u ON u.id = ar.user_id
-      LEFT JOIN classes c ON c.id = ar.class_id
+      LEFT JOIN classes c ON c.id = COALESCE(
+        ar.class_id,
+        (SELECT membership.class_id FROM class_members membership WHERE membership.user_id=ar.user_id AND membership.left_at IS NULL ORDER BY CAST(membership.joined_at AS DATETIME(3)) DESC,membership.id DESC LIMIT 1)
+      )
       ${whereSql}
-      `
-    )
-    .get(...values) as { total: number };
+      `, [...values])) as { total: number };
 
-  const registrationRows = db
-    .prepare(
-      `
+  const registrationRows = (await db.rows(`
       SELECT
         ar.id,
         ar.user_id,
@@ -187,20 +179,22 @@ export default async function FacultyOfficerActivityDetailPage({
         ar.checked_in_at
       FROM activity_registrations ar
       INNER JOIN users u ON u.id = ar.user_id
-      LEFT JOIN classes c ON c.id = ar.class_id
+      LEFT JOIN classes c ON c.id = COALESCE(
+        ar.class_id,
+        (SELECT membership.class_id FROM class_members membership WHERE membership.user_id=ar.user_id AND membership.left_at IS NULL ORDER BY CAST(membership.joined_at AS DATETIME(3)) DESC,membership.id DESC LIMIT 1)
+      )
       ${whereSql}
       ORDER BY
         CASE ar.status
           WHEN 'registered' THEN 1
           WHEN 'attended' THEN 2
+          WHEN 'absent' THEN 3
           ELSE 3
         END ASC,
-        datetime(ar.registered_at) DESC,
+        CAST(ar.registered_at AS DATETIME(3)) DESC,
         ar.id DESC
       LIMIT ? OFFSET ?
-      `
-    )
-    .all(...values, pageSize, offset) as RegistrationRow[];
+      `, [...values, pageSize, offset])) as RegistrationRow[];
 
   const activity: FacultyOfficerActivityDetail = {
     id: Number(activityRow.id),
@@ -244,31 +238,31 @@ export default async function FacultyOfficerActivityDetailPage({
   return (
     <main className="space-y-6">
       <FacultyOfficerActivityDetailHeader item={activity} />
-
       <section className="grid gap-4 sm:grid-cols-3">
-        <Metric label="Sinh viên đăng ký" value={activity.participants} tone="blue" />
-        <Metric label="Đã tham gia" value={activity.attended} tone="emerald" />
-        <Metric label="Tỷ lệ tham gia" value={`${activity.participants ? Math.round(activity.attended / activity.participants * 100) : 0}%`} tone="amber" />
+        <Metric icon={<Users size={20} />} label="Sinh viên đăng ký" value={activity.participants} />
+        <Metric icon={<UserCheck size={20} />} label="Đã tham gia" value={activity.attended} />
+        <Metric icon={<Percent size={20} />} label="Tỷ lệ tham gia" value={`${activity.participants ? Math.round(activity.attended / activity.participants * 100) : 0}%`} />
       </section>
 
-      <FacultyOfficerActivityDetailCard activity={activity} assignedClassCount={classes.length} />
+      <FacultyOfficerActivityDetailCard activity={activity} />
 
-      <FacultyOfficerActivityRegistrationsTable
+      <div data-table-frame className="min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<FacultyOfficerActivityRegistrationsTable page={page}
         items={registrations}
         classes={classes}
       />
-
-      <Pagination
+<Pagination totalResults={total} resultLabel="lượt đăng ký"
         page={page}
         totalPages={totalPages}
-        searchParams={{
+        searchParams={{ cohort: sp.cohort,
           keyword,
           status,
           classId: classId || undefined,
         }}
       />
+</div>
     </main>
   );
 }
 
-function Metric({label,value,tone}:{label:string;value:number|string;tone:"blue"|"emerald"|"amber"}){const colors={blue:"text-blue-700",emerald:"text-emerald-700",amber:"text-amber-700"};return <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100"><div className="text-sm font-medium text-slate-500">{label}</div><div className={`mt-2 text-3xl font-semibold ${colors[tone]}`}>{value}</div></div>}
+function Metric({icon,label,value }:{icon:React.ReactNode;label:string;value:number|string;}){return <div className={[statCardStyles.card, "min-w-0"].join(" ")}><div className="flex items-center justify-between gap-3"><span className={statCardStyles.label}>{label}</span><span className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</span></div><div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div></div>}

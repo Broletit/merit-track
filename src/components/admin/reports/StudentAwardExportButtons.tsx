@@ -9,10 +9,12 @@ export default function StudentAwardExportButtons({
   termId,
   eventId,
   classId,
+  cohort,
 }: {
   termId: number;
   eventId: number;
   classId: number;
+  cohort?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -29,6 +31,7 @@ export default function StudentAwardExportButtons({
       if (eventId > 0) formData.set("eventId", String(eventId));
       if (classId > 0) formData.set("classId", String(classId));
       formData.set("exportType", exportType);
+      if(cohort) formData.set("cohort",cohort);
 
       const result = await exportStudentAwardReport(formData);
 
@@ -54,13 +57,13 @@ export default function StudentAwardExportButtons({
   }
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: PointerEvent) {
       if (!ref.current) return;
       if (!ref.current.contains(event.target as Node)) setOpen(false);
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   return (

@@ -24,7 +24,7 @@ export default function OfficerEventInfoCard({
   submissionBasePath: string;
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-900">Thông tin đợt xét</h2>
@@ -62,11 +62,11 @@ export default function OfficerEventInfoCard({
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+        <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
           <div className="text-sm text-slate-500">Tình trạng nhận hồ sơ</div>
           <div className="mt-2"><EventSubmissionPhaseBadge event={event} /></div>
         </div>
-        <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+        <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
           <div className="text-sm text-slate-500">Thời gian nhận hồ sơ</div>
           <div className="mt-1 text-sm font-medium text-slate-900">
             {formatDateTimeVN(event.startAt)} → {formatDateTimeVN(event.endAt)}
@@ -74,11 +74,6 @@ export default function OfficerEventInfoCard({
         </div>
       </div>
 
-      {disabledReason ? (
-        <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-amber-100">
-          {disabledReason}
-        </div>
-      ) : null}
     </section>
   );
 }

@@ -38,7 +38,7 @@ export default function StudentSubmissionSubmitPanel({
   }
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <ActionFeedback pending={pending} message={message} ok={ok} />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -62,7 +62,7 @@ export default function StudentSubmissionSubmitPanel({
       </div>
 
       {!editable ? (
-        <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500 ring-1 ring-slate-200">
+        <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
           Hồ sơ hiện không thể chỉnh sửa hoặc gửi lại.
         </div>
       ) : null}

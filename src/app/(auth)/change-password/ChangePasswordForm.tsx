@@ -1,4 +1,7 @@
 "use client";
+import PasswordChangeSuccess from "@/components/shared/PasswordChangeSuccess";
+import RequiredMark from "@/components/common/RequiredMark";
+
 
 import { useActionState } from "react";
 import { KeyRound } from "lucide-react";
@@ -13,6 +16,8 @@ const initialState: ChangePasswordState = {
 
 export default function ChangePasswordForm() {
   const [state, formAction, pending] = useActionState(changePasswordAction, initialState);
+
+  if (state.ok) return <PasswordChangeSuccess />;
 
   return (
     <form action={formAction} className="space-y-4">
@@ -30,10 +35,10 @@ export default function ChangePasswordForm() {
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-600">
           Mật khẩu hiện tại
-        </label>
+        <RequiredMark required={true}/></label>
         <input
           type="password"
-          name="currentPassword"
+          name="currentPassword" required
           className={appUi.input}
           placeholder="Nhập mật khẩu hiện tại..."
         />
@@ -42,10 +47,10 @@ export default function ChangePasswordForm() {
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-600">
           Mật khẩu mới
-        </label>
+        <RequiredMark required={true}/></label>
         <input
           type="password"
-          name="newPassword"
+          name="newPassword" required minLength={8} autoComplete="new-password"
           className={appUi.input}
           placeholder="Nhập mật khẩu mới..."
         />
@@ -54,10 +59,10 @@ export default function ChangePasswordForm() {
       <div>
         <label className="mb-2 block text-sm font-medium text-slate-600">
           Xác nhận mật khẩu mới
-        </label>
+        <RequiredMark required={true}/></label>
         <input
           type="password"
-          name="confirmPassword"
+          name="confirmPassword" required
           className={appUi.input}
           placeholder="Nhập lại mật khẩu mới..."
         />

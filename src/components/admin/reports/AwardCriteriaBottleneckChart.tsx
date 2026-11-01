@@ -13,7 +13,7 @@ export default function AwardCriteriaBottleneckChart({
   totalSubmissions: number;
 }) {
   if (items.length === 0) {
-    return <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ring-1 ring-slate-100">Chưa có tiêu chí bị thiếu.</div>;
+    return <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ring-1 ring-slate-100 shadow-md shadow-slate-200/60">Chưa có tiêu chí bị thiếu.</div>;
   }
 
   const max = Math.max(1, ...items.map((item) => item.value));

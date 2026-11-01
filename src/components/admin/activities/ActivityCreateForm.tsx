@@ -1,15 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { createActivity } from "@/server/actions/activities/createActivity";
 import ActionFeedback from "@/components/shared/ActionFeedback";
 import ActivityBasicInfoForm from "./ActivityBasicInfoForm";
-import ActivityAudienceForm from "./ActivityAudienceForm";
+import ActivityAudienceStatusForm from "./ActivityAudienceStatusForm";
 import ActivityConductForm from "./ActivityConductForm";
 import ActivityScheduleForm from "./ActivityScheduleForm";
-import ActivitySettingsForm from "./ActivitySettingsForm";
 import ActivityOrganizationForm from "./ActivityOrganizationForm";
 import type {
   ActivityClassOption,
@@ -29,6 +28,7 @@ async function createActivityAction(
   formData: FormData
 ): Promise<ActivityCreateState> {
   const values = {
+    maxRegistrations: String(formData.get("maxRegistrations") ?? ""),
     title: String(formData.get("title") ?? ""),
     description: String(formData.get("description") ?? ""),
     audienceType: String(formData.get("audienceType") ?? "student"),
@@ -41,6 +41,7 @@ async function createActivityAction(
     endAt: String(formData.get("endAt") ?? ""),
     scopeMode: String(formData.get("scopeMode") ?? "all"),
     classIds: formData.getAll("classIds").map(String),
+    cohorts: formData.getAll("cohorts").map(String),
     organizerLevel: String(formData.get("organizerLevel") ?? "class"),
     participationSource: String(formData.get("participationSource") ?? "internal"),
     conductCategoryId: String(formData.get("conductCategoryId") ?? ""),
@@ -75,6 +76,7 @@ export default function ActivityCreateForm({
   categories: ConductCategoryOption[];
 }) {
   const router = useRouter();
+  const [audienceType, setAudienceType] = useState("student");
   const [state, formAction, pending] = useActionState(
     createActivityAction,
     initialState
@@ -107,11 +109,10 @@ export default function ActivityCreateForm({
     <form key={state.revision} ref={formRef} action={formAction} className="space-y-6">
       <ActionFeedback pending={pending} message={state.ok ? "" : state.message} ok={false} />
       <ActivityBasicInfoForm defaultTitle={values?.title} defaultDescription={values?.description} errorField={state.field} />
-      <ActivityOrganizationForm classes={classes} defaultLevel={values?.organizerLevel} defaultClassId={Number(values?.classIds[0] || 0) || undefined} errorField={state.field} />
-      <ActivityAudienceForm defaultValue={values?.audienceType} errorField={state.field} />
+      <ActivityOrganizationForm classes={classes} defaultLevel={values?.organizerLevel} defaultClassIds={values?.classIds.map(Number)} defaultCohorts={values?.cohorts.map(Number)} errorField={state.field} />
+      <ActivityAudienceStatusForm audience={audienceType} onAudienceChange={setAudienceType} status={values?.status} errorField={state.field}/>
       <ActivityScheduleForm defaultValues={values} errorField={state.field} />
-      <ActivityConductForm categories={categories} defaultCategoryId={Number(values?.conductCategoryId || 0) || undefined} defaultConductScore={Number(values?.conductScore ?? 0)} defaultQrCheckinEnabled={values?.qrCheckinEnabled ?? true} errorField={state.field} />
-      <ActivitySettingsForm defaultValue={values?.status} errorField={state.field} />
+      <ActivityConductForm categoryRequired={audienceType === "student"} maxRegistrations={values?.maxRegistrations??""} categories={categories} defaultCategoryId={Number(values?.conductCategoryId || 0) || undefined} defaultConductScore={Number(values?.conductScore ?? 0)} defaultQrCheckinEnabled={values?.qrCheckinEnabled ?? true} errorField={state.field} />
 
       <div className="flex justify-end">
         <button
@@ -132,7 +133,7 @@ function getActivityErrorField(error: unknown) {
   if (message.includes("tên hoạt động")) return "title";
   if (message.includes("mô tả")) return "description";
   if (message.includes("đối tượng")) return "audienceType";
-  if (message.includes("chi đoàn")) return "classIds";
+  if (message.includes("chi đoàn") || message.includes("lớp hoặc khóa") || message.includes("phạm vi")) return "classIds";
   if (message.includes("cấp tổ chức")) return "organizerLevel";
   if (message.includes("trạng thái")) return "status";
   if (message.includes("điểm rèn luyện")) return "conductScore";

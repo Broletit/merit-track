@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import ActivityEditForm from "@/components/admin/activities/ActivityEditForm";
 import ActivityFormHeader from "@/components/admin/activities/ActivityFormHeader";
 import type {
@@ -11,6 +11,7 @@ import type {
 } from "@/components/admin/activities/types";
 
 type ActivityRow = {
+  max_registrations: number | null;
   id: number;
   title: string;
   description: string;
@@ -21,6 +22,7 @@ type ActivityRow = {
   registration_start_at: string;
   registration_end_at: string;
   conduct_score: number;
+  absence_penalty: number;
   conduct_category_id: number | null;
   term_id: number;
   qr_checkin_enabled: number;
@@ -30,7 +32,8 @@ type ActivityRow = {
   term_is_active: number;
 };
 
-type ClassRow = { id: number; code: string; name: string };
+type ClassRow = {
+  cohort: number | null; id: number; code: string; name: string };
 
 type CriteriaRow = {
   template_id: number;
@@ -55,17 +58,16 @@ export default async function AdminEditActivityPage({
   await requireAdminContext();
 
   const { id } = await params;
-  const activityId = Number(id);
+  const activityId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(activityId)) notFound();
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const activityRow = db
-    .prepare(
-      `
+  const activityRow = (await db.first(`
       SELECT
         a.id,
+        a.max_registrations,
         a.title,
         a.description,
         a.audience_type,
@@ -75,6 +77,7 @@ export default async function AdminEditActivityPage({
         a.registration_start_at,
         a.registration_end_at,
         a.conduct_score,
+        a.absence_penalty,
         a.conduct_category_id,
         a.term_id,
         a.qr_checkin_enabled,
@@ -91,14 +94,12 @@ export default async function AdminEditActivityPage({
           WHERE ar.activity_id = a.id
             AND ar.status != 'cancelled'
         ) AS participant_count
-        ,CASE WHEN datetime(a.start_at) <= datetime('now') THEN 1 ELSE 0 END AS has_started
+        ,CASE WHEN CAST(a.start_at AS DATETIME(3)) <= CURRENT_TIMESTAMP(3) THEN 1 ELSE 0 END AS has_started
       FROM activities a
       INNER JOIN academic_terms at ON at.id = a.term_id
       WHERE a.id = ?
       LIMIT 1
-      `
-    )
-    .get(activityId) as ActivityRow | undefined;
+      `, [activityId])) as ActivityRow | undefined;
 
   if (!activityRow) notFound();
   if (!activityRow.term_is_active) notFound();
@@ -117,27 +118,25 @@ export default async function AdminEditActivityPage({
         ? "limited"
         : "extension";
 
-  const classRows = db
-    .prepare(`SELECT id, code, name FROM classes ORDER BY name ASC, id ASC`)
-    .all() as ClassRow[];
+  const classRows = (await db.rows(`SELECT id, code, name, cohort FROM classes ORDER BY name ASC, id ASC`, [])) as ClassRow[];
 
-  const categoryRows = db.prepare(`
+  const categoryRows = (await db.rows(`
     WITH RECURSIVE tree AS (
       SELECT id, parent_id, code, name, score_max, sort_order, 0 AS depth,
-        printf('%08d', sort_order) || code AS path
+        CAST(CONCAT(LPAD(CAST(sort_order AS CHAR), 8, '0'), code) AS CHAR(4096)) AS path
       FROM conduct_score_categories
       WHERE term_id = ? AND parent_id IS NULL
       UNION ALL
       SELECT c.id, c.parent_id, c.code, c.name, c.score_max, c.sort_order,
         tree.depth + 1,
-        tree.path || '/' || printf('%08d', c.sort_order) || c.code
+        CONCAT(CONCAT(CONCAT(tree.path, '/'), LPAD(CAST(c.sort_order AS CHAR), 8, '0')), c.code)
       FROM conduct_score_categories c
       INNER JOIN tree ON c.parent_id = tree.id
     )
     SELECT id, parent_id, code, name, score_max, depth
     FROM tree
     ORDER BY path
-  `).all(activityRow.term_id) as Array<{
+  `, [activityRow.term_id])) as Array<{
     id: number; parent_id: number | null; code: string; name: string;
     score_max: number; depth: number;
   }>;
@@ -149,11 +148,10 @@ export default async function AdminEditActivityPage({
     name: String(item.name),
     scoreMax: Number(item.score_max),
     depth: Number(item.depth),
+    hasChildren: categoryRows.some((candidate) => candidate.parent_id === item.id),
   }));
 
-  const criteriaRows = db
-    .prepare(
-      `
+  const criteriaRows = (await db.rows(`
       SELECT
         cti.template_id,
         ct.name AS template_name,
@@ -163,28 +161,21 @@ export default async function AdminEditActivityPage({
       FROM criteria_template_items cti
       INNER JOIN criteria_templates ct ON ct.id = cti.template_id
       ORDER BY ct.name ASC, cti.group_code ASC, cti.sort_order ASC, cti.id ASC
-      `
-    )
-    .all() as CriteriaRow[];
+      `, [])) as CriteriaRow[];
 
-  const scopeRows = db
-    .prepare(`SELECT class_id FROM activity_scopes WHERE activity_id = ?`)
-    .all(activityId) as ScopeRow[];
+  const scopeRows = (await db.rows(`SELECT class_id FROM activity_scopes WHERE activity_id = ?`, [activityId])) as ScopeRow[];
 
-  const ruleRows = db
-    .prepare(
-      `
+  const ruleRows = (await db.rows(`
       SELECT template_id, criteria_code
       FROM criteria_activity_rules
       WHERE activity_id = ?
-      `
-    )
-    .all(activityId) as RuleRow[];
+      `, [activityId])) as RuleRow[];
 
   const classes: ActivityClassOption[] = classRows.map((item) => ({
     id: Number(item.id),
     code: String(item.code ?? ""),
     name: String(item.name ?? ""),
+    cohort: item.cohort,
   }));
 
   const criteriaOptions: ActivityCriteriaOption[] = criteriaRows.map((item) => ({
@@ -196,6 +187,7 @@ export default async function AdminEditActivityPage({
   }));
 
   const activity: ActivityEditDetail = {
+    maxRegistrations: activityRow.max_registrations,
     id: Number(activityRow.id),
     title: String(activityRow.title ?? ""),
     description: String(activityRow.description ?? ""),
@@ -206,9 +198,12 @@ export default async function AdminEditActivityPage({
     registrationStartAt: String(activityRow.registration_start_at ?? ""),
     registrationEndAt: String(activityRow.registration_end_at ?? ""),
     conductScore: Number(activityRow.conduct_score ?? 0),
+    absencePenalty: Number(activityRow.absence_penalty ?? 0),
     conductCategoryId: activityRow.conduct_category_id == null ? null : Number(activityRow.conduct_category_id),
     qrCheckinEnabled: Number(activityRow.qr_checkin_enabled ?? 0) === 1,
     selectedClassIds: scopeRows.map((item) => Number(item.class_id)),
+    selectedCohorts: ((await db.rows("SELECT cohort FROM activity_cohort_scopes WHERE activity_id=?", [activityId])) as Array<{cohort:number}>).map(item=>item.cohort),
+    organizerLevel: ((await db.first("SELECT organizer_level FROM activities WHERE id=?", [activityId])) as {organizer_level:string}).organizer_level,
     selectedCriteriaBindings: ruleRows.map(
       (item) => `${Number(item.template_id)}::${String(item.criteria_code)}`
     ),
@@ -219,7 +214,7 @@ export default async function AdminEditActivityPage({
 
   return (
     <main className="space-y-6">
-      <ActivityFormHeader />
+      <ActivityFormHeader title="Chỉnh sửa hoạt động" />
 
       <ActivityEditForm
         activity={activity}

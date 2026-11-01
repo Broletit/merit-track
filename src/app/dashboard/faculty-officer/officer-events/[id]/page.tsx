@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireOfficerParticipantContext } from "@/server/auth/requireOfficerParticipantContext";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import OfficerEventDetailHeader from "@/components/faculty-officer/officer-events/OfficerEventDetailHeader";
 import OfficerEventInfoCard from "@/components/faculty-officer/officer-events/OfficerEventInfoCard";
 import OfficerEventApplyForm from "@/components/faculty-officer/officer-events/OfficerEventApplyForm";
@@ -37,6 +37,7 @@ type CriteriaRow = {
   description: string | null;
   group_code: string;
   group_title: string;
+  min_required: number;
   score_max: number;
   is_required: number;
   matched_activity_count: number;
@@ -67,15 +68,13 @@ export async function OfficerEventDetailPageView({
 }) {
   const user = await requireOfficerParticipantContext();
   const { id } = await params;
-  const eventId = Number(id);
+  const eventId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(eventId) || eventId <= 0) notFound();
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const eventRow = db
-    .prepare(
-      `
+  const eventRow = (await db.first(`
       SELECT
         e.id,
         e.title,
@@ -105,9 +104,7 @@ export async function OfficerEventDetailPageView({
         AND e.type = 'officer'
         AND e.status = 'published'
       LIMIT 1
-      `
-    )
-    .get(eventId) as EventRow | undefined;
+      `, [eventId])) as EventRow | undefined;
 
   if (!eventRow) notFound();
 
@@ -132,15 +129,14 @@ export async function OfficerEventDetailPageView({
     criteriaCount: Number(eventRow.criteria_count ?? 0),
   };
 
-  const criteriaRows = db
-    .prepare(
-      `
+  const criteriaRows = (await db.rows(`
       SELECT
         i.code,
         i.title,
         i.description,
         i.group_code,
         g.title AS group_title,
+        g.min_required,
         i.score_max,
         i.is_required,
         (
@@ -165,7 +161,7 @@ export async function OfficerEventDetailPageView({
             AND car.criteria_code = i.code
         ) AS matched_activity_score
         ,(
-          SELECT GROUP_CONCAT(matched.title, '||')
+          SELECT GROUP_CONCAT(matched.title SEPARATOR '||')
           FROM (
             SELECT DISTINCT a.title
             FROM criteria_activity_rules car
@@ -187,9 +183,7 @@ export async function OfficerEventDetailPageView({
        AND g.code = i.group_code
       WHERE e.id = ?
       ORDER BY g.sort_order ASC, i.sort_order ASC
-      `
-    )
-    .all(user.id, user.id, user.id, eventId) as CriteriaRow[];
+      `, [user.id, user.id, user.id, eventId])) as CriteriaRow[];
 
   const criteria: OfficerEventCriteriaItem[] = criteriaRows.map((item) => {
     const matchedActivityCount = Number(item.matched_activity_count ?? 0);
@@ -202,11 +196,12 @@ export async function OfficerEventDetailPageView({
       description: item.description ? String(item.description) : null,
       groupCode: String(item.group_code ?? ""),
       groupTitle: String(item.group_title ?? ""),
+      minRequired: Number(item.min_required ?? 0),
       scoreMax: Number(item.score_max ?? 0),
       isRequired: Number(item.is_required ?? 0) === 1,
       autoPassed,
       autoMessage: autoPassed
-        ? `Đã đạt tự động nhờ ${matchedActivityCount} hoạt động phù hợp.`
+        ? `Đạt tự động từ hoạt động: ${String(item.matched_activity_titles ?? "").split("||").filter(Boolean).join(", ")}`
         : null,
       matchedActivityCount,
       matchedActivityScore,
@@ -216,9 +211,7 @@ export async function OfficerEventDetailPageView({
     };
   });
 
-  const submissionRows = db
-    .prepare(
-      `
+  const submissionRows = (await db.rows(`
       SELECT
         id,
         status,
@@ -228,10 +221,8 @@ export async function OfficerEventDetailPageView({
       FROM submissions
       WHERE event_id = ?
         AND user_id = ?
-      ORDER BY datetime(updated_at) DESC, id DESC
-      `
-    )
-    .all(eventId, user.id) as SubmissionRow[];
+      ORDER BY CAST(updated_at AS DATETIME(3)) DESC, id DESC
+      `, [eventId, user.id])) as SubmissionRow[];
 
   const submissions: OfficerEventSubmissionItem[] = submissionRows.map((item) => ({
     id: Number(item.id),

@@ -1,3 +1,4 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
 import Link from "next/link";
 import {
   Activity,
@@ -8,7 +9,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
 import DonutChart from "@/components/admin/reports/DonutChart";
 import ReportProgressBar from "@/components/admin/reports/ReportProgressBar";
@@ -37,29 +38,25 @@ export default async function AdminDashboardPage({
 }) {
   await requireAdminContext();
   const params = await searchParams;
-  const db = getDb();
-  const terms = getAcademicTermsForSelect();
-  const term = getAcademicTermForView(params.termId);
-  const summary = getAdminOverviewSummary(term.id);
+  const db = getDatabase();
+  const terms = (await getAcademicTermsForSelect());
+  const term = (await getAcademicTermForView(params.termId));
+  const summary = (await getAdminOverviewSummary(term.id));
   const rates = calculateOverviewRates(summary);
 
-  const closingEvents = db
-    .prepare(
-      `
+  const closingEvents = (await db.rows(`
       SELECT e.id, e.title, e.end_at,
         COUNT(CASE WHEN s.status <> 'draft' AND s.submitted_at IS NOT NULL THEN 1 END)
           AS submitted_count
       FROM events e
       LEFT JOIN submissions s ON s.event_id = e.id
       WHERE e.term_id = ? AND e.status = 'published'
-        AND datetime(e.end_at) >= datetime('now')
-        AND datetime(e.end_at) <= datetime('now', '+7 days')
+        AND CAST(e.end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)
+        AND CAST(e.end_at AS DATETIME(3)) <= DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL 7 DAY)
       GROUP BY e.id
-      ORDER BY datetime(e.end_at) ASC
+      ORDER BY CAST(e.end_at AS DATETIME(3)) ASC
       LIMIT 3
-      `
-    )
-    .all(term.id) as ClosingEvent[];
+      `, [term.id])) as ClosingEvent[];
 
   const submittedTotal = summary.student_submitted + summary.officer_submitted;
   const passedTotal = summary.student_passed + summary.officer_passed;
@@ -71,7 +68,7 @@ export default async function AdminDashboardPage({
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold">Dashboard quản trị</h1>
@@ -86,14 +83,14 @@ export default async function AdminDashboardPage({
           label="Sinh viên đang quản lý"
           value={summary.active_students}
           hint="Bao gồm sinh viên và cán bộ lớp đang hoạt động"
-          href="/dashboard/admin/students"
+          href="/dashboard/admin/users"
         />
         <OverviewCard
           icon={<School size={20} />}
           label="Lớp đang quản lý"
           value={summary.active_classes}
           hint="Các lớp còn hoạt động trong hệ thống"
-          href="/dashboard/admin/students"
+          href="/dashboard/admin/classes"
         />
         <OverviewCard
           icon={<Activity size={20} />}
@@ -102,23 +99,22 @@ export default async function AdminDashboardPage({
           hint={`${summary.completed_activities} hoạt động đã kết thúc`}
           href="/dashboard/admin/activities"
         />
-        <OverviewCard
-          icon={<ClipboardCheck size={20} />}
-          label="Hồ sơ đã nộp"
-          value={submittedTotal}
-          hint={`${summary.student_submitted} sinh viên · ${summary.officer_submitted} cán bộ`}
-          href="/dashboard/admin/reports/overview"
+        <SubmissionOverviewCard
+          total={submittedTotal}
+          studentTotal={summary.student_submitted}
+          officerTotal={summary.officer_submitted}
+          termId={term.id}
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-3">
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+      <section className="grid gap-6 xl:grid-cols-2">
+        <div className="hidden rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">Chỉ số học kỳ</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Tiến độ vận hành học kỳ</h2>
             </div>
             <Link
-              href={`/dashboard/admin/reports/overview?termId=${term.id}`}
+              href="/dashboard/admin/reports"
               className="shrink-0 text-sm font-semibold text-blue-700 hover:text-blue-800"
             >
               Xem báo cáo
@@ -127,7 +123,7 @@ export default async function AdminDashboardPage({
 
           <div className="mt-6 space-y-6">
             <RateRow
-              label="Sinh viên tham gia ít nhất một hoạt động"
+              label="Sinh viên đã tham gia ít nhất một hoạt động"
               value={rates.studentCoverageRate}
               detail={`${summary.unique_student_attendees}/${summary.active_students} sinh viên`}
             />
@@ -144,13 +140,10 @@ export default async function AdminDashboardPage({
           </div>
         </div>
 
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
           <h2 className="text-xl font-semibold text-slate-900">
             Hồ sơ sinh viên
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Cơ cấu {summary.student_submitted} hồ sơ đã nộp trong học kỳ.
-          </p>
           <div className="mt-6">
             <DonutChart
               items={[
@@ -163,13 +156,10 @@ export default async function AdminDashboardPage({
           </div>
         </div>
 
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
           <h2 className="text-xl font-semibold text-slate-900">
             Hồ sơ cán bộ
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Cơ cấu {summary.officer_submitted} hồ sơ đã nộp trong học kỳ.
-          </p>
           <div className="mt-6">
             <DonutChart
               items={[
@@ -183,7 +173,7 @@ export default async function AdminDashboardPage({
         </div>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+      <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
         <div className="flex items-center gap-3">
           <AlertTriangle className="text-amber-500" size={22} />
           <div>
@@ -193,22 +183,22 @@ export default async function AdminDashboardPage({
 
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           <AlertCard
+            icon={<ClipboardCheck size={18} />}
             value={pendingTotal}
-            label="Hồ sơ đang chờ duyệt"
+            label="Hồ sơ cán bộ chờ duyệt"
             href="/dashboard/admin/submissions"
-            tone={pendingTotal > 0 ? "amber" : "green"}
           />
           <AlertCard
+            icon={<Activity size={18} />}
             value={summary.unresolved_attendance}
-            label="Lượt điểm danh chưa chốt"
+            label="Hoạt động chưa chốt điểm danh"
             href="/dashboard/admin/activities"
-            tone={summary.unresolved_attendance > 0 ? "red" : "green"}
           />
           <AlertCard
+            icon={<CalendarClock size={18} />}
             value={closingEvents.length}
             label="Đợt xét đóng trong 7 ngày"
             href="/dashboard/admin/events"
-            tone={closingEvents.length > 0 ? "amber" : "green"}
           />
         </div>
 
@@ -246,14 +236,41 @@ function OverviewCard({ icon, label, value, hint, href }: {
   href: string;
 }) {
   return (
-    <Link href={href} className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:shadow-md">
+    <Link href={href} className={[statCardStyles.card, "min-w-0 transition"].join(" ")}>
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-medium text-slate-500">{label}</div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">{icon}</div>
+        <div className={statCardStyles.label}>{label}</div>
+        <div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</div>
       </div>
-      <div className="mt-4 text-3xl font-bold text-slate-900">{value}</div>
-      <div className="mt-1 text-sm leading-5 text-slate-500">{hint}</div>
+      <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div>
+      <div className={[statCardStyles.label, "mt-1 leading-5"].join(" ")}>{hint}</div>
     </Link>
+  );
+}
+
+function SubmissionOverviewCard({ total, studentTotal, officerTotal, termId }: {
+  total: number;
+  studentTotal: number;
+  officerTotal: number;
+  termId: number;
+}) {
+  return (
+    <article className={[statCardStyles.card, "min-w-0"].join(" ")}>
+      <div className="flex items-center justify-between gap-3">
+        <div className={statCardStyles.label}>Hồ sơ đã nộp</div>
+        <div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>
+          <ClipboardCheck size={20} />
+        </div>
+      </div>
+      <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{total}</div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Link href={`/dashboard/admin/submissions?termId=${termId}`} className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
+          {studentTotal} sinh viên
+        </Link>
+        <Link href={`/dashboard/admin/officer-reviews?termId=${termId}`} className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-100">
+          {officerTotal} cán bộ
+        </Link>
+      </div>
+    </article>
   );
 }
 
@@ -272,21 +289,16 @@ function RateRow({ label, value, detail }: { label: string; value: number; detai
   );
 }
 
-function AlertCard({ value, label, href, tone }: {
+function AlertCard({ icon, value, label, href }: {
+  icon: React.ReactNode;
   value: number;
   label: string;
   href: string;
-  tone: "amber" | "red" | "green";
 }) {
-  const tones = {
-    amber: "bg-amber-50 text-amber-800 ring-amber-100",
-    red: "bg-red-50 text-red-700 ring-red-100",
-    green: "bg-emerald-50 text-emerald-700 ring-emerald-100",
-  };
   return (
-    <Link href={href} className={`rounded-2xl p-4 ring-1 transition hover:brightness-95 ${tones[tone]}`}>
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="mt-1 text-sm font-medium">{label}</div>
+    <Link href={href} className={[statCardStyles.card, "min-w-0 transition"].join(" ")}>
+      <div className="flex items-center justify-between gap-3"><div className={statCardStyles.label}>{label}</div><div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</div></div>
+      <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div>
     </Link>
   );
 }

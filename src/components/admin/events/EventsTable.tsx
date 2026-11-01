@@ -1,3 +1,4 @@
+import NumberedTable from "@/components/common/NumberedTable";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import type { AdminEventItem } from "./types";
 import EventsFilter from "./EventsFilter";
@@ -8,7 +9,7 @@ import TableActionLink from "@/components/shared/TableActionLink";
 
 function mapType(type: string) {
   if (type === "student") return "Sinh viên";
-  if (type === "officer") return "Cán bộ đoàn";
+  if (type === "officer") return "Cán bộ";
   return type;
 }
 
@@ -31,27 +32,27 @@ function statusClass(status: string) {
   return "bg-amber-50 text-amber-700 ring-amber-100";
 }
 
-export default function EventsTable({
+export default function EventsTable({ page = 1,
   items,
   canManage,
-}: {
+}: { page?: number;
   items: AdminEventItem[];
   canManage: boolean;
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900">
-          Danh sách sự kiện
-        </h2>
-      </div>
-
-      <div className="mt-5">
+    <section className="flex flex-col rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <div className="order-2 mt-5">
         <EventsFilter />
       </div>
 
-      <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
-        <table className="min-w-[1050px] table-fixed divide-y divide-slate-200">
+      <div className="order-1">
+        <h2 className="text-xl font-semibold text-slate-900">
+          Danh sách đợt xét
+        </h2>
+      </div>
+
+      <div className="order-3 mt-5 overflow-x-auto rounded-none border border-slate-200">
+        <NumberedTable page={page} className="min-w-0 table-fixed divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
               <th className="w-[22%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -64,7 +65,7 @@ export default function EventsTable({
                 Trạng thái
               </th>
               <th className="w-[16%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                Nhận hồ sơ
+                Trạng thái tiếp nhận
               </th>
               <th className="w-[18%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Thời gian
@@ -148,7 +149,7 @@ export default function EventsTable({
               </tr>
             )}
           </tbody>
-        </table>
+        </NumberedTable>
       </div>
     </section>
   );

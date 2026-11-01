@@ -1,8 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { changeCurrentUserPassword } from "@/server/auth/auth";
-import { getSessionUser } from "@/server/auth/getSessionUser";
 
 export type ChangePasswordState = {
   ok: boolean;
@@ -34,11 +32,5 @@ export async function changePasswordAction(
     return { ok: false, error: result.error };
   }
 
-  const user = await getSessionUser();
-
-  if (user?.role === "admin") {
-    redirect("/dashboard/admin");
-  }
-
-  redirect("/dashboard/student");
+  return { ok: true, error: "" };
 }

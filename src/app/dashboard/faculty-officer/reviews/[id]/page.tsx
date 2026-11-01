@@ -1,12 +1,14 @@
+import SubmissionSupportCard from "@/components/shared/submissions/SubmissionSupportCard";
 import { notFound } from "next/navigation";
 import { requireFacultyOfficerContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import ReviewHeader from "@/components/shared/reviews/ReviewHeader";
 import ReviewHistory from "@/components/shared/reviews/ReviewHistory";
 import FacultyOfficerReviewPanel from "@/components/faculty-officer/reviews/FacultyOfficerReviewPanel";
 import { getSubmissionTimeline } from "@/server/submissions/getSubmissionTimeline";
 import SubmissionCriteriaDetailList from "@/components/shared/submissions/SubmissionCriteriaDetailList";
-import SubmissionEvidenceViewer from "@/components/shared/submissions/SubmissionEvidenceViewer";
+import SubmissionViewOverview from "@/components/shared/submissions/SubmissionViewOverview";
+import { evaluateSubmissionRequirements } from "@/server/submissions/evaluateSubmissionRequirements";
 
 type SubmissionRow = {
   id: number;
@@ -15,6 +17,10 @@ type SubmissionRow = {
   student_name: string;
   mssv: string;
   class_code: string;
+  submitted_at: string | null;
+  updated_at: string | null;
+  closes_at: string | null;
+  review_round: number;
 };
 
 type CriteriaRow = {
@@ -44,25 +50,26 @@ type FileRow = {
   id: number;
   file_name: string;
   mime_type: string;
+  criteria_code: string;
 };
 
 export default async function FacultyOfficerReviewDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ termId?: string; mode?: string }>;
 }) {
   const officer = await requireFacultyOfficerContext();
 
-  const { id } = await params;
-  const submissionId = Number(id);
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const submissionId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(submissionId) || submissionId <= 0) notFound();
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const submission = db
-    .prepare(
-      `
+  const submission = (await db.first(`
       SELECT
         s.id,
         s.status,
@@ -70,6 +77,10 @@ export default async function FacultyOfficerReviewDetailPage({
         u.full_name AS student_name,
         u.mssv,
         c.code AS class_code
+        ,s.submitted_at
+        ,s.updated_at
+        ,e.end_at AS closes_at
+        ,s.review_round
       FROM submissions s
       INNER JOIN events e ON e.id = s.event_id
       INNER JOIN users u ON u.id = s.user_id
@@ -82,15 +93,11 @@ export default async function FacultyOfficerReviewDetailPage({
             AND fca.class_id = s.class_id
         )
       LIMIT 1
-      `
-    )
-    .get(submissionId, officer.id) as SubmissionRow | undefined;
+      `, [submissionId, officer.id])) as SubmissionRow | undefined;
 
   if (!submission) notFound();
 
-  const criteria = db
-    .prepare(
-      `
+  const criteria = (await db.rows(`
       SELECT
         i.code,
         i.title,
@@ -101,15 +108,15 @@ export default async function FacultyOfficerReviewDetailPage({
         i.evidence_type,
         i.is_required,
         ar.passed AS auto_passed,
-        COALESCE(CASE WHEN ar.passed=1 AND TRIM(COALESCE(ar.matched_activity_titles,''))<>'' THEN 'Đạt tự động từ hoạt động: ' || REPLACE(ar.matched_activity_titles,'||',', ') END, ar.message) AS auto_message,
+        COALESCE(CASE WHEN ar.passed=1 AND TRIM(COALESCE(ar.matched_activity_titles,''))<>'' THEN CONCAT('Đạt tự động từ hoạt động: ', REPLACE(ar.matched_activity_titles,'||',', ')) END, ar.message) AS auto_message,
         si.content_text,
         COALESCE((
           SELECT COUNT(*)
-          FROM submission_files sf
+          FROM submission_ready_files sf
           WHERE sf.submission_id = s.id
             AND sf.criteria_code = i.code
         ), 0) AS file_count,
-        (SELECT cr.decision FROM submission_criteria_reviews cr WHERE cr.submission_id=s.id AND cr.criteria_code=i.code AND cr.round=2 LIMIT 1) AS review_decision
+        (SELECT cr.decision FROM submission_criteria_reviews cr WHERE cr.submission_id=s.id AND cr.criteria_code=i.code AND cr.round=s.review_round LIMIT 1) AS review_decision
       FROM submissions s
       INNER JOIN event_criteria_items i ON i.event_id = s.event_id
       INNER JOIN event_criteria_groups g
@@ -123,24 +130,16 @@ export default async function FacultyOfficerReviewDetailPage({
        AND si.criteria_code = i.code
       WHERE s.id = ?
       ORDER BY g.sort_order ASC, i.sort_order ASC
-      `
-    )
-    .all(submissionId) as CriteriaRow[];
+      `, [submissionId])) as CriteriaRow[];
 
-  const files = db
-    .prepare(
-      `
-      SELECT id, file_name, mime_type
-      FROM submission_files
+  const files = (await db.rows(`
+      SELECT id, file_name, mime_type, criteria_code
+      FROM submission_ready_files
       WHERE submission_id = ?
       ORDER BY uploaded_at DESC, id DESC
-      `
-    )
-    .all(submissionId) as FileRow[];
+      `, [submissionId])) as FileRow[];
 
-  const reviews = db
-    .prepare(
-      `
+  const reviews = (await db.rows(`
       SELECT
         r.round,
         r.decision,
@@ -150,9 +149,7 @@ export default async function FacultyOfficerReviewDetailPage({
       LEFT JOIN users u ON u.id = r.reviewer_id
       WHERE r.submission_id = ?
       ORDER BY r.id ASC
-      `
-    )
-    .all(submissionId) as ReviewRow[];
+      `, [submissionId])) as ReviewRow[];
 
   const reviewItems = reviews.map((item) => ({
     round: Number(item.round),
@@ -160,43 +157,63 @@ export default async function FacultyOfficerReviewDetailPage({
     note: item.note ? String(item.note) : null,
     reviewerName: item.reviewer_name ? String(item.reviewer_name) : null,
   }));
-  const timeline = getSubmissionTimeline(submissionId);
+  const timeline = (await getSubmissionTimeline(submissionId));
+  const isReviewMode = sp.mode === "review";
+  const criteriaWithFiles = criteria.map((item) => ({
+    ...item,
+    evidence_files: files
+      .filter((file) => file.criteria_code === item.code)
+      .map((file) => ({
+        id: Number(file.id),
+        fileName: String(file.file_name ?? ""),
+        mimeType: String(file.mime_type ?? ""),
+      })),
+  }));
+  const achievedCriteria = criteria.filter(
+    (item) => Number(item.auto_passed) === 1 || item.review_decision === "pass",
+  ).length;
+  const requirements = (await evaluateSubmissionRequirements(db, submission.id, "approved"));
 
   return (
     <main className="space-y-6">
       <ReviewHeader
         title={submission.event_title}
         subtitle={`${submission.student_name} - ${submission.mssv} - ${submission.class_code}`}
-        backHref="/dashboard/faculty-officer/reviews"
+        backHref={`/dashboard/faculty-officer/reviews${sp.termId ? `?termId=${encodeURIComponent(sp.termId)}` : ""}`}
       />
 
-      <ReviewHistory items={reviewItems} timeline={timeline} />
+      <SubmissionSupportCard submissionId={submissionId} isDraft={!submission.submitted_at}/>
 
-      <SubmissionCriteriaDetailList items={criteria} submissionId={submission.id} canReview={submission.status === "submitted_v2"} />
+      {!isReviewMode && submission.submitted_at ? (
+        <SubmissionViewOverview
+          status={submission.status}
+          submittedAt={submission.submitted_at}
+          updatedAt={submission.updated_at}
+          closesAt={submission.closes_at}
+          currentRound={Number(submission.review_round)}
+          achievedCriteria={achievedCriteria}
+          totalCriteria={criteria.length}
+        />
+      ) : null}
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <h2 className="text-lg font-semibold text-slate-900">
-          File minh chứng
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Xem nhanh PDF/ảnh hoặc tải xuống file minh chứng.
-        </p>
+      {submission.submitted_at ? <ReviewHistory items={reviewItems} timeline={timeline} /> : null}
 
-        <div className="mt-5">
-          <SubmissionEvidenceViewer
-            items={files.map((item) => ({
-              id: Number(item.id),
-              fileName: String(item.file_name ?? ""),
-              mimeType: String(item.mime_type ?? ""),
-            }))}
-          />
-        </div>
-      </section>
-
-      <FacultyOfficerReviewPanel
-        submissionId={submission.id}
-        canReview={submission.status === "submitted_v2"}
+      <SubmissionCriteriaDetailList
+        items={criteriaWithFiles}
+        submissionId={isReviewMode ? submission.id : undefined}
+        canReview={isReviewMode && ["submitted_v1","submitted_v2"].includes(submission.status)}
+        reviewHref={!isReviewMode ? `/dashboard/faculty-officer/reviews/${submission.id}?mode=review${sp.termId ? `&termId=${encodeURIComponent(sp.termId)}` : ""}#review-panel` : undefined}
+        canOpenReview={["submitted_v1", "submitted_v2"].includes(submission.status)}
       />
+
+      {isReviewMode ? (
+        <FacultyOfficerReviewPanel
+          submissionId={submission.id}
+          canReview={["submitted_v1","submitted_v2"].includes(submission.status)}
+          reviewRound={Number(submission.review_round) === 2 ? 2 : 1}
+          requirementsMet={requirements.valid}
+        />
+      ) : null}
     </main>
   );
 }

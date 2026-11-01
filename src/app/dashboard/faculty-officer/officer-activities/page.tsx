@@ -1,12 +1,15 @@
+import { activityCohortSql } from "@/server/cohorts/sql";
+import { parseCohort } from "@/lib/cohorts/cohorts";
+import { activityVisibleSql } from "@/server/cohorts/sql";
 import { requireOfficerParticipantContext } from "@/server/auth/requireOfficerParticipantContext";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import OfficerActivitiesTable from "@/components/faculty-officer/officer-activities/OfficerActivitiesTable";
 import type { OfficerActivityItem } from "@/components/faculty-officer/officer-activities/types";
 import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
 import OfficerActivityStatsCards from "@/components/faculty-officer/officer-activities/OfficerActivityStatsCards";
 import { getAcademicTermForView, getAcademicTermsForSelect } from "@/server/academic-terms/getAcademicTermForView";
 
-type SearchParams = Promise<{
+type SearchParams = Promise<{ cohort?: string;
   keyword?: string;
   status?: string;
   time?: string;
@@ -38,9 +41,9 @@ export default async function FacultyOfficerOfficerActivitiesPage({
 }) {
   const user = await requireOfficerParticipantContext();
   const params = await searchParams;
-  const db = getDb();
-  const terms = getAcademicTermsForSelect();
-  const selectedTerm = getAcademicTermForView(params.termId);
+  const db = getDatabase();
+  const terms = (await getAcademicTermsForSelect());
+  const selectedTerm = (await getAcademicTermForView(params.termId));
 
   const keyword = String(params.keyword ?? "").trim();
   const status = String(params.status ?? "").trim();
@@ -50,26 +53,28 @@ export default async function FacultyOfficerOfficerActivitiesPage({
 
   const where: string[] = [
     "a.audience_type = 'officer'",
-    "(NOT EXISTS(SELECT 1 FROM activity_scopes s WHERE s.activity_id=a.id) OR EXISTS(SELECT 1 FROM activity_scopes s JOIN class_members cm ON cm.class_id=s.class_id WHERE s.activity_id=a.id AND cm.user_id=? AND cm.left_at IS NULL))",
+    activityVisibleSql("a", String(user.id)),
     "a.status = 'published'",
     "a.term_id = ?",
   ];
-  const values: unknown[] = [user.id, selectedTerm.id];
+  const values: unknown[] = [selectedTerm.id];
+  const cohort = parseCohort(params.cohort);
+  if (params.cohort && !cohort) where.push("0=1");
+  if (cohort) { where.push(`(${activityCohortSql("a")})`); values.push(cohort,cohort); }
 
-  const summary = db.prepare(`
+  const summary = (await db.first(`
     SELECT COUNT(*) AS total,
-      COUNT(CASE WHEN datetime(a.start_at)>datetime('now') THEN 1 END) AS upcoming,
+      COUNT(CASE WHEN CAST(a.start_at AS DATETIME(3))>CURRENT_TIMESTAMP(3) THEN 1 END) AS upcoming,
       COUNT(CASE WHEN ar.status='registered' THEN 1 END) AS registered,
       COUNT(CASE WHEN ar.status='attended' THEN 1 END) AS attended
     FROM activities a LEFT JOIN activity_registrations ar ON ar.activity_id=a.id AND ar.user_id=?
     WHERE a.audience_type='officer' AND a.status='published' AND a.term_id=?
-      AND (NOT EXISTS(SELECT 1 FROM activity_scopes s WHERE s.activity_id=a.id)
-        OR EXISTS(SELECT 1 FROM activity_scopes s JOIN class_members cm ON cm.class_id=s.class_id WHERE s.activity_id=a.id AND cm.user_id=? AND cm.left_at IS NULL))
-  `).get(user.id, selectedTerm.id, user.id) as SummaryRow;
+      AND ${activityVisibleSql("a", String(user.id))}
+  `, [user.id, selectedTerm.id])) as SummaryRow;
 
   if (keyword) {
-    where.push("(a.title LIKE ? OR a.description LIKE ?)");
-    values.push(`%${keyword}%`, `%${keyword}%`);
+    where.push("a.title LIKE ?");
+    values.push(`%${keyword}%`);
   }
 
   if (status === "registered") {
@@ -78,8 +83,8 @@ export default async function FacultyOfficerOfficerActivitiesPage({
 
   if (status === "open") {
     where.push("ar.status IS NULL");
-    where.push("datetime(a.registration_start_at) <= datetime('now')");
-    where.push("datetime(a.registration_end_at) >= datetime('now')");
+    where.push("CAST(a.registration_start_at AS DATETIME(3)) <= CURRENT_TIMESTAMP(3)");
+    where.push("CAST(a.registration_end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)");
   }
 
   if (status === "attended") {
@@ -87,41 +92,35 @@ export default async function FacultyOfficerOfficerActivitiesPage({
   }
 
   if (status === "expired") {
-    where.push("datetime(a.registration_end_at) < datetime('now')");
+    where.push("CAST(a.registration_end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)");
   }
 
   if (time === "upcoming") {
-    where.push("datetime(a.start_at) > datetime('now')");
+    where.push("CAST(a.start_at AS DATETIME(3)) > CURRENT_TIMESTAMP(3)");
   }
 
   if (time === "ongoing") {
     where.push(
-      "datetime(a.start_at) <= datetime('now') AND datetime(a.end_at) >= datetime('now')"
+      "CAST(a.start_at AS DATETIME(3)) <= CURRENT_TIMESTAMP(3) AND CAST(a.end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)"
     );
   }
 
   if (time === "ended") {
-    where.push("datetime(a.end_at) < datetime('now')");
+    where.push("CAST(a.end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)");
   }
 
   const whereSql = `WHERE ${where.join(" AND ")}`;
 
-  const total = db
-    .prepare(
-      `
+  const total = (await db.first(`
       SELECT COUNT(*) AS total
       FROM activities a
       LEFT JOIN activity_registrations ar
         ON ar.activity_id = a.id
        AND ar.user_id = ?
       ${whereSql}
-      `
-    )
-    .get(user.id, ...values) as { total: number };
+      `, [user.id, ...values])) as { total: number };
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         a.id,
         a.title,
@@ -139,12 +138,10 @@ export default async function FacultyOfficerOfficerActivitiesPage({
         ON ar.activity_id = a.id
        AND ar.user_id = ?
       ${whereSql}
-      ORDER BY datetime(a.start_at) DESC, a.id DESC
+      ORDER BY CAST(a.start_at AS DATETIME(3)) DESC, a.id DESC
       LIMIT ?
       OFFSET ?
-      `
-    )
-    .all(user.id, ...values, PAGE_SIZE, offset) as Row[];
+      `, [user.id, ...values, PAGE_SIZE, offset])) as Row[];
 
   const totalPages = Math.max(1, Math.ceil(Number(total.total ?? 0) / PAGE_SIZE));
 
@@ -177,7 +174,7 @@ export default async function FacultyOfficerOfficerActivitiesPage({
 
   return (
     <main className="space-y-6">
-      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)]">
+      <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold">Hoạt động cán bộ</h1>
           <AcademicTermSelect variant="header" terms={terms} selectedTermId={selectedTerm.id} />
@@ -192,7 +189,7 @@ export default async function FacultyOfficerOfficerActivitiesPage({
         totalPages={totalPages}
         totalResults={Number(total.total ?? 0)}
         basePath="/dashboard/faculty-officer/officer-activities"
-        searchParams={{
+        searchParams={{ cohort: params.cohort,
           keyword,
           status,
           time,

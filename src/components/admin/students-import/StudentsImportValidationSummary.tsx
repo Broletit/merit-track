@@ -1,12 +1,15 @@
 "use client";
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
 
-import { AlertCircle, CheckCircle2, AlertTriangle } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowRightLeft, CheckCircle2, CircleAlert, CircleCheck, Rows3, UserPlus, UserRoundPen } from "lucide-react";
 import type { ImportPreviewResult } from "./types";
 
 export default function StudentsImportValidationSummary({
   preview,
+  warningMessage,
 }: {
   preview: ImportPreviewResult | null;
+  warningMessage: string;
 }) {
   if (!preview) return null;
 
@@ -15,10 +18,10 @@ export default function StudentsImportValidationSummary({
     preview.sameClassDifferentInfo > 0 || preview.differentClass > 0;
 
   return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       {/* ===== STATUS BOX ===== */}
       <div
-        className={`rounded-xl px-4 py-3 text-sm ring-1 flex items-start gap-3 ${
+        className={`rounded-none px-4 py-3 text-sm ring-1 flex items-start gap-3 ${
           hasError
             ? "bg-rose-50 text-rose-700 ring-rose-100"
             : hasWarning
@@ -49,33 +52,22 @@ export default function StudentsImportValidationSummary({
       {/* ===== STATS ===== */}
       {preview.ok ? (
         <div className="mt-5 grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-          <StatCard label="Tổng dòng" value={preview.total} />
-          <StatCard label="Tạo mới" value={preview.creatable} />
-          <StatCard label="Đúng lớp" value={preview.sameClassUnchanged} />
-          <StatCard label="Khác thông tin" value={preview.sameClassDifferentInfo} />
-          <StatCard label="Khác lớp" value={preview.differentClass} />
+          <StatCard icon={<Rows3 size={18} />} label="Tổng dòng" value={preview.total} />
+          <StatCard icon={<UserPlus size={18} />} label="Tạo mới" value={preview.creatable} />
+          <StatCard icon={<CircleCheck size={18} />} label="Đúng lớp" value={preview.sameClassUnchanged} />
+          <StatCard icon={<UserRoundPen size={18} />} label="Khác thông tin" value={preview.sameClassDifferentInfo} />
+          <StatCard icon={<ArrowRightLeft size={18} />} label="Khác lớp" value={preview.differentClass} />
           <StatCard
+            icon={<CircleAlert size={18} />}
             label="Lỗi / trùng"
             value={preview.invalid + preview.duplicateInFile}
           />
         </div>
       ) : null}
 
-      {/* ===== HARD WARNING ===== */}
-      {preview.ok &&
-      (preview.invalid > 0 || preview.duplicateInFile > 0) ? (
-        <div className="mt-5 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700 ring-1 ring-rose-100">
-          Có dữ liệu lỗi hoặc trùng trong file. Bạn cần sửa trước khi import.
-        </div>
-      ) : null}
-
-      {/* ===== SOFT WARNING ===== */}
-      {preview.ok &&
-      preview.invalid === 0 &&
-      preview.duplicateInFile === 0 &&
-      hasWarning ? (
-        <div className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-amber-100">
-          Có sinh viên khác lớp hoặc khác thông tin. Hãy bật tùy chọn phù hợp trước khi import.
+      {warningMessage ? (
+        <div role="alert" className="mt-5 rounded-none bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-amber-100 shadow-md shadow-slate-200/60">
+          {warningMessage}
         </div>
       ) : null}
     </section>
@@ -83,16 +75,18 @@ export default function StudentsImportValidationSummary({
 }
 
 function StatCard({
+  icon,
   label,
   value,
 }: {
+  icon: React.ReactNode;
   label: string;
   value: number;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-slate-900">{value}</div>
+    <div className={[statCardStyles.card, "min-w-0"].join(" ")}>
+      <div className="flex items-center justify-between gap-3"><div className={statCardStyles.label}>{label}</div><div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</div></div>
+      <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div>
     </div>
   );
 }

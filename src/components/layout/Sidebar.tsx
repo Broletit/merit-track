@@ -14,10 +14,13 @@ import { getDefaultRouteByRoleContext } from "@/server/auth/role-context";
 
 export default function Sidebar({
   role,
+  emailMissing = false,
 }: {
   role: string;
+  emailMissing?: boolean;
 }) {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname.startsWith("/a/") ? `/dashboard/${role.replaceAll("_","-")}/activities` : rawPathname.startsWith("/o/") ? `/dashboard/${role.replaceAll("_","-")}/officer-activities` : rawPathname;
 
   const groups = getSidebarGroups(role);
 
@@ -95,6 +98,7 @@ export default function Sidebar({
             key={group.label}
             group={group}
             pathname={pathname}
+            emailMissing={emailMissing}
             collapsed={collapsed}
           />
         ))}

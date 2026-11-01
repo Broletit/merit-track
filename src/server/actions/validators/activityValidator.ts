@@ -4,12 +4,14 @@ export function validateActivityTime({
   startAt,
   endAt,
   allowPastRegistrationStart = false,
+  allowRegistrationDuringActivity = false,
 }: {
   registrationStartAt: string;
   registrationEndAt: string;
   startAt: string;
   endAt: string;
   allowPastRegistrationStart?: boolean;
+  allowRegistrationDuringActivity?: boolean;
 }) {
   const now = new Date();
 
@@ -35,8 +37,12 @@ export function validateActivityTime({
     throw new Error("Thời gian đóng đăng ký phải sau thời gian mở đăng ký.");
   }
 
-  if (activityStart <= regEnd) {
+  if (!allowRegistrationDuringActivity && activityStart <= regEnd) {
     throw new Error("Thời gian bắt đầu hoạt động phải sau thời gian đóng đăng ký.");
+  }
+
+  if (allowRegistrationDuringActivity && regEnd > activityEnd) {
+    throw new Error("Thời gian đóng đăng ký không được sau thời gian kết thúc hoạt động.");
   }
 
   if (activityEnd <= activityStart) {

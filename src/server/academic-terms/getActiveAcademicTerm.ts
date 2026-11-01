@@ -1,4 +1,4 @@
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 
 export type ActiveAcademicTerm = {
   id: number;
@@ -18,20 +18,16 @@ type Row = {
   end_at: string;
 };
 
-export function getActiveAcademicTerm(): ActiveAcademicTerm | null {
-  const db = getDb();
+export async function getActiveAcademicTerm(): Promise<ActiveAcademicTerm | null> {
+  const db = getDatabase();
 
-  const row = db
-    .prepare(
-      `
+  const row = (await db.first(`
       SELECT id, academic_year, semester, name, start_at, end_at
       FROM academic_terms
       WHERE is_active = 1
       ORDER BY id DESC
       LIMIT 1
-      `
-    )
-    .get() as Row | undefined;
+      `, [])) as Row | undefined;
 
   if (!row) return null;
 

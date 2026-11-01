@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import useCohorts from "@/components/shared/useCohorts";
 import { Search } from "lucide-react";
 import { assignFacultyOfficerClasses } from "@/server/actions/admin/users/assignFacultyOfficerClasses";
 import ActionFeedback from "@/components/shared/ActionFeedback";
@@ -10,6 +11,7 @@ type ClassOption = {
   id: number;
   code: string;
   name: string;
+  cohort?:number|null;
 };
 
 type State = {
@@ -34,6 +36,8 @@ export default function FacultyClassAssignmentForm({
   selectedClassIds: number[];
 }) {
   const router = useRouter();
+  const {cohorts}=useCohorts();
+  const [cohort,setCohort] = useState("");
   const [keyword, setKeyword] = useState("");
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [selected, setSelected] = useState(() => new Set(selectedClassIds));
@@ -80,13 +84,13 @@ export default function FacultyClassAssignmentForm({
       const matchesKeyword = `${item.code} ${item.name}`
         .toLocaleLowerCase("vi")
         .includes(normalizedKeyword);
-      return matchesKeyword && (!showSelectedOnly || selected.has(item.id));
+      return (!cohort || item.cohort===Number(cohort)) && matchesKeyword && (!showSelectedOnly || selected.has(item.id));
     }).map((item) => item.id)),
-    [classes, normalizedKeyword, selected, showSelectedOnly]
+    [classes, cohort, normalizedKeyword, selected, showSelectedOnly]
   );
 
   return (
-    <section className="h-full rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="h-full rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div>
         <h2 className="text-xl font-semibold text-slate-900">
           Phân công lớp quản lý
@@ -106,6 +110,7 @@ export default function FacultyClassAssignmentForm({
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="Tìm theo mã hoặc tên lớp..." className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500" />
           </div>
+          <select aria-label="Lọc lớp theo khóa" value={cohort} onChange={event=>setCohort(event.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Tất cả khóa</option>{cohorts.map(item=><option key={item} value={item}>Khóa {item}</option>)}</select>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -114,13 +119,13 @@ export default function FacultyClassAssignmentForm({
             >
               {showSelectedOnly ? "Xem tất cả" : "Lớp đã phân công"}
             </button>
-            <div className="rounded-xl bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700">
+            <div className="rounded-none bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-md shadow-slate-200/60">
               Đã phân công {selected.size}/{classes.length} lớp
             </div>
           </div>
         </div>
 
-        <div ref={classListRef} className="h-40 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+        <div ref={classListRef} className="h-40 overflow-y-auto rounded-none border border-slate-200 bg-slate-50/60 p-3 shadow-md shadow-slate-200/60">
         <div className="grid gap-2 sm:grid-cols-2">
           {classes.map((item) => (
             <label
@@ -159,7 +164,7 @@ export default function FacultyClassAssignmentForm({
         <div className="mt-auto flex justify-end">
           <button
             disabled={pending}
-            className="h-11 min-w-44 rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60"
+            className="min-h-11 h-auto min-w-44 rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60 py-2 max-w-full break-words"
           >
             {pending ? "Đang lưu..." : "Lưu phân công"}
           </button>

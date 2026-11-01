@@ -2,43 +2,35 @@
 
 import { redirect } from "next/navigation";
 import { requireOfficerParticipantContext } from "@/server/auth/requireOfficerParticipantContext";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import { evaluateSubmissionAuto } from "@/server/events/evaluateSubmissionAuto";
 import { evaluateSubmission } from "@/server/submissions/evaluateSubmission";
 import { assertEventAcceptsSubmissions } from "@/lib/events/eventSubmissionPhase";
 
 export async function createOfficerSubmission(eventId: number) {
   const user = await requireOfficerParticipantContext();
-  const db = getDb();
+  const db = getDatabase();
 
-  const existed = db
-    .prepare(
-      `
+  const existed = (await db.first(`
       SELECT id
       FROM submissions
       WHERE event_id = ?
         AND user_id = ?
       LIMIT 1
-      `
-    )
-    .get(eventId, user.id) as { id: number } | undefined;
+      `, [eventId, user.id])) as { id: number } | undefined;
 
   if (existed) {
     redirect(`/dashboard/${user.role === "class_officer" ? "class-officer" : "faculty-officer"}/officer-submissions/detail/${existed.id}`);
   }
 
-  const event = db
-    .prepare(
-      `
+  const event = (await db.first(`
       SELECT id, type, status, start_at, end_at, allow_late
       FROM events
       WHERE id = ?
         AND type = 'officer'
         AND status = 'published'
       LIMIT 1
-      `
-    )
-    .get(eventId) as
+      `, [eventId])) as
     | {
         id: number;
         type: string;
@@ -60,9 +52,7 @@ export async function createOfficerSubmission(eventId: number) {
     allowLate: Number(event.allow_late ?? 0) === 1,
   });
 
-  const result = db
-    .prepare(
-      `
+  const result = (await db.execute(`
       INSERT INTO submissions (
         event_id,
         user_id,
@@ -72,15 +62,13 @@ export async function createOfficerSubmission(eventId: number) {
         submitted_at,
         updated_at
       )
-      VALUES (?, ?, NULL, 'draft', 0, NULL, datetime('now'))
-      `
-    )
-    .run(event.id, user.id);
+      VALUES (?, ?, NULL, 'draft', 0, NULL, CURRENT_TIMESTAMP(3))
+      `, [event.id, user.id]));
 
-  const submissionId = Number(result.lastInsertRowid);
+  const submissionId = Number(result.insertId);
 
-  evaluateSubmissionAuto(submissionId);
-  evaluateSubmission(submissionId);
+  (await evaluateSubmissionAuto(submissionId));
+  (await evaluateSubmission(submissionId));
 
   redirect(`/dashboard/${user.role === "class_officer" ? "class-officer" : "faculty-officer"}/officer-submissions/detail/${submissionId}`);
 }

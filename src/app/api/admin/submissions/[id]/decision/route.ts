@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/server/auth/guards";
+import { requireAdminContext } from "@/server/auth/guards";
 import { reviewSubmission } from "@/server/actions/reviews/reviewSubmission";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await requireAdmin();
+  await requireAdminContext();
 
   const { type } = await req.json();
   const { id: rawId } = await params;

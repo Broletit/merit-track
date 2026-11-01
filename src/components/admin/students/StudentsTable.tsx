@@ -1,3 +1,4 @@
+import PaginatedTable from "@/components/common/PaginatedTable";
 import StudentsFilter from "./StudentsFilters";
 import type { AdminStudentClassOption, AdminStudentItem } from "./types";
 
@@ -9,19 +10,19 @@ export default function StudentsTable({
   classes: AdminStudentClassOption[];
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div>
+        <StudentsFilter classes={classes} />
+      </div>
+
+      <div className="mt-5">
         <h2 className="text-xl font-semibold text-slate-900">
           Danh sách sinh viên
         </h2>
       </div>
 
-      <div className="mt-5">
-        <StudentsFilter classes={classes} />
-      </div>
-
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-        <table className="min-w-full table-fixed divide-y divide-slate-200">
+      <div data-table-frame className="mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<PaginatedTable className="min-w-full table-fixed divide-y divide-slate-200" containerClassName="overflow-hidden rounded-none border border-slate-200" resultLabel="bản ghi">
           <thead className="bg-slate-50">
             <tr>
               <th className="w-[32%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -30,7 +31,7 @@ export default function StudentsTable({
               <th className="w-[18%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 MSSV
               </th>
-              <th className="w-[28%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="left" className="w-[28%] whitespace-nowrap px-4 py-3  text-sm font-semibold text-slate-700 text-left">
                 Lớp
               </th>
               <th className="w-[22%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -56,7 +57,7 @@ export default function StudentsTable({
                     {item.mssv}
                   </td>
 
-                  <td className="px-4 py-4 align-top text-sm text-slate-700">
+                  <td data-column-align="left" className="px-4 py-4 align-top text-sm text-slate-700 text-left">
                     {item.classCode ? (
                       <>
                         <div className="font-medium">{item.classCode}</div>
@@ -93,8 +94,9 @@ export default function StudentsTable({
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+        </PaginatedTable>
+
+</div>
     </section>
   );
 }

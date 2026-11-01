@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import { requireOfficerParticipantContext } from "@/server/auth/requireOfficerParticipantContext";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import ReviewHeader from "@/components/shared/reviews/ReviewHeader";
 import ReviewHistory from "@/components/shared/reviews/ReviewHistory";
 import { getSubmissionTimeline } from "@/server/submissions/getSubmissionTimeline";
-import OfficerSubmissionEvidenceForm from "@/components/faculty-officer/officer-submissions/OfficerSubmissionEvidenceForm";
+import OfficerSubmissionCriteriaPanel from "@/components/faculty-officer/officer-submissions/OfficerSubmissionCriteriaPanel";
 import SubmissionStatusBadge from "@/components/shared/submissions/SubmissionStatusBadge";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 
@@ -18,6 +18,7 @@ type SubmissionRow = {
   event_description: string | null;
   event_start_at: string;
   event_end_at: string;
+  event_score_max: number | null;
 };
 
 type CriteriaRow = {
@@ -27,6 +28,7 @@ type CriteriaRow = {
   group_code: string;
   group_title: string;
   min_required: number;
+  group_score_max: number;
   score_max: number;
   is_required: number;
   auto_passed: number | null;
@@ -55,15 +57,13 @@ export async function OfficerSubmissionDetailPageView({
 }) {
   const user = await requireOfficerParticipantContext();
   const { id } = await params;
-  const submissionId = Number(id);
+  const submissionId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(submissionId) || submissionId <= 0) notFound();
 
-  const db = getDb();
+  const db = getDatabase();
 
-  const submission = db
-    .prepare(
-      `
+  const submission = (await db.first(`
       SELECT
         s.id,
         s.status,
@@ -73,22 +73,19 @@ export async function OfficerSubmissionDetailPageView({
         e.title AS event_title,
         e.description AS event_description,
         e.start_at AS event_start_at,
-        e.end_at AS event_end_at
+        e.end_at AS event_end_at,
+        e.score_max AS event_score_max
       FROM submissions s
       INNER JOIN events e ON e.id = s.event_id
       WHERE s.id = ?
         AND s.user_id = ?
         AND e.type = 'officer'
       LIMIT 1
-      `
-    )
-    .get(submissionId, user.id) as SubmissionRow | undefined;
+      `, [submissionId, user.id])) as SubmissionRow | undefined;
 
   if (!submission) notFound();
 
-  const criteria = db
-    .prepare(
-      `
+  const criteria = (await db.rows(`
       SELECT
         i.code,
         i.title,
@@ -96,6 +93,7 @@ export async function OfficerSubmissionDetailPageView({
         i.group_code,
         g.title AS group_title,
         g.min_required,
+        g.score_max AS group_score_max,
         i.score_max,
         i.is_required,
         ar.passed AS auto_passed,
@@ -105,7 +103,7 @@ export async function OfficerSubmissionDetailPageView({
         si.content_text,
         (
           SELECT sf.file_name
-          FROM submission_files sf
+          FROM submission_ready_files sf
           WHERE sf.submission_id = s.id
             AND sf.criteria_code = i.code
           ORDER BY sf.id DESC
@@ -113,7 +111,7 @@ export async function OfficerSubmissionDetailPageView({
         ) AS file_name,
         (
           SELECT sf.file_path
-          FROM submission_files sf
+          FROM submission_ready_files sf
           WHERE sf.submission_id = s.id
             AND sf.criteria_code = i.code
           ORDER BY sf.id DESC
@@ -121,7 +119,7 @@ export async function OfficerSubmissionDetailPageView({
         ) AS file_path
         ,(
           SELECT COUNT(*)
-          FROM submission_files sf
+          FROM submission_ready_files sf
           WHERE sf.submission_id = s.id
             AND sf.criteria_code = i.code
         ) AS file_count
@@ -135,7 +133,6 @@ export async function OfficerSubmissionDetailPageView({
            AND activity_registration.status = 'attended'
           WHERE car.template_id = e.criteria_template_id
             AND car.criteria_code = i.code
-            AND a.term_id = e.term_id
         ) AS auto_score
       FROM submissions s
       INNER JOIN events e ON e.id = s.event_id
@@ -151,20 +148,17 @@ export async function OfficerSubmissionDetailPageView({
        AND si.criteria_code = i.code
       WHERE s.id = ?
       ORDER BY g.sort_order ASC, i.sort_order ASC
-      `
-    )
-    .all(user.id, submissionId) as CriteriaRow[];
+      `, [user.id, submissionId])) as CriteriaRow[];
 
-  const reviews = db
-    .prepare(
-      `
+  const evidenceFiles = (await db.rows("SELECT id,criteria_code,file_name,mime_type FROM submission_ready_files WHERE submission_id=? ORDER BY id DESC", [submissionId])) as Array<{id:number;criteria_code:string;file_name:string;mime_type:string}>;
+  const criteriaWithFiles = criteria.map(item=>({...item,evidence_type:"manual",evidence_files:evidenceFiles.filter(file=>file.criteria_code===item.code).map(file=>({id:file.id,fileName:file.file_name,mimeType:file.mime_type}))}));
+
+  const reviews = (await db.rows(`
       SELECT round, decision, note
       FROM reviews
       WHERE submission_id = ?
       ORDER BY id ASC
-      `
-    )
-    .all(submissionId) as ReviewRow[];
+      `, [submissionId])) as ReviewRow[];
 
   const reviewItems = reviews.map((item) => ({
     round: Number(item.round),
@@ -172,9 +166,15 @@ export async function OfficerSubmissionDetailPageView({
     note: item.note ? String(item.note) : null,
     reviewerName: null,
   }));
-  const timeline = getSubmissionTimeline(submissionId);
+  const timeline = (await getSubmissionTimeline(submissionId));
 
   const canEdit = ["draft", "needs_revision_v1"].includes(submission.status);
+  const groupMaximum = Array.from(
+    new Map(criteria.map((item) => [item.group_code, Number(item.group_score_max ?? 0)])).values()
+  ).reduce((total, score) => total + score, 0);
+  const scoreMaximum = Number(submission.event_score_max ?? 0) > 0
+    ? Math.min(Number(submission.event_score_max), groupMaximum || Number(submission.event_score_max))
+    : groupMaximum;
 
   return (
     <main className="space-y-6">
@@ -183,7 +183,7 @@ export async function OfficerSubmissionDetailPageView({
         backHref={basePath}
       />
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+      <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-xl font-semibold text-slate-900">Thông tin hồ sơ</h2>
 
@@ -191,7 +191,7 @@ export async function OfficerSubmissionDetailPageView({
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Info label="Điểm hiện tại" value={`${Number(submission.score_total ?? 0)}/${criteria.reduce((total, item) => total + Number(item.score_max), 0)} điểm`} />
+          <Info label="Điểm hiện tại" value={`${Number(submission.score_total ?? 0)}/${scoreMaximum} điểm`} />
           <Info label="Ngày gửi" value={submission.submitted_at ? formatDateTimeVN(submission.submitted_at) : "Chưa gửi"} />
           <Info label="Cập nhật" value={formatDateTimeVN(submission.updated_at)} />
           <Info label="Trạng thái sửa" value={canEdit ? "Có thể chỉnh sửa" : "Không thể chỉnh sửa"} />
@@ -203,20 +203,17 @@ export async function OfficerSubmissionDetailPageView({
         timeline={timeline}
         title="Phản hồi đợt xét"
         emptyMessage="Chưa có phản hồi xét duyệt."
+        singleStage
       />
 
-      <OfficerSubmissionEvidenceForm
-        submissionId={submission.id}
-        canEdit={canEdit}
-        items={criteria}
-      />
+      <OfficerSubmissionCriteriaPanel submissionId={submission.id} canEdit={canEdit} items={criteriaWithFiles}/>
     </main>
   );
 }
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
       <div className="text-sm text-slate-500">{label}</div>
       <div className="mt-1 text-sm font-medium text-slate-900">{value}</div>
     </div>

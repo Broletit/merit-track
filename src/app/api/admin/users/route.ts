@@ -1,15 +1,17 @@
+import { cohortClause } from "@/server/cohorts/sql";
 import { NextResponse } from "next/server";
-import { getDb } from "@/server/db/sqlite";
-import { requireAdmin } from "@/server/auth/guards";
+import { getDatabase } from "@/server/db/mysql";
+import { requireAdminContext } from "@/server/auth/guards";
 
-export async function GET() {
-  await requireAdmin();
-  const db = getDb();
+export async function GET(req:Request) {
+  await requireAdminContext();
+  const db = getDatabase();
 
-  const items = db.prepare(`
+  const items = (await db.rows(`
     SELECT
       u.id,
       u.mssv,
+      u.cohort,
       u.full_name,
       u.email,
       u.role,
@@ -17,8 +19,9 @@ export async function GET() {
       u.must_change_pw,
       u.created_at
     FROM users u
+    WHERE ${cohortClause(new URL(req.url).searchParams.get("cohort"),"u.cohort")}
     ORDER BY u.role DESC, u.mssv ASC
-  `).all();
+  `, []));
 
   return NextResponse.json({ items });
 }

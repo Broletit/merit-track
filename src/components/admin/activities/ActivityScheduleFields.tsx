@@ -1,4 +1,7 @@
 "use client";
+import FieldError from "@/components/common/FieldError";
+import RequiredMark from "@/components/common/RequiredMark";
+
 
 import { useMemo, useState } from "react";
 
@@ -26,11 +29,13 @@ function getNowLocalInputValue() {
 export default function ActivityScheduleFields({
   defaultValues,
   allowPastRegistrationStart = false,
+  allowRegistrationDuringActivity = false,
   serverErrorField,
   disabledFields = [],
 }: {
   defaultValues?: Partial<FormState>;
   allowPastRegistrationStart?: boolean;
+  allowRegistrationDuringActivity?: boolean;
   serverErrorField?: string;
   disabledFields?: Array<keyof FormState>;
 }) {
@@ -66,10 +71,12 @@ export default function ActivityScheduleFields({
       registrationEndAt:
         regStart && regEnd && regEnd <= regStart
           ? "Thời gian đóng đăng ký phải sau thời gian mở đăng ký."
-          : "",
+          : allowRegistrationDuringActivity && regEnd && activityEnd && regEnd > activityEnd
+            ? "Thời gian đóng đăng ký không được sau thời gian kết thúc hoạt động."
+            : "",
 
       startAt:
-        regEnd && activityStart && activityStart <= regEnd
+        !allowRegistrationDuringActivity && regEnd && activityStart && activityStart <= regEnd
           ? "Thời gian bắt đầu hoạt động phải sau thời gian đóng đăng ký."
           : "",
 
@@ -78,7 +85,7 @@ export default function ActivityScheduleFields({
           ? "Thời gian kết thúc hoạt động phải sau thời gian bắt đầu."
           : "",
     };
-  }, [form, allowPastRegistrationStart]);
+  }, [form, allowPastRegistrationStart, allowRegistrationDuringActivity]);
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -152,7 +159,7 @@ function Field({
     <div>
       <label className="mb-2 block text-sm font-medium text-slate-600">
         {label}
-      </label>
+      <RequiredMark required={true}/></label>
 
       <input
         type="datetime-local"
@@ -170,7 +177,7 @@ function Field({
         }`}
       />
 
-      {error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null}
+      <FieldError message={error} />
     </div>
   );
 }

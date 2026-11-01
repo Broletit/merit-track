@@ -1,6 +1,6 @@
 export default function ActivitySettingsForm({ defaultValue = "draft", errorField }: { defaultValue?: string; errorField?: string }) {
   return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <h2 className="text-lg font-semibold text-slate-900">Trạng thái hoạt động</h2>
 
       <div className="mt-5 grid gap-3 md:grid-cols-2">

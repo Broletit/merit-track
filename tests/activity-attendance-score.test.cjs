@@ -1,0 +1,21 @@
+require('./helpers/mysql-fixture.cjs');
+const fs=require('fs'),ts=require('typescript'),Module=require('module'),Database=require('better-sqlite3'),assert=require('node:assert/strict'),XLSX=require('xlsx');
+function load(file,mocks){const m=new Module(file,module);m.paths=module.paths;const req=m.require.bind(m);m.require=id=>Object.hasOwn(mocks,id)?mocks[id]:req(id);m._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,file);return m.exports;}
+const db=new Database(':memory:');
+db.exec(`CREATE TABLE activities(id INTEGER,title TEXT,conduct_score REAL,end_at TEXT,audience_type TEXT,status TEXT,term_id INTEGER);
+CREATE TABLE academic_terms(id INTEGER,name TEXT,academic_year TEXT,semester TEXT,start_at TEXT,end_at TEXT,is_active INTEGER);
+CREATE TABLE conduct_periods(id INTEGER PRIMARY KEY,code TEXT,name TEXT,academic_year TEXT,semester TEXT,start_at TEXT,end_at TEXT,is_active INTEGER);
+CREATE TABLE activity_registrations(activity_id INTEGER,user_id INTEGER,status TEXT,note TEXT,class_id INTEGER);
+CREATE TABLE conduct_scores(id INTEGER PRIMARY KEY,user_id INTEGER,period_id INTEGER,source_type TEXT,source_id INTEGER,score_value REAL,note TEXT,created_at TEXT,UNIQUE(user_id,period_id,source_type,source_id));
+CREATE UNIQUE INDEX unique_activity_score ON conduct_scores(user_id,source_type,source_id) WHERE source_type='activity';
+CREATE TABLE users(id INTEGER,full_name TEXT,mssv TEXT);CREATE TABLE classes(id INTEGER,code TEXT);
+INSERT INTO academic_terms VALUES(1,'K? c?','2024-2025','1','2024-01-01','2025-01-01',0);
+INSERT INTO activities VALUES(1,'Hoạt động 2 ?i?m',2,'2025-01-01','student','published',1),(2,'Hoạt động 3 ?i?m',3,'2025-01-01','student','closed',1),(3,'Ch?a k?t th?c',3,'2099-01-01','student','published',1);
+INSERT INTO users VALUES(1,'Sinh viên A','24706461');
+INSERT INTO activity_registrations VALUES(1,1,'registered',NULL,NULL),(2,1,'registered',NULL,NULL),(3,1,'registered',NULL,NULL);`);
+const sync=load('src/server/conduct/ensureActivityConductScores.ts',{'@/server/db/mysql':{getDatabase:()=>db}}).ensureActivityConductScores;
+db.prepare("INSERT INTO conduct_scores(user_id,period_id,source_type,source_id,score_value) VALUES(1,99,'activity',1,-4)").run();
+sync();sync();assert.deepEqual(db.prepare('SELECT score_value FROM conduct_scores ORDER BY source_id').all().map(x=>x.score_value),[-2,-3]);assert.equal(db.prepare('SELECT period_id FROM conduct_scores WHERE source_id=1').get().period_id,1);assert.equal(db.prepare('SELECT status FROM activity_registrations WHERE activity_id=3').get().status,'registered');
+const route=load('src/app/api/admin/activities/[id]/export/route.ts',{'@/server/db/mysql':{getDatabase:()=>db},'@/server/auth/guards':{requireAdminContext:async()=>({id:99})},'@/server/conduct/ensureActivityConductScores':{ensureActivityConductScores:sync}});
+(async()=>{const response=await route.GET(new Request('http://localhost'),{params:Promise.resolve({id:'1'})});assert.equal(response.status,200);const book=XLSX.read(Buffer.from(await response.arrayBuffer()),{type:'buffer'});const sheet=book.Sheets[book.SheetNames[0]],rows=XLSX.utils.sheet_to_json(sheet,{header:1});assert.equal(rows[0][0],'Danh sách Đánh giá sinh viên tham gia hoạt động\nHoạt động 2 ?i?m');assert.deepEqual(rows[1],['STT','Họ tên','MSSV','Xem chỉ số đánh giá trong Phần mềm','Ghi chú']);assert.deepEqual(rows[2],[1,'Sinh viên A','24706461',0,'Không tham gia (-100%)']);assert.equal(sheet['!merges'][0].e.c,4);
+db.prepare("UPDATE activity_registrations SET status='attended' WHERE activity_id=1").run();sync();assert.equal(db.prepare('SELECT score_value FROM conduct_scores WHERE source_id=1').get().score_value,2);const attendedResponse=await route.GET(new Request('http://localhost'),{params:Promise.resolve({id:'1'})});const attendedBook=XLSX.read(Buffer.from(await attendedResponse.arrayBuffer()),{type:'buffer'});const attendedRows=XLSX.utils.sheet_to_json(attendedBook.Sheets[attendedBook.SheetNames[0]],{header:1});assert.equal(attendedRows[2][3],1);db.close();console.log('Passed: absence -2/-3, upcoming preserved, correct term, idempotency, supplemental attendance replaces penalty, five-column Excel and merged title.');})().catch(e=>{console.error(e);process.exitCode=1});

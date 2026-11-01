@@ -1,4 +1,7 @@
 "use client";
+import NumberedTable from "@/components/common/NumberedTable";
+import styles from "./CriteriaTemplatesTable.module.css";
+
 
 import { useState } from "react";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
@@ -12,52 +15,52 @@ function mapForType(value: string) {
   return "Sinh viên";
 }
 
-export default function CriteriaTemplatesTable({
+export default function CriteriaTemplatesTable({ page = 1,
   items,
-}: {
+}: { page?: number;
   items: AdminCriteriaTemplateItem[];
 }) {
   const [editingItem, setEditingItem] =
     useState<AdminCriteriaTemplateItem | null>(null);
 
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <h2 className="text-xl font-semibold text-slate-900">
-        Danh sách bộ tiêu chuẩn
-      </h2>
-
-      <div className="mt-5">
+    <section className="flex flex-col rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <div className="order-2 mt-5">
         <CriteriaTemplatesFilter />
       </div>
 
+      <h2 className="order-1 text-xl font-semibold text-slate-900">
+        Danh sách bộ tiêu chuẩn
+      </h2>
+
       {editingItem ? (
-        <CriteriaTemplateEditInlineForm
+        <div className="order-3 mt-5"><CriteriaTemplateEditInlineForm
           item={editingItem}
           onCancel={() => setEditingItem(null)}
           onSaved={() => setEditingItem(null)}
-        />
+        /></div>
       ) : null}
 
-      <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
-        <table className="w-full min-w-[960px] table-fixed divide-y divide-slate-200">
+      <div className="order-4 mt-5 overflow-x-auto rounded-none border border-slate-200">
+        <NumberedTable page={page} className={`${styles.table} w-full min-w-0 table-fixed divide-y divide-slate-200`}>
           <thead className="bg-slate-50">
             <tr>
-              <th className="w-[34%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="left" className="w-[34%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Bộ tiêu chuẩn
               </th>
-              <th className="w-[14%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="center" className="w-[14%] px-4 py-3 text-center text-sm font-semibold text-slate-700">
                 Đối tượng
               </th>
-              <th className="w-[10%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="center" className="w-[10%] px-4 py-3 text-center text-sm font-semibold text-slate-700">
                 Tiêu chuẩn
               </th>
-              <th className="w-[10%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="center" className="w-[10%] px-4 py-3 text-center text-sm font-semibold text-slate-700">
                 Tiêu chí
               </th>
-              <th className="w-[12%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="center" className="w-[12%] px-4 py-3 text-center text-sm font-semibold text-slate-700">
                 Ngày tạo
               </th>
-              <th className="w-[20%] px-4 py-3 text-center text-sm font-semibold text-slate-700">
+              <th data-column-align="center" className="w-[20%] px-4 py-3 text-center text-sm font-semibold text-slate-700">
                 Thao tác
               </th>
             </tr>
@@ -70,7 +73,7 @@ export default function CriteriaTemplatesTable({
                   key={item.id}
                   className={editingItem?.id === item.id ? "bg-amber-50" : ""}
                 >
-                  <td className="px-4 py-4 align-top">
+                  <td data-column-align="left" className="px-4 py-4 align-top">
                     <div className="text-sm font-semibold text-slate-900">
                       {item.name}
                     </div>
@@ -79,23 +82,23 @@ export default function CriteriaTemplatesTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 align-top text-sm text-slate-700">
+                  <td data-column-align="center" className="px-4 py-4 align-top text-sm text-slate-700">
                     {mapForType(item.forType)}
                   </td>
 
-                  <td className="px-4 py-4 align-top text-sm text-slate-700">
+                  <td data-column-align="center" className="px-4 py-4 align-top text-sm text-slate-700">
                     {item.groups}
                   </td>
 
-                  <td className="px-4 py-4 align-top text-sm text-slate-700">
+                  <td data-column-align="center" className="px-4 py-4 align-top text-sm text-slate-700">
                     {item.criteria}
                   </td>
 
-                  <td className="px-4 py-4 align-top text-sm text-slate-700">
+                  <td data-column-align="center" className="px-4 py-4 align-top text-sm text-slate-700">
                     {formatDateTimeVN(item.createdAt)}
                   </td>
 
-                  <td className="whitespace-nowrap px-4 py-4 text-center align-top">
+                  <td data-column-align="center" className="whitespace-nowrap px-4 py-4 text-center align-top">
                     <CriteriaTemplateActions
                       item={item}
                       onEdit={() => setEditingItem(item)}
@@ -119,7 +122,7 @@ export default function CriteriaTemplatesTable({
               </tr>
             )}
           </tbody>
-        </table>
+        </NumberedTable>
       </div>
     </section>
   );

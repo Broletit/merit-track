@@ -1,5 +1,8 @@
+import { getSubmissionStatusLabel } from "@/lib/submissions/submissionStatus";
+
 type Status =
   | "draft"
+  | "support"
   | "submitted_v1"
   | "needs_revision_v1"
   | "submitted_v2"
@@ -9,6 +12,8 @@ type Status =
 
 function getConfig(status: Status) {
   switch (status) {
+    case "support":
+      return { label: "Cần hỗ trợ", className: "bg-amber-50 text-amber-700 ring-amber-100" };
     case "submitted_v1":
       return {
         label: "Chờ duyệt vòng 1",
@@ -47,21 +52,22 @@ function getConfig(status: Status) {
 
     default:
       return {
-        label: "Nháp",
+        label: "Chưa hoàn tất",
         className: "bg-slate-100 text-slate-700 ring-slate-200",
       };
   }
 }
 
-export default function SubmissionStatusBadge({ status }: { status: string }) {
-  const normalized = (status || "draft") as Status;
+export default function SubmissionStatusBadge({ status, reviewRound }: { status: string; reviewRound?: number }) {
+  void reviewRound;
+  const normalized = (status === 'approved' ? 'passed' : status === 'rejected' ? 'failed' : ['needs_revision_v2','rejected_v1','rejected_v2'].includes(status) ? 'needs_revision_v1' : status || "draft") as Status;
   const config = getConfig(normalized);
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${config.className}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ring-1 ${config.className}`}
     >
-      {config.label}
+      {getSubmissionStatusLabel(status || 'draft')}
     </span>
   );
 }

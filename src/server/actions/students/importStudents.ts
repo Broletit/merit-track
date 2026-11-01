@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDb } from "@/server/db/sqlite";
+import { assertSameClassCohort } from "@/server/cohorts/classCohortIntegrity";
+import { classDraftErrors } from "@/lib/classes/classDraft";
+import { assertImportCohort } from "@/lib/cohorts/cohorts";
+import { getDatabase } from "@/server/db/mysql";
 import { requireAdminContext } from "@/server/auth/guards";
 import { hashPasswordSync } from "@/server/auth/password";
 import type {
@@ -11,11 +14,11 @@ import type {
 
 type ConfirmImportPayload = {
   classMode: "existing" | "new";
+  cohort: number;
   classId?: number | null;
   newClassCode?: string;
   newClassName?: string;
   newClassFaculty?: string;
-  newClassIntakeYear?: number | null;
   allowUpdateExisting?: boolean;
   allowTransferClass?: boolean;
   rows: ParsedImportStudentRow[];
@@ -47,22 +50,18 @@ function getFullName(row: ParsedImportStudentRow) {
     .trim();
 }
 
-function resolveClassId(payload: ConfirmImportPayload) {
-  const db = getDb();
+async function resolveClassId(payload: ConfirmImportPayload) {
+  const db = getDatabase();
 
   if (payload.classMode === "existing") {
     const classId = Number(payload.classId ?? 0);
 
-    const found = db
-      .prepare(
-        `
+    const found = (await db.first(`
         SELECT id
         FROM classes
         WHERE id = ?
         LIMIT 1
-        `
-      )
-      .get(classId) as { id: number } | undefined;
+        `, [classId])) as { id: number } | undefined;
 
     if (!found) {
       throw new Error("Lớp đã chọn không tồn tại.");
@@ -74,54 +73,35 @@ function resolveClassId(payload: ConfirmImportPayload) {
   const code = clean(payload.newClassCode);
   const name = clean(payload.newClassName);
   const faculty = clean(payload.newClassFaculty);
-  const intakeYear = Number(payload.newClassIntakeYear ?? 0);
 
   if (!code || !name) {
     throw new Error("Thiếu thông tin lớp mới.");
   }
 
-  if (!Number.isFinite(intakeYear) || intakeYear <= 0) {
-    throw new Error("Khóa lớp mới không hợp lệ.");
-  }
 
-  const existed = db
-    .prepare(
-      `
-      SELECT id
-      FROM classes
-      WHERE code = ?
-      LIMIT 1
-      `
-    )
-    .get(code) as { id: number } | undefined;
+  const errors=classDraftErrors((await db.rows("SELECT code,name FROM classes", [])) as Array<{code:string;name:string}>,code,name,String(payload.newClassFaculty??""));
+  const error=Object.values(errors).filter(Boolean).join("\n");
+  if(error) throw new Error(error);
 
-  if (existed) {
-    return Number(existed.id);
-  }
-
-  const result = db
-    .prepare(
-      `
+  const result = (await db.execute(`
       INSERT INTO classes (
         code,
         name,
         faculty,
-        intake_year,
+        cohort,
         is_active,
         created_at
       )
-      VALUES (?, ?, ?, ?, 1, datetime('now'))
-      `
-    )
-    .run(code, name, faculty || "Chưa cập nhật", intakeYear);
+      VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP(3))
+      `, [code, name, faculty || "Chưa cập nhật", payload.cohort]));
 
-  return Number(result.lastInsertRowid);
+  return Number(result.insertId);
 }
 
 export async function importStudents(payload: ConfirmImportPayload) {
   await requireAdminContext();
 
-  const db = getDb();
+  const db = getDatabase();
 
   if (!payload.rows || payload.rows.length === 0) {
     throw new Error("Không có dữ liệu để import.");
@@ -131,10 +111,20 @@ export async function importStudents(payload: ConfirmImportPayload) {
     throw new Error("Bạn cần kiểm tra dữ liệu trước khi import.");
   }
 
-  const targetClassId = resolveClassId(payload);
+  const cohort = assertImportCohort(payload.cohort, payload.rows);
+  return (await (async () => (await db.withTransaction(async () => {
+  // Validate all rows and class creation in one transaction: an error leaves no partial import.
+  for (const row of payload.rows) {
+    const existing = (await db.first("SELECT cohort FROM users WHERE mssv=?", [clean(row.mssv)])) as {cohort:number|null}|undefined;
+    if (existing?.cohort != null && existing.cohort !== cohort) throw new Error(`MSSV ${clean(row.mssv)} đang được lưu ở Khóa ${existing.cohort}, không khớp Khóa ${cohort}. Vui lòng kiểm tra dữ liệu, không tự đổi khóa khi import.`);
+  }
+  const targetClassId = (await resolveClassId(payload));
+  const targetClass = (await db.first("SELECT cohort FROM classes WHERE id=?", [targetClassId])) as {cohort:number|null};
+  if (targetClass.cohort && targetClass.cohort !== cohort) throw new Error("Lớp đã chọn thuộc khóa khác.");
+  (await db.execute("UPDATE classes SET cohort=? WHERE id=? AND cohort IS NULL", [cohort, targetClassId]));
   const passwordHash = hashPasswordSync("1111");
 
-  const userColumns = db.prepare(`PRAGMA table_info(users)`).all() as Array<{
+  const userColumns = (await db.rows(`SELECT COLUMN_NAME AS name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='users'`, [])) as Array<{
     name: string;
   }>;
 
@@ -144,24 +134,9 @@ export async function importStudents(payload: ConfirmImportPayload) {
     throw new Error("Bảng users chưa có cột date_of_birth.");
   }
 
-  const findUserStmt = db.prepare(
-    `
-    SELECT id
-    FROM users
-    WHERE mssv = ?
-    LIMIT 1
-    `
-  );
+  
 
-  const latestClassStmt = db.prepare(
-    `
-    SELECT class_id
-    FROM class_members
-    WHERE user_id = ?
-    ORDER BY rowid DESC
-    LIMIT 1
-    `
-  );
+  
 
   const blockers: string[] = [];
 
@@ -181,13 +156,24 @@ export async function importStudents(payload: ConfirmImportPayload) {
       continue;
     }
 
-    const existingUser = findUserStmt.get(mssv) as UserRow | undefined;
+    const existingUser = (await db.first(`
+    SELECT id
+    FROM users
+    WHERE mssv = ?
+    LIMIT 1
+    `, [mssv])) as UserRow | undefined;
 
     if (!existingUser) {
       continue;
     }
 
-    const latestClass = latestClassStmt.get(existingUser.id) as
+    const latestClass = (await db.first(`
+    SELECT class_id
+    FROM class_members
+    WHERE user_id = ? AND left_at IS NULL
+    ORDER BY id DESC
+    LIMIT 1
+    `, [existingUser.id])) as
       | { class_id: number }
       | undefined;
 
@@ -209,20 +195,6 @@ export async function importStudents(payload: ConfirmImportPayload) {
     ) {
       blockers.push(
         `Dòng ${rowNumber} (${mssv}): sinh viên đang thuộc lớp khác. Không thể chỉ cập nhật thông tin, vui lòng chọn “Cho phép chuyển lớp”.`
-      );
-
-      continue;
-    }
-
-    /**
-     * ĐÚNG LỚP
-     */
-    if (
-      !isDifferentClass &&
-      payload.allowTransferClass
-    ) {
-      blockers.push(
-        `Dòng ${rowNumber} (${mssv}): sinh viên đã thuộc đúng lớp. Không cần chuyển lớp, vui lòng chọn “Cập nhật thông tin sinh viên đã tồn tại”.`
       );
 
       continue;
@@ -289,7 +261,7 @@ export async function importStudents(payload: ConfirmImportPayload) {
 
   const conflictMessages: string[] = [];
 
-  const tx = db.transaction(() => {
+  const tx = (async () => (await db.withTransaction(async () => {
     for (const rawRow of payload.rows) {
       const mssv = clean(rawRow.mssv);
       const fullName = getFullName(rawRow);
@@ -299,13 +271,26 @@ export async function importStudents(payload: ConfirmImportPayload) {
       const gender = clean(rawRow.gender);
       const dateOfBirth = clean(rawRow.date_of_birth);
 
-      const existingUser = findUserStmt.get(mssv) as UserRow | undefined;
+      const existingUser = (await db.first(`
+    SELECT id
+    FROM users
+    WHERE mssv = ?
+    LIMIT 1
+    `, [mssv])) as UserRow | undefined;
 
       /**
        * USER ĐÃ TỒN TẠI
        */
       if (existingUser) {
-        const latestClass = latestClassStmt.get(existingUser.id) as
+        (await db.execute("UPDATE users SET cohort=? WHERE id=? AND cohort IS NULL", [cohort, existingUser.id]));
+        (await assertSameClassCohort(db,existingUser.id,targetClassId));
+        const latestClass = (await db.first(`
+    SELECT class_id
+    FROM class_members
+    WHERE user_id = ? AND left_at IS NULL
+    ORDER BY id DESC
+    LIMIT 1
+    `, [existingUser.id])) as
           | { class_id: number }
           | undefined;
 
@@ -348,18 +333,16 @@ export async function importStudents(payload: ConfirmImportPayload) {
           values.push(dateOfBirth || null);
 
           if (columnNames.has("updated_at")) {
-            sets.push("updated_at = datetime('now')");
+            sets.push("updated_at = CURRENT_TIMESTAMP(3)");
           }
 
           values.push(existingUser.id);
 
-          db.prepare(
-            `
+          (await db.execute(`
             UPDATE users
             SET ${sets.join(", ")}
             WHERE id = ?
-            `
-          ).run(...values);
+            `, [...values]));
 
           updated++;
           continue;
@@ -369,23 +352,20 @@ export async function importStudents(payload: ConfirmImportPayload) {
          * CHUYỂN LỚP
          */
         if (isDifferentClass && payload.allowTransferClass) {
-          db.prepare(
-            `
-            DELETE FROM class_members
-            WHERE user_id = ?
-            `
-          ).run(existingUser.id);
+          (await db.execute(`
+            UPDATE class_members SET left_at=CURRENT_TIMESTAMP(3)
+            WHERE user_id = ? AND left_at IS NULL
+            `, [existingUser.id]));
 
-          db.prepare(
-            `
+          (await db.execute(`
             INSERT INTO class_members (
               class_id,
               user_id,
               joined_at
             )
-            VALUES (?, ?, datetime('now'))
-            `
-          ).run(targetClassId, existingUser.id);
+            VALUES (?, ?, CURRENT_TIMESTAMP(3))
+            ON DUPLICATE KEY UPDATE joined_at=CURRENT_TIMESTAMP(3),left_at=NULL
+            `, [targetClassId, existingUser.id]));
 
           transferred++;
 
@@ -429,6 +409,10 @@ export async function importStudents(payload: ConfirmImportPayload) {
         `${mssv}-${Date.now()}`,
       ];
 
+      insertColumns.push("cohort");
+      placeholders.push("?");
+      insertValues.push(cohort);
+
       if (columnNames.has("phone")) {
         insertColumns.push("phone");
         placeholders.push("?");
@@ -447,52 +431,49 @@ export async function importStudents(payload: ConfirmImportPayload) {
 
       if (columnNames.has("created_at")) {
         insertColumns.push("created_at");
-        placeholders.push("datetime('now')");
+        placeholders.push("CURRENT_TIMESTAMP(3)");
       }
 
       if (columnNames.has("updated_at")) {
         insertColumns.push("updated_at");
-        placeholders.push("datetime('now')");
+        placeholders.push("CURRENT_TIMESTAMP(3)");
       }
 
-      const result = db
-        .prepare(
-          `
+      const result = (await db.execute(`
           INSERT INTO users (
             ${insertColumns.join(", ")}
           )
           VALUES (
             ${placeholders.join(", ")}
           )
-          `
-        )
-        .run(...insertValues);
+          `, [...insertValues]));
 
-      const newUserId = Number(result.lastInsertRowid);
+      const newUserId = Number(result.insertId);
 
-      db.prepare(
-        `
+      (await db.execute(`
         INSERT INTO class_members (
           class_id,
           user_id,
           joined_at
         )
-        VALUES (?, ?, datetime('now'))
-        `
-      ).run(targetClassId, newUserId);
+        VALUES (?, ?, CURRENT_TIMESTAMP(3))
+        `, [targetClassId, newUserId]));
 
       inserted++;
       attachedToClass++;
     }
-  });
+  })));
 
-  tx();
+  (await tx());
 
   const conflicts = conflictMessages.length;
 
   revalidatePath("/dashboard/admin/users");
   revalidatePath("/dashboard/admin/students");
   revalidatePath("/dashboard/admin/students-import");
+  revalidatePath("/dashboard/admin/users");
+  revalidatePath("/dashboard/admin/classes");
+  revalidatePath("/dashboard/student/activities");
 
   const total =
     inserted +
@@ -514,4 +495,5 @@ export async function importStudents(payload: ConfirmImportPayload) {
     total,
     conflictMessages,
   };
+  })))());
 }

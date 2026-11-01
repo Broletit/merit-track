@@ -1,5 +1,5 @@
 import { requireAdminContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import Pagination from "@/components/common/Pagination";
 import CriteriaTemplatesHeader from "@/components/admin/criteria-templates/CriteriaTemplatesHeader";
 import CriteriaTemplatesTable from "@/components/admin/criteria-templates/CriteriaTemplatesTable";
@@ -17,7 +17,7 @@ type Row = {
   description: string | null;
   for_type: string;
   created_at: string;
-  groups: number;
+  groups_count: number;
   criteria: number;
   used_events: number;
 };
@@ -30,7 +30,7 @@ export default async function AdminCriteriaTemplatesPage({
   await requireAdminContext();
 
   const params = await searchParams;
-  const db = getDb();
+  const db = getDatabase();
 
   const page = Math.max(1, Number(params.page ?? 1) || 1);
   const pageSize = 10;
@@ -43,8 +43,8 @@ export default async function AdminCriteriaTemplatesPage({
   const values: unknown[] = [];
 
   if (keyword) {
-    where.push(`(ct.name LIKE ? OR ct.description LIKE ?)`);
-    values.push(`%${keyword}%`, `%${keyword}%`);
+    where.push(`ct.name LIKE ?`);
+    values.push(`%${keyword}%`);
   }
 
   if (forType) {
@@ -54,19 +54,13 @@ export default async function AdminCriteriaTemplatesPage({
 
   const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
 
-  const totalRow = db
-    .prepare(
-      `
+  const totalRow = (await db.first(`
       SELECT COUNT(*) AS total
       FROM criteria_templates ct
       ${whereSql}
-      `
-    )
-    .get(...values) as { total: number };
+      `, [...values])) as { total: number };
 
-  const rows = db
-    .prepare(
-      `
+  const rows = (await db.rows(`
       SELECT
         ct.id,
         ct.name,
@@ -77,7 +71,7 @@ export default async function AdminCriteriaTemplatesPage({
           SELECT COUNT(*)
           FROM criteria_template_groups g
           WHERE g.template_id = ct.id
-        ) AS groups,
+        ) AS groups_count,
         (
           SELECT COUNT(*)
           FROM criteria_template_items i
@@ -90,18 +84,16 @@ export default async function AdminCriteriaTemplatesPage({
         ) AS used_events
       FROM criteria_templates ct
       ${whereSql}
-      ORDER BY datetime(ct.created_at) DESC, ct.id DESC
+      ORDER BY CAST(ct.created_at AS DATETIME(3)) DESC, ct.id DESC
       LIMIT ? OFFSET ?
-      `
-    )
-    .all(...values, pageSize, offset) as Row[];
+      `, [...values, pageSize, offset])) as Row[];
 
   const items: AdminCriteriaTemplateItem[] = rows.map((item) => ({
     id: Number(item.id),
     name: String(item.name ?? ""),
     description: item.description ? String(item.description) : null,
     forType: String(item.for_type ?? ""),
-    groups: Number(item.groups ?? 0),
+    groups: Number(item.groups_count ?? 0),
     criteria: Number(item.criteria ?? 0),
     usedEvents: Number(item.used_events ?? 0),
     createdAt: String(item.created_at ?? ""),
@@ -113,9 +105,9 @@ export default async function AdminCriteriaTemplatesPage({
   return (
     <main className="space-y-6">
       <CriteriaTemplatesHeader />
-      <CriteriaTemplatesTable items={items} />
-
-      <Pagination
+      <div data-table-frame className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-md shadow-slate-200/60">
+<CriteriaTemplatesTable page={page} items={items} />
+<Pagination totalResults={total} resultLabel="bộ tiêu chuẩn"
         page={page}
         totalPages={totalPages}
         searchParams={{
@@ -123,6 +115,7 @@ export default async function AdminCriteriaTemplatesPage({
           forType,
         }}
       />
+</div>
     </main>
   );
 }

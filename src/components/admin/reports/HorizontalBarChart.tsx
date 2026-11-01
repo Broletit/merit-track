@@ -46,7 +46,7 @@ export default function HorizontalBarChart({
           );
         })
       ) : (
-        <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ring-1 ring-slate-100">
+        <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ring-1 ring-slate-100 shadow-md shadow-slate-200/60">
           Chưa có dữ liệu phù hợp.
         </div>
       )}

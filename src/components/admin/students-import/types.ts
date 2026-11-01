@@ -1,4 +1,6 @@
 export type ImportClassOption = {
+  faculty?: string | null;
+  cohort?: number | null;
   id: number;
   code: string;
   name: string;

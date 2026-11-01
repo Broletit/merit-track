@@ -17,7 +17,7 @@ export default function ActivityScopeForm({
   );
 
   return (
-    <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <h2 className="text-lg font-semibold text-slate-900">Phạm vi áp dụng</h2>
 
       <input type="hidden" name="scopeMode" value={scopeMode} />
@@ -71,7 +71,7 @@ export default function ActivityScopeForm({
           ))}
         </div>
       ) : (
-        <div className="mt-5 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200">
+        <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
           Hoạt động sẽ áp dụng cho toàn khoa.
         </div>
       )}

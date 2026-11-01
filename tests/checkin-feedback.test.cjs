@@ -1,0 +1,11 @@
+const fs=require('fs'),ts=require('typescript'),Module=require('module'),path=require('path'),assert=require('node:assert/strict');
+let result={ok:false,message:'Hoạt động đã kết thúc nên không thể điểm danh.'};
+const file=path.resolve('src/components/faculty-officer/checkin/FacultyOfficerManualScanForm.tsx');
+const mod=new Module(file,module);mod.filename=file;mod.paths=Module._nodeModulePaths(path.dirname(file));const original=mod.require.bind(mod);
+mod.require=id=>id==='@/server/actions/activities/scanActivityQr'?{scanActivityQr:async()=>result}:id==='@/components/common/RequiredMark'?{default:()=>null}:id==='@/components/shared/ActionFeedback'?{default:()=>null}:original(id);
+mod._compile(ts.transpileModule(fs.readFileSync(file,'utf8')+'\nexport { scanAction };',{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,file);
+(async()=>{const form=new FormData();form.set('activityId','1');form.set('mssv','25000001');
+let state=await mod.exports.scanAction({},form);assert.equal(state.ok,false);assert.equal(state.message,result.message);
+result={ok:true,message:'Điểm danh thành công.'};state=await mod.exports.scanAction({},form);assert.equal(state.ok,true);
+form.set('mssv','');state=await mod.exports.scanAction({},form);assert.equal(state.ok,false);
+console.log('Passed: rejected check-in stays error, successful check-in stays success, empty MSSV rejected.');})().catch(error=>{console.error(error);process.exitCode=1});

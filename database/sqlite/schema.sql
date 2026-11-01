@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   gender            TEXT,
   date_of_birth     TEXT,
   phone             TEXT,
+  cohort            INTEGER CHECK(cohort IS NULL OR cohort BETWEEN 17 AND 95),
   password_hash     TEXT NOT NULL,
   role              TEXT NOT NULL CHECK(role IN ('student','class_officer','faculty_officer','admin')),
   is_active         INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS classes (
   name              TEXT NOT NULL,
   faculty           TEXT,
   intake_year       INTEGER,
+  cohort            INTEGER CHECK(cohort IS NULL OR cohort BETWEEN 17 AND 95),
   is_active         INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
   created_at        TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -143,6 +145,7 @@ CREATE TABLE IF NOT EXISTS activities (
   checkin_start_at      TEXT,
   checkin_end_at        TEXT,
   conduct_score         REAL NOT NULL DEFAULT 0,
+  absence_penalty       REAL NOT NULL DEFAULT 0 CHECK(absence_penalty >= 0),
   attendance_mode       TEXT NOT NULL DEFAULT 'qr' CHECK(attendance_mode IN ('qr','manual','both')),
   qr_checkin_enabled    INTEGER NOT NULL DEFAULT 1 CHECK(qr_checkin_enabled IN (0,1)),
   created_by            INTEGER NOT NULL,
@@ -150,6 +153,7 @@ CREATE TABLE IF NOT EXISTS activities (
   published_at          TEXT,
   closed_at             TEXT,
   term_id INTEGER,
+  score_max REAL CHECK(score_max IS NULL OR score_max > 0),
   FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
 );
 
@@ -232,6 +236,7 @@ CREATE TABLE IF NOT EXISTS criteria_template_groups (
   title             TEXT NOT NULL,
   description       TEXT,
   min_required      INTEGER NOT NULL DEFAULT 1 CHECK(min_required >= 0),
+  score_max         REAL NOT NULL DEFAULT 0 CHECK(score_max >= 0),
   sort_order        INTEGER NOT NULL DEFAULT 0,
   UNIQUE(template_id, code),
   FOREIGN KEY(template_id) REFERENCES criteria_templates(id) ON DELETE CASCADE
@@ -341,6 +346,7 @@ CREATE TABLE IF NOT EXISTS event_criteria_groups (
   title             TEXT NOT NULL,
   description       TEXT,
   min_required      INTEGER NOT NULL DEFAULT 1 CHECK(min_required >= 0),
+  score_max         REAL NOT NULL DEFAULT 0 CHECK(score_max >= 0),
   sort_order        INTEGER NOT NULL DEFAULT 0,
   UNIQUE(event_id, code),
   FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE
@@ -384,6 +390,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   v1_deadline       TEXT,
   v1_note           TEXT,
   v2_note           TEXT,
+  review_round      INTEGER NOT NULL DEFAULT 1 CHECK(review_round IN (1,2)),
   FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE SET NULL,
@@ -709,3 +716,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_conduct_categories_sibling_code
 ON conduct_score_categories(term_id, COALESCE(parent_id, 0), code);
 CREATE INDEX IF NOT EXISTS idx_activity_import_batches_activity
 ON activity_import_batches(activity_id);
+
+CREATE TABLE IF NOT EXISTS activity_cohort_scopes (
+ activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+ cohort INTEGER NOT NULL CHECK(cohort BETWEEN 17 AND 95),
+ PRIMARY KEY(activity_id, cohort)
+);

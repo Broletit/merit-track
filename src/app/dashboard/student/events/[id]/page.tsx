@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireStudentContext } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { getDatabase } from "@/server/db/mysql";
 import StudentEventDetailHeader from "@/components/student/events/StudentEventDetailHeader";
 import StudentEventDetailCard from "@/components/student/events/StudentEventDetailCard";
 import StudentEventApplyForm from "@/components/student/events/StudentEventApplyForm";
@@ -34,6 +34,7 @@ type CriteriaRow = {
   description: string | null;
   group_code: string;
   group_title: string;
+  min_required: number;
   is_required: number;
   auto_passed: number;
   auto_message: string | null;
@@ -49,16 +50,14 @@ export default async function StudentEventDetailPage({
   const user = await requireStudentContext();
   const { id } = await params;
   const query=await searchParams;
-  const eventId = Number(id);
+  const eventId = await getDatabase().resolveRouteRecordId(id);
 
   if (!Number.isFinite(eventId) || eventId <= 0) notFound();
 
-  const db = getDb();
-  ensureActivityConductScores();
+  const db = getDatabase();
+  (await ensureActivityConductScores());
   
-  const event = db
-    .prepare(
-      `
+  const event = (await db.first(`
       SELECT
         e.id,
         e.title,
@@ -77,12 +76,10 @@ export default async function StudentEventDetailPage({
         ON s.event_id = e.id
        AND s.user_id = ?
       WHERE e.id = ?
-        AND e.status = 'published'
+        AND (e.status = 'published' OR (e.status = 'closed' AND s.id IS NOT NULL))
         AND e.type = 'student'
       LIMIT 1
-      `
-    )
-    .get(user.id, eventId) as EventRow | undefined;
+      `, [user.id, eventId])) as EventRow | undefined;
 
   if (!event) notFound();
 
@@ -101,15 +98,14 @@ export default async function StudentEventDetailPage({
 
   const criteriaRows =
     templateId > 0
-      ? (db
-          .prepare(
-            `
+      ? ((await db.rows(`
             SELECT
               cti.code,
               cti.title,
               cti.description,
               cti.group_code,
               ctg.title AS group_title,
+        ctg.min_required,
               cti.is_required,
 
               CASE
@@ -120,13 +116,13 @@ export default async function StudentEventDetailPage({
 
               CASE
                 WHEN attended.activity_title IS NOT NULL
-                  THEN 'Đạt tự động từ hoạt động: ' || attended.activity_title
+                  THEN CONCAT('Đạt tự động từ hoạt động: ', attended.activity_title)
 
                 WHEN conduct_result.passed = 1
-                  THEN 'Đạt tự động từ điểm rèn luyện: ' || conduct_result.total_score || ' điểm'
+                  THEN CONCAT(CONCAT('Đạt tự động từ điểm rèn luyện: ', conduct_result.total_score), ' điểm')
 
                 WHEN conduct_result.min_score IS NOT NULL
-                  THEN 'Cần đạt tối thiểu ' || conduct_result.min_score || ' điểm rèn luyện. Hiện có ' || conduct_result.total_score || ' điểm.'
+                  THEN CONCAT(CONCAT(CONCAT(CONCAT('Cần đạt tối thiểu ', conduct_result.min_score), ' điểm rèn luyện. Hiện có '), conduct_result.total_score), ' điểm.')
 
                 WHEN EXISTS (
                   SELECT 1
@@ -190,17 +186,7 @@ export default async function StudentEventDetailPage({
             ORDER BY
               ctg.sort_order ASC,
               cti.sort_order ASC
-            `
-          )
-          .all(
-            templateId,
-            user.id,
-            templateId,
-            user.id,
-            event.term_id,
-            templateId,
-            templateId
-          ) as CriteriaRow[])
+            `, [templateId, user.id, templateId, user.id, event.term_id, templateId, templateId])) as CriteriaRow[])
       : [];
 
   const item: StudentEventDetail = {
@@ -225,12 +211,13 @@ export default async function StudentEventDetailPage({
     description: row.description ? String(row.description) : null,
     groupCode: String(row.group_code ?? ""),
     groupTitle: String(row.group_title ?? ""),
+    minRequired: Number(row.min_required ?? 0),
     isRequired: Number(row.is_required ?? 0) === 1,
     autoPassed: Number(row.auto_passed ?? 0) === 1,
     autoMessage: row.auto_message ? String(row.auto_message) : null,
   }));
   const editing=query.edit==="1"&&Boolean(event.submission_id)&&canSubmit;
-  const editCriteria=editing?db.prepare(`SELECT i.code,i.title,i.description,i.group_code,g.title group_title,g.min_required,i.is_required,ar.passed auto_passed,ar.message auto_message,si.content_text,(SELECT sf.file_name FROM submission_files sf WHERE sf.submission_id=? AND sf.criteria_code=i.code ORDER BY sf.uploaded_at DESC,sf.id DESC LIMIT 1) file_name FROM event_criteria_items i INNER JOIN event_criteria_groups g ON g.event_id=i.event_id AND g.code=i.group_code LEFT JOIN submission_auto_results ar ON ar.submission_id=? AND ar.criteria_code=i.code LEFT JOIN submission_items si ON si.submission_id=? AND si.criteria_code=i.code WHERE i.event_id=? ORDER BY g.sort_order,i.sort_order`).all(event.submission_id,event.submission_id,event.submission_id,event.id) as Array<{code:string;title:string;description:string|null;group_code:string;group_title:string;min_required:number;is_required:number;auto_passed:number|null;auto_message:string|null;content_text:string|null;file_name:string|null}>:[];
+  const editCriteria=editing?(await db.rows(`SELECT i.code,i.title,i.description,i.group_code,g.title group_title,g.min_required,i.is_required,ar.passed auto_passed,ar.message auto_message,si.content_text,(SELECT sf.file_name FROM submission_ready_files sf WHERE sf.submission_id=? AND sf.criteria_code=i.code ORDER BY sf.uploaded_at DESC,sf.id DESC LIMIT 1) file_name FROM event_criteria_items i INNER JOIN event_criteria_groups g ON g.event_id=i.event_id AND g.code=i.group_code LEFT JOIN submission_auto_results ar ON ar.submission_id=? AND ar.criteria_code=i.code LEFT JOIN submission_items si ON si.submission_id=? AND si.criteria_code=i.code WHERE i.event_id=? ORDER BY g.sort_order,i.sort_order`, [event.submission_id, event.submission_id, event.submission_id, event.id])) as Array<{code:string;title:string;description:string|null;group_code:string;group_title:string;min_required:number;is_required:number;auto_passed:number|null;auto_message:string|null;content_text:string|null;file_name:string|null}>:[];
 
   return (
     <main className="space-y-6">

@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ActionFeedback from "@/components/shared/ActionFeedback";
-import { cancelActivityRegistration } from "@/server/actions/activities/cancelActivityRegistration";
 import { registerActivity } from "@/server/actions/activities/registerActivity";
 
 export default function StudentActivityRegisterButton({
@@ -11,13 +10,11 @@ export default function StudentActivityRegisterButton({
   disabled,
   label,
   registrationStatus,
-  canCancel = false,
 }: {
   activityId: number;
   disabled: boolean;
   label: string;
   registrationStatus: string | null;
-  canCancel?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -27,11 +24,11 @@ export default function StudentActivityRegisterButton({
     ["registered", "attended"].includes(String(registrationStatus))
   );
 
-  const isDisabled = disabled || pending || (registered && !canCancel);
+  const isDisabled = disabled || pending || registered;
   const defaultLabel = label === "Đã đăng ký" ? "Đăng ký" : label;
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-[10rem] w-full space-y-2">
       <ActionFeedback
         pending={pending}
         message={successMessage || errorMessage}
@@ -42,12 +39,10 @@ export default function StudentActivityRegisterButton({
         disabled={isDisabled}
         onClick={() => startTransition(async () => {
           try {
-            const result = registered
-              ? await cancelActivityRegistration(activityId)
-              : await registerActivity(activityId);
+            const result = await registerActivity(activityId);
             setSuccessMessage(result.message);
             setErrorMessage("");
-            setRegistered(!registered);
+            setRegistered(true);
             router.refresh();
           } catch (error) {
             setSuccessMessage("");
@@ -58,17 +53,11 @@ export default function StudentActivityRegisterButton({
             );
           }
         })}
-        className={`inline-flex whitespace-nowrap rounded-xl border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-          registered && canCancel
-            ? "border-red-300 bg-white text-red-700 hover:bg-red-50"
-            : "border-blue-700 bg-blue-700 text-white hover:bg-blue-800"
-        }`}
+        className="inline-flex min-h-10 w-full items-center justify-center whitespace-nowrap rounded-xl border border-blue-700 bg-blue-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending
           ? "Đang xử lý..."
-          : registered && canCancel
-            ? "Hủy đăng ký"
-            : registered
+          : registered
               ? "Đã đăng ký"
               : defaultLabel}
       </button>

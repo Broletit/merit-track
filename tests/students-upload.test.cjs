@@ -1,0 +1,27 @@
+const fs=require('fs'),ts=require('typescript'),Module=require('module'),XLSX=require('xlsx'),assert=require('node:assert/strict');
+const m=new Module('parser',module);m.paths=module.paths;m._compile(ts.transpileModule(fs.readFileSync('src/components/admin/students-import/parseStudentsUpload.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,'parser');
+const parse=m.exports.parseStudentsUpload;
+(async()=>{
+const buffer=fs.readFileSync('public/templates/mau-import-sinh-vien.xlsx');let result=await parse(new File([buffer],'sample.xlsx'));
+assert.equal(result.error,'');assert.equal(result.parsedRows.length,2);assert.equal(result.parsedRows[0].rowNumber,10);assert.equal(result.parsedRows[0].mssv,'25000001');assert.equal(result.parsedRows[0].full_name,'Nguyễn Văn A');assert.equal(result.parsedRows[0].phone,'0900000001');assert.equal(result.parsedRows[0].date_of_birth,'2007-01-01');assert.equal(result.headers.length,10);assert.equal(result.rows[0][0],'1');
+const shortDateWorkbook=XLSX.read(buffer);
+const dateCell=XLSX.utils.aoa_to_sheet([[new Date(Date.UTC(2003,9,1))]]).A1;
+dateCell.z='m/d/yy';delete dateCell.w;
+shortDateWorkbook.Sheets[shortDateWorkbook.SheetNames[0]].F10=dateCell;
+const shortDateResult=await parse(new File([XLSX.write(shortDateWorkbook,{type:'buffer',bookType:'xlsx'})],'short-date.xlsx'));
+assert.equal(shortDateResult.rows[0][5],'01/10/2003');
+assert.equal(shortDateResult.parsedRows[0].date_of_birth,'2003-10-01');
+const templateWorkbook=XLSX.read(buffer,{cellNF:true});
+assert.equal(templateWorkbook.Sheets[templateWorkbook.SheetNames[0]].F10.z,'dd/mm/yyyy');
+const wb=XLSX.read(buffer),csv=XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]],{FS:';'});result=await parse(new File(['\uFEFF'+csv],'sample.csv'));assert.equal(result.error,'');assert.equal(result.parsedRows[1].phone,'0900000002');
+result=await parse(new File([XLSX.write(wb,{type:'buffer',bookType:'biff8'})],'sample.xls'));assert.equal(result.error,'');assert.equal(result.parsedRows[0].rowNumber,10);
+result=await parse(new File(['mssv;last_name;first_name;email;phone;gender;date_of_birth\n25000001;Nguyễn Văn;An;a@example.com;0901234567;male;2007-01-01'],'legacy.csv'));assert.equal(result.error,'');assert.equal(result.parsedRows[0].full_name,'Nguyễn Văn An');assert.equal(result.parsedRows[0].rowNumber,2);
+result=await parse(new File(['Tiêu đề\nKhông có bảng'],'bad.csv'));assert.match(result.error,/tiêu đề/);
+const footerHeaders=['STT','Mã SV','Họ đệm','Tên','Giới tính','Ngày sinh','Dân tộc','Tôn giáo','Hộ khẩu thường trú','Nơi sinh','Email','Số ĐT'];
+const footerData=[footerHeaders,[1,'25000001','Nguyễn Văn','An','Nam','26/04/2007'],['Sỉ số: 31','','','','','','','TP. HCM, ngày 21 tháng 04 năm 2026'],['','','','','','','','Trưởng khoa']];
+const footerWorkbook=XLSX.utils.book_new();const footerSheet=XLSX.utils.aoa_to_sheet(footerData);XLSX.utils.book_append_sheet(footerWorkbook,footerSheet,'Sheet1');
+result=await parse(new File([XLSX.write(footerWorkbook,{type:'buffer',bookType:'xlsx'})],'footer.xlsx'));assert.equal(result.error,'');assert.equal(result.parsedRows.length,1);
+XLSX.utils.sheet_add_aoa(footerSheet,[[2,'25652611','','','Nam','06/10/2007'],[3,'','Nguyễn Hồng','Anh','Nam','06/10/2007']],{origin:'A5'});
+result=await parse(new File([XLSX.write(footerWorkbook,{type:'buffer',bookType:'xlsx'})],'missing.xlsx'));assert.equal(result.parsedRows.length,3);assert.match(result.error,/Dòng 5: thiếu họ tên/);assert.match(result.error,/Dòng 6: thiếu MSSV/);
+console.log('Passed: Vietnamese report XLSX/XLS/CSV, metadata and blank rows, original row numbers, phone zeros, birth dates, legacy headers and invalid headers.');
+})().catch(error=>{console.error(error);process.exitCode=1});

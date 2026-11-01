@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/server/auth/guards";
-import { getDb } from "@/server/db/sqlite";
+import { requireAdminContext } from "@/server/auth/guards";
+import { getDatabase } from "@/server/db/mysql";
 
 type CriteriaInput = {
   code: string;
@@ -11,8 +11,8 @@ type CriteriaInput = {
 };
 
 export async function POST(req: Request) {
-  const admin = await requireAdmin();
-  const db = getDb();
+  const admin = await requireAdminContext();
+  const db = getDatabase();
 
   try {
     const body = await req.json();
@@ -32,8 +32,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Cần ít nhất một tiêu chí." }, { status: 400 });
     }
 
-    const tx = db.transaction(() => {
-      const eventRes = db.prepare(`
+    const tx = (async () => (await db.withTransaction(async () => {
+      const eventRes = (await db.execute(`
         INSERT INTO events (
           title,
           description,
@@ -44,17 +44,10 @@ export async function POST(req: Request) {
           created_by,
           created_at
         )
-        VALUES (?, ?, ?, ?, ?, 'recognition', ?, datetime('now'))
-      `).run(
-        title,
-        description || null,
-        status,
-        startAt,
-        endAt,
-        admin.id
-      );
+        VALUES (?, ?, ?, ?, ?, 'recognition', ?, CURRENT_TIMESTAMP(3))
+      `, [title, description || null, status, startAt, endAt, admin.id]));
 
-      const eventId = Number(eventRes.lastInsertRowid);
+      const eventId = Number(eventRes.insertId);
 
       for (let i = 0; i < criteria.length; i += 1) {
         const item = criteria[i];
@@ -64,7 +57,7 @@ export async function POST(req: Request) {
 
         if (!code || !itemTitle) continue;
 
-        db.prepare(`
+        (await db.execute(`
           INSERT INTO event_criteria_items (
             event_id,
             code,
@@ -73,29 +66,23 @@ export async function POST(req: Request) {
             sort_order
           )
           VALUES (?, ?, ?, ?, ?)
-        `).run(
-          eventId,
-          code,
-          itemTitle,
-          evidenceType,
-          i + 1
-        );
+        `, [eventId, code, itemTitle, evidenceType, i + 1]));
 
         if (Array.isArray(item.activity_ids) && item.activity_ids.length > 0) {
           for (const activityId of item.activity_ids) {
-            db.prepare(`
+            (await db.execute(`
               INSERT INTO criteria_activity_rules (
                 template_id,
                 criteria_code,
                 activity_id
               )
               VALUES (?, ?, ?)
-            `).run(eventId, code, Number(activityId));
+            `, [eventId, code, Number(activityId)]));
           }
         }
 
         if (typeof item.min_score === "number" && Number(item.min_score) > 0) {
-          db.prepare(`
+          (await db.execute(`
             INSERT INTO criteria_conduct_rules (
               template_id,
               criteria_code,
@@ -103,14 +90,14 @@ export async function POST(req: Request) {
               period_scope
             )
             VALUES (?, ?, ?, 'active')
-          `).run(eventId, code, Number(item.min_score));
+          `, [eventId, code, Number(item.min_score)]));
         }
       }
 
       return eventId;
-    });
+    })));
 
-    const eventId = tx();
+    const eventId = (await tx());
 
     return NextResponse.json({
       ok: true,

@@ -1,4 +1,7 @@
 "use client";
+import { SquareX } from "lucide-react";
+import RequiredMark from "@/components/common/RequiredMark";
+
 
 import { useActionState, useMemo, useState } from "react";
 import { createCriteriaItem } from "@/server/actions/criteria-templates/createCriteriaItem";
@@ -44,6 +47,13 @@ export default function CriteriaInlineItemCreateForm({
   );
   const [activityKeyword, setActivityKeyword] = useState("");
   const [activityOpen, setActivityOpen] = useState(false);
+  const termOptions = useMemo(
+    () => Array.from(new Map(activities.map((item) => [item.termId, item.termName])).entries()),
+    [activities]
+  );
+  const [activityTermId, setActivityTermId] = useState<number>(() =>
+    activities.find((item) => item.isCurrentTerm)?.termId ?? activities[0]?.termId ?? 0
+  );
 
   function toggleActivity(activityId: number) {
     setSelectedActivityIds((current) =>
@@ -56,12 +66,14 @@ export default function CriteriaInlineItemCreateForm({
   const filteredActivities = useMemo(() => {
     const keyword = activityKeyword.trim().toLowerCase();
 
-    if (!keyword) return activities.slice(0, 30);
+    const inSelectedTerm = activities.filter((item) => item.termId === activityTermId);
 
-    return activities
+    if (!keyword) return inSelectedTerm.slice(0, 30);
+
+    return inSelectedTerm
       .filter((item) => item.title.toLowerCase().includes(keyword))
       .slice(0, 30);
-  }, [activities, activityKeyword]);
+  }, [activities, activityKeyword, activityTermId]);
 
   const selectedActivities = activities.filter((item) =>
     selectedActivityIds.includes(item.id)
@@ -109,16 +121,17 @@ export default function CriteriaInlineItemCreateForm({
     <form
       key={editingItem?.code ?? "create"}
       action={formAction}
-      className={`rounded-2xl p-4 ring-1 ${
+      className={`rounded-none p-4 shadow-md shadow-slate-200/60 ring-1 ${
         isEditing
           ? "bg-amber-50 ring-amber-200"
           : "bg-slate-50 ring-slate-200"
       }`}
     >
+      <div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-sm font-semibold text-slate-900">{isEditing ? "Chỉnh sửa tiêu chí" : "Thêm tiêu chí"}</h3><button type="button" onClick={onCancelEdit} disabled={pending} aria-label="Đóng khung nhập" title="Đóng" className="inline-flex h-10! w-10! min-h-10! min-w-10! shrink-0 items-center justify-center rounded-md! border-0! bg-transparent! p-0! text-red-500! shadow-none! transition-colors hover:bg-red-50! hover:text-red-700! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300 disabled:opacity-50"><SquareX size={24} strokeWidth={1.75} aria-hidden="true" /></button></div>
       <input type="hidden" name="groupCode" value={groupCode} />
 
       {isEditing ? (
-        <div className="mb-3 rounded-xl bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800">
+        <div className="mb-3 rounded-none bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 shadow-md shadow-slate-200/60">
           Đang sửa tiêu chí {editingItem?.code}
         </div>
       ) : null}
@@ -127,7 +140,7 @@ export default function CriteriaInlineItemCreateForm({
         <div className="md:col-span-3">
           <label className="mb-1 block text-xs font-medium text-slate-500">
             Tên tiêu chí
-          </label>
+          <RequiredMark required={true}/></label>
           <input
             name="title"
             required
@@ -190,6 +203,15 @@ export default function CriteriaInlineItemCreateForm({
 
           {activityOpen ? (
             <div className="absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+              <select
+                value={activityTermId}
+                onChange={(event) => setActivityTermId(Number(event.target.value))}
+                className="mb-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
+              >
+                {termOptions.map(([termId, termName]) => (
+                  <option key={termId} value={termId}>{termName}</option>
+                ))}
+              </select>
               <div className="max-h-48 overflow-y-auto">
                 {filteredActivities.length > 0 ? (
                   filteredActivities.map((activity) => {
@@ -249,7 +271,7 @@ export default function CriteriaInlineItemCreateForm({
             <>
               Đã chọn:{" "}
               <span className="font-medium text-slate-700">
-                {selectedActivities.map((item) => item.title).join(", ")}
+                {selectedActivities.map((item) => `${item.title} (${item.termName})`).join(", ")}
               </span>
             </>
           ) : (
@@ -258,19 +280,10 @@ export default function CriteriaInlineItemCreateForm({
         </div>
 
         <div className="flex justify-end gap-2 md:col-span-12">
-          {isEditing ? (
-            <button
-              type="button"
-              onClick={onCancelEdit}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Hủy
-            </button>
-          ) : null}
 
           <button
             disabled={pending}
-            className="h-10 rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+            className="min-h-10 h-auto rounded-xl bg-blue-700 px-5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60 py-2 max-w-full break-words"
           >
             {pending
               ? isEditing

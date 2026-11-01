@@ -1,3 +1,4 @@
+import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
 import type { AdminCriteriaGroup } from "./types";
 
 function getEvidenceLabel(evidenceType: string) {
@@ -17,28 +18,28 @@ export default function SubmissionCriteriaList({
       {groups.map((group) => (
         <section
           key={group.code}
-          className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100"
+          className={[statCardStyles.card, "min-w-0"].join(" ")}
         >
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-medium text-slate-500">{group.code}</div>
-              <h2 className="mt-1 text-2xl font-semibold text-slate-900">
+              <div className={statCardStyles.label}>{group.code}</div>
+              <h2 className={[statCardStyles.value, "text-slate-900"].join(" ")}>
                 {group.title}
               </h2>
-              <p className="mt-2 text-sm text-slate-600">{group.description}</p>
+              <p className={[statCardStyles.label, "mt-2"].join(" ")}>{group.description}</p>
             </div>
 
             <div className="flex flex-col items-end gap-2">
-              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200">
+              <div className={[statCardStyles.label, "rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200 shadow-md shadow-slate-200/60"].join(" ")}>
                 Đạt {group.passedCount}/{group.minRequired}
               </div>
 
               {group.passed ? (
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                <span className={[statCardStyles.label, "rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700"].join(" ")}>
                   Tiêu chuẩn đạt
                 </span>
               ) : (
-                <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
+                <span className={[statCardStyles.label, "rounded-full bg-rose-50 px-3 py-1 font-semibold text-rose-700"].join(" ")}>
                   Tiêu chuẩn chưa đạt
                 </span>
               )}
@@ -49,32 +50,30 @@ export default function SubmissionCriteriaList({
             {group.items.map((item) => (
               <div
                 key={item.code}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-md shadow-slate-200/60"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm font-medium text-slate-500">
+                    <div className={statCardStyles.label}>
                       {item.code}
                     </div>
                     <div className="mt-1 text-lg font-semibold text-slate-900">
                       {item.title}
                     </div>
-                    <div className="mt-2 text-sm text-slate-600">
+                    <div className={[statCardStyles.label, "mt-2"].join(" ")}>
                       {item.description}
                     </div>
                   </div>
 
                   <div className="flex flex-col items-end gap-2">
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+                    <span className={[statCardStyles.label, "rounded-full bg-white px-3 py-1 ring-1 ring-slate-200"].join(" ")}>
                       {getEvidenceLabel(item.evidenceType)}
                     </span>
 
                     {item.autoPassed ? (
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        Đạt tự động
-                      </span>
+                      <span className={[statCardStyles.label, "rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700"].join(" ")}>Đã đạt</span>
                     ) : (
-                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                      <span className={[statCardStyles.label, "rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-700"].join(" ")}>
                         Chưa đạt tự động
                       </span>
                     )}
@@ -86,7 +85,7 @@ export default function SubmissionCriteriaList({
                     {item.autoMessages.map((message, index) => (
                       <div
                         key={`${item.code}-${index}`}
-                        className="rounded-xl bg-white px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200"
+                        className={[statCardStyles.label, "rounded-none bg-white px-4 py-3 ring-1 ring-slate-200 shadow-md shadow-slate-200/60"].join(" ")}
                       >
                         {message}
                       </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import FilterRow from "@/components/shared/filters/FilterRow";
 
 export default function OfficerEventsFilter() {
   const router = useRouter();
@@ -12,12 +13,13 @@ export default function OfficerEventsFilter() {
 
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("cohort");
 
     if (value) params.set(key, value);
     else params.delete(key);
 
     params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`, {scroll:false});
   }
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export default function OfficerEventsFilter() {
   }, [keyword]);
 
   return (
-    <div className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(320px,2fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(320px,2fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
       <div className="relative">
         <Search
           size={16}
@@ -44,7 +46,6 @@ export default function OfficerEventsFilter() {
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-
       <select
         defaultValue={searchParams.get("submission") ?? ""}
         onChange={(event) => updateParam("submission", event.target.value)}
@@ -54,18 +55,16 @@ export default function OfficerEventsFilter() {
         <option value="created">Đã tạo hồ sơ</option>
         <option value="not_created">Chưa tạo hồ sơ</option>
       </select>
-
       <select
         defaultValue={searchParams.get("phase") ?? ""}
         onChange={(event) => updateParam("phase", event.target.value)}
         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
       >
-        <option value="">Tất cả tình trạng nhận</option>
-        <option value="not_open">Chưa mở nộp</option>
+        <option value="">Tất cả trạng thái tiếp nhận</option>
+        <option value="not_open">Chưa mở nhận hồ sơ</option>
         <option value="accepting">Đang nhận hồ sơ</option>
-        <option value="late_allowed">Đang nhận hồ sơ trễ</option>
-        <option value="expired">Đã hết hạn nộp</option>
+        <option value="expired">Đã hết hạn</option>
       </select>
-    </div>
+    </FilterRow>
   );
 }

@@ -1,3 +1,4 @@
+import NumberedTable from "@/components/common/NumberedTable";
 import Link from "next/link";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import ReviewFilters from "@/components/shared/reviews/ReviewFilters";
@@ -26,18 +27,19 @@ export default function ClassOfficerSubmissionsTable({
   searchParams: Record<string, string | undefined>;
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div>
+        <ReviewFilters />
+      </div>
+
+      <div className="mt-5">
         <h2 className="text-xl font-semibold text-slate-900">Danh sách hồ sơ</h2>
         
       </div>
 
-      <div className="mt-5">
-        <ReviewFilters />
-      </div>
-
-      <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-        <table className="min-w-full table-fixed divide-y divide-slate-200">
+      <div data-table-frame className="mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
+<div className="overflow-hidden rounded-none border border-slate-200">
+        <NumberedTable page={page} className="min-w-full table-fixed divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
               <th className="w-[28%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -46,7 +48,7 @@ export default function ClassOfficerSubmissionsTable({
               <th className="w-[22%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
                 Sinh viên
               </th>
-              <th className="w-[10%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
+              <th data-column-align="left" className="w-[10%] px-4 py-3  text-sm font-semibold text-slate-700 text-left">
                 Lớp
               </th>
               <th className="w-[15%] px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -78,7 +80,7 @@ export default function ClassOfficerSubmissionsTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 align-top text-sm text-slate-700">
+                  <td data-column-align="left" className="px-4 py-4 align-top text-sm text-slate-700 text-left">
                     {item.classCode}
                   </td>
 
@@ -111,10 +113,9 @@ export default function ClassOfficerSubmissionsTable({
               </tr>
             )}
           </tbody>
-        </table>
+        </NumberedTable>
       </div>
-
-      <div className="mt-5">
+<div className="mt-5">
         <ReviewPagination
           page={page}
           totalPages={totalPages}
@@ -122,6 +123,7 @@ export default function ClassOfficerSubmissionsTable({
           searchParams={searchParams}
         />
       </div>
+</div>
     </section>
   );
 }

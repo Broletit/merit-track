@@ -1,3 +1,4 @@
+import NumberedTable from "@/components/common/NumberedTable";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import ActivitiesFilter from "./AdminActivitiesFilters";
 import type { AdminActivityItem } from "./types";
@@ -21,27 +22,27 @@ function mapAudienceLabel(audienceType: string) {
   return "Không xác định";
 }
 
-export default function ActivitiesTable({
+export default function ActivitiesTable({ page = 1,
   items,
   canManage,
-}: {
+}: { page?: number;
   items: AdminActivityItem[];
   canManage: boolean;
 }) {
   return (
-    <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <div>
+    <section className="flex flex-col rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+      <div className="order-2 mt-5">
+        <ActivitiesFilter />
+      </div>
+
+      <div className="order-1">
         <h2 className="text-xl font-semibold text-slate-900">
           Danh sách hoạt động
         </h2>
       </div>
 
-      <div className="mt-5">
-        <ActivitiesFilter />
-      </div>
-
-      <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
-        <table className="min-w-[980px] table-fixed divide-y divide-slate-200">
+      <div className="order-3 mt-5 overflow-x-auto rounded-none border border-slate-200">
+        <NumberedTable page={page} className="min-w-0 table-fixed divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
               <th className="w-[34%] whitespace-nowrap px-4 py-3 text-left text-sm font-semibold text-slate-700">
@@ -148,7 +149,7 @@ export default function ActivitiesTable({
               </tr>
             )}
           </tbody>
-        </table>
+        </NumberedTable>
       </div>
     </section>
   );
