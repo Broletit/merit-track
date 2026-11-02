@@ -1,0 +1,52 @@
+.grid {
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.field {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline: 0;
+}
+
+.input {
+  display: block;
+  box-sizing: border-box;
+  inline-size: 100%;
+  width: 100%;
+  min-inline-size: 0;
+  min-width: 0;
+  max-inline-size: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .field {
+    padding-inline: 0.5rem;
+  }
+
+  .input {
+    inline-size: calc(100% - 0.75rem);
+    width: calc(100% - 0.75rem);
+    max-inline-size: calc(100% - 0.75rem);
+    max-width: calc(100% - 0.75rem);
+  }
+}
+
+@media (min-width: 560px) and (max-width: 767px) and (orientation: landscape) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

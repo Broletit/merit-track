@@ -23,8 +23,9 @@ type CriteriaRow = {
   title: string;
 };
 
-export default async function AdminCreateActivityPage() {
+export default async function AdminCreateActivityPage({ searchParams }: { searchParams: Promise<{ historical?: string }> }) {
   await requireAdminContext();
+  const historical = (await searchParams).historical === "1";
   const db = getDatabase();
   const activeTerm = (await getRequiredActiveTerm());
   const categories = (await db.rows(`WITH RECURSIVE tree AS (SELECT id,parent_id,code,name,score_max,sort_order,0 depth,CAST(CONCAT(LPAD(CAST(sort_order AS CHAR), 8, '0'), code) AS CHAR(4096)) path FROM conduct_score_categories WHERE term_id=? AND parent_id IS NULL UNION ALL SELECT c.id,c.parent_id,c.code,c.name,c.score_max,c.sort_order,tree.depth+1,CONCAT(CONCAT(CONCAT(tree.path, '/'), LPAD(CAST(c.sort_order AS CHAR), 8, '0')), c.code) FROM conduct_score_categories c JOIN tree ON c.parent_id=tree.id) SELECT * FROM tree ORDER BY path`, [activeTerm.id])) as Array<{id:number;parent_id:number|null;code:string;name:string;score_max:number;depth:number}>;
@@ -64,8 +65,9 @@ export default async function AdminCreateActivityPage() {
 
   return (
     <main className="space-y-6">
-      <ActivityFormHeader />
-      <ActivityCreateForm classes={classes} criteriaOptions={criteriaOptions} categories={categories.map((item) => ({ id: item.id, parentId:item.parent_id, depth:item.depth, code: item.code, name: item.name, scoreMax: Number(item.score_max), hasChildren: categories.some((candidate)=>candidate.parent_id===item.id) }))} />
+      <ActivityFormHeader title={historical ? "Nhập hoạt động quá khứ" : "Tạo hoạt động"} />
+      {historical ? <section className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">Chức năng tạm để nhập dữ liệu lịch sử. Sau khi tạo, vào chi tiết hoạt động để nhập file danh sách tham gia.</section> : null}
+      <ActivityCreateForm historical={historical} classes={classes} criteriaOptions={criteriaOptions} categories={categories.map((item) => ({ id: item.id, parentId:item.parent_id, depth:item.depth, code: item.code, name: item.name, scoreMax: Number(item.score_max), hasChildren: categories.some((candidate)=>candidate.parent_id===item.id) }))} />
     </main>
   );
 }

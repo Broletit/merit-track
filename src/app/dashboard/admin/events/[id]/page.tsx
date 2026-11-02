@@ -165,11 +165,11 @@ export default async function AdminEventDetailPage({
             </div>
           </div>
 
-          <div className="flex flex-col items-stretch gap-3">
-            <div className="flex flex-wrap gap-3">
+          <div className="flex w-full flex-col items-stretch gap-2 lg:w-auto lg:gap-3">
+            <div className="flex flex-wrap gap-2 lg:gap-3">
               {Boolean(event.term_is_active) ? <Link
                 href="/dashboard/admin/events"
-                className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+                className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15 lg:min-h-0 lg:flex-none"
                data-back-link>
                 <ArrowLeft size={16} />
                 Quay về
@@ -177,7 +177,7 @@ export default async function AdminEventDetailPage({
 
               <Link
                 href={`/dashboard/admin/events/${event.id}/edit`}
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-blue-900 transition hover:bg-blue-50"
+                className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-blue-900 transition hover:bg-blue-50 lg:min-h-0 lg:flex-none"
               >
                 <Pencil size={16} />
                 Chỉnh sửa

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarPlus, Plus } from "lucide-react";
+import { CalendarClock, CalendarPlus, Plus } from "lucide-react";
 import { appUi } from "@/lib/ui/appUi";
 import type { ReactNode } from "react";
 
@@ -24,6 +24,10 @@ export default function ActivitiesHeader({ termSelect }: { termSelect?: ReactNod
           <Link href="/dashboard/admin/activities/create" className={`${appUi.secondaryButton} shrink-0 whitespace-nowrap`}>
             <Plus size={16} />
             <span className="ml-2">Tạo hoạt động</span>
+          </Link>
+          <Link href="/dashboard/admin/activities/create?historical=1" className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 transition hover:bg-amber-100">
+            <CalendarClock size={16} />
+            <span className="ml-2">Nhập hoạt động quá khứ</span>
           </Link>
         </div>
       </div>

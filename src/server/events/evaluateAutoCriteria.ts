@@ -56,7 +56,8 @@ export async function evaluateAutoCriteria({
       ORDER BY sort_order ASC, code ASC
       `, [eventId])) as CriteriaRow[];
 
-  return (await Promise.all(criteriaRows.map(async (criteria) => {
+  const results: AutoCriteriaResult[] = [];
+  for (const criteria of criteriaRows) {
     const matches = (await db.rows(`
         SELECT
           a.id AS activity_id,
@@ -102,13 +103,14 @@ export async function evaluateAutoCriteria({
       conductPassed = Number(scoreRow?.total_score ?? 0) >= Number(conductRule.min_score);
     }
 
-    return {
+    results.push({
       criteriaCode: criteria.code,
       passed: matches.length > 0 || conductPassed,
       matchedActivityIds: matches.map((item) => Number(item.activity_id)),
       matchedActivityTitles: matches.map((item) =>
         String(item.activity_title ?? "")
       ),
-    };
-  })));
+    });
+  }
+  return results;
 }

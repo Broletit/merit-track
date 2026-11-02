@@ -15,8 +15,9 @@ function toIsoOrNull(value: FormDataEntryValue | null) {
 
 export async function createActivity(formData: FormData) {
   const user = await requireAdminContext();
-  const term = (await getRequiredActiveTerm());
   const db = getDatabase();
+  const historicalImport = String(formData.get("historicalImport") ?? "") === "1";
+  const term = (await getRequiredActiveTerm());
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -81,7 +82,7 @@ export async function createActivity(formData: FormData) {
     throw new Error("Thời gian không hợp lệ.");
   }
 
-  if (regStart < now) {
+  if (!historicalImport && regStart < now) {
     throw new Error("Thời gian mở đăng ký không được ở quá khứ.");
   }
 
@@ -97,7 +98,7 @@ export async function createActivity(formData: FormData) {
     throw new Error("Thời gian kết thúc hoạt động phải sau thời gian bắt đầu.");
   }
 
-  assertDateRangeInsideTerm({
+  if (!historicalImport) assertDateRangeInsideTerm({
     startAt: registrationStartAt,
     endAt: registrationEndAt,
     termStartAt: term.startAt,
@@ -105,7 +106,7 @@ export async function createActivity(formData: FormData) {
     label: "Thời gian đăng ký",
   });
 
-  assertDateRangeInsideTerm({
+  if (!historicalImport) assertDateRangeInsideTerm({
     startAt,
     endAt,
     termStartAt: term.startAt,

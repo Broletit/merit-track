@@ -385,7 +385,11 @@ export default async function OfficerAchievementsReportPage({
       || b.potential_score - a.potential_score
       || a.full_name.localeCompare(b.full_name, "vi")
     );
-  const assessment = ["ready", "potential"].includes(String(params.assessment)) ? String(params.assessment) : "";
+  const assessment = ["ready", "potential"].includes(String(params.potentialStatus))
+    ? String(params.potentialStatus)
+    : ["ready", "potential"].includes(String(params.assessment))
+      ? String(params.assessment)
+      : "";
   const filteredPotentialRows = assessment === "ready"
     ? potentialRows.filter((item) => item.missing_required === 0)
     : assessment === "potential"

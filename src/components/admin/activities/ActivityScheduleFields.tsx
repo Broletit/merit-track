@@ -1,6 +1,7 @@
 "use client";
 import FieldError from "@/components/common/FieldError";
 import RequiredMark from "@/components/common/RequiredMark";
+import styles from "./ActivityScheduleFields.module.css";
 
 
 import { useMemo, useState } from "react";
@@ -88,7 +89,7 @@ export default function ActivityScheduleFields({
   }, [form, allowPastRegistrationStart, allowRegistrationDuringActivity]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className={styles.grid}>
       <Field
         label="Mở đăng ký"
         name="registrationStartAt"
@@ -156,7 +157,7 @@ function Field({
   onChange: (name: keyof FormState, value: string) => void;
 }) {
   return (
-    <div>
+    <div className={styles.field}>
       <label className="mb-2 block text-sm font-medium text-slate-600">
         {label}
       <RequiredMark required={true}/></label>
@@ -170,7 +171,7 @@ function Field({
         disabled={disabled}
         aria-invalid={Boolean(error || serverError)}
         onChange={(event) => onChange(name, event.target.value)}
-        className={`h-11 w-full rounded-xl border px-4 text-sm outline-none transition disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${
+        className={`${styles.input} h-11 rounded-xl border px-3 text-sm outline-none transition disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${
           error || serverError
             ? "border-rose-500 bg-white ring-3 ring-rose-100 focus:border-rose-600"
             : "border-slate-200 focus:border-blue-500"

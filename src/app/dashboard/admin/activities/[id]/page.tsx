@@ -61,7 +61,7 @@ export default async function AdminActivityDetailPage({ params, searchParams }: 
   return (
     <main className="space-y-6">
       <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 flex-1 items-start gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15">
               <CalendarCheck size={26} />
@@ -81,32 +81,32 @@ export default async function AdminActivityDetailPage({ params, searchParams }: 
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 flex-col gap-2">
-            <div className="flex flex-nowrap items-center gap-2">
-            <Link href="/dashboard/admin/activities" className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/15 sm:px-4" data-back-link>
+          <div className="flex w-full shrink-0 flex-col gap-2 lg:w-auto">
+            <div className="flex flex-wrap gap-2 lg:flex-nowrap">
+            <Link href="/dashboard/admin/activities" className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/15 sm:flex-none sm:px-4" data-back-link>
               <ArrowLeft size={16} />Quay về
             </Link>
             {Boolean(activity.term_is_active) ? (
-              <Link href={`/dashboard/admin/activities/${activity.id}/edit`} className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-semibold text-blue-900 transition hover:bg-blue-50 sm:px-4">
+              <Link href={`/dashboard/admin/activities/${activity.id}/edit`} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-semibold text-blue-900 transition hover:bg-blue-50 sm:flex-none sm:px-4">
                 <Pencil size={16} />Chỉnh sửa
               </Link>
             ) : (
               <span
                 aria-disabled="true"
                 title="Học kỳ không hiện hành, chỉ được xem dữ liệu"
-                className="inline-flex shrink-0 cursor-not-allowed items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-400 shadow-sm sm:px-4"
+                className="inline-flex min-h-10 flex-1 cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-400 shadow-sm sm:flex-none sm:px-4"
               >
                 <Pencil size={16} />Chỉnh sửa
               </span>
             )}
             </div>
             {Number(activity.registrations ?? 0) > 0 ? (
-              <a href={`/api/admin/activities/${activity.id}/export`} className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl bg-amber-300 px-3 text-sm font-medium text-amber-950 transition hover:bg-amber-200">Xuất kết quả tham gia</a>
+              <a href={`/api/admin/activities/${activity.id}/export`} className="inline-flex min-h-10 w-full items-center justify-center whitespace-nowrap rounded-xl bg-amber-300 px-3 text-sm font-medium text-amber-950 transition hover:bg-amber-200">Xuất kết quả tham gia</a>
             ) : (
               <span
                 aria-disabled="true"
                 title="Chưa có người đăng ký nên chưa thể xuất danh sách"
-                className="inline-flex h-9 cursor-not-allowed items-center justify-center whitespace-nowrap rounded-xl bg-slate-200 px-3 text-sm font-medium text-slate-400"
+                className="inline-flex min-h-10 w-full cursor-not-allowed items-center justify-center whitespace-nowrap rounded-xl bg-slate-200 px-3 text-sm font-medium text-slate-400"
               >
                 Xuất danh sách tham gia
               </span>

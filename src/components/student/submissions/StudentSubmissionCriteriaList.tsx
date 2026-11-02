@@ -75,7 +75,7 @@ export default function StudentSubmissionCriteriaList({ items, editable, editHre
         const groupItems = items.filter(item => item.group_code === groupCode);
         return <div key={groupCode} className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3 border-l-4 border-blue-700 bg-blue-50 px-4 py-3"><h3 className="text-base font-semibold text-blue-950">{groupCode}. {groupTitle}</h3><p className="text-sm font-medium text-blue-900">Yêu cầu: Đạt tối thiểu {Math.max(Number(groupItems[0]?.min_required ?? 0),groupItems.filter(item=>Number(item.is_required)===1).length)}/{groupItems.length} tiêu chí</p></div>
-          <CriteriaTable className="w-full! min-w-0! table-fixed! [&_th]:whitespace-nowrap! [&_td]:whitespace-normal!  [&_td_div]:whitespace-normal!  [&_td]:[overflow-wrap:anywhere] [&_td_*]:min-w-0 [&_td_*]:max-w-full divide-y divide-slate-200 [&_tr::before]:w-auto! [&_tr::before]:text-xs! [&_tr::before]:px-1! sm:[&_tr::before]:px-2!" containerClassName="overflow-x-auto rounded-none!">
+          <CriteriaTable style={{width:"76rem",minWidth:"76rem",tableLayout:"auto"}} className="submission-criteria-table divide-y divide-slate-200 [&_th]:whitespace-nowrap! [&_td]:whitespace-normal! [&_td_div]:whitespace-normal! [&_td]:[overflow-wrap:anywhere]" containerClassName="overflow-x-auto rounded-none!">
             <colgroup><col style={{width:"8%"}}/><col style={{width:"8%"}}/><col style={{width:"34%"}}/><col style={{width:"12%"}}/><col style={{width:"22%"}}/><col style={{width:"16%"}}/></colgroup>
             <thead className="bg-blue-800 text-white"><tr>
               <th className="px-1 py-3 text-center text-sm font-semibold whitespace-nowrap break-words sm:px-3">Mã</th>

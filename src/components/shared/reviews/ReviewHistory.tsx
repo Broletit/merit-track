@@ -110,7 +110,8 @@ export default function ReviewHistory({
       <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
       {rows.length ? (
         <PaginatedTable containerClassName="mt-5" resultLabel="bản ghi" showResultCount={!singleStage} paginate={!singleStage}
-          className="w-full! min-w-0! table-fixed! [&_tr::before]:px-1! [&_th]:whitespace-nowrap! [&_td]:whitespace-normal! [&_td_div]:whitespace-normal!  [&_td]:[overflow-wrap:anywhere]">
+          style={{ width: singleStage ? "56rem" : "68rem", minWidth: singleStage ? "56rem" : "68rem", tableLayout: "auto" }}
+          className="review-history-table [&_tr::before]:px-1! [&_th]:whitespace-nowrap! [&_td]:whitespace-normal! [&_td_div]:whitespace-normal! [&_td]:[overflow-wrap:anywhere]">
           <colgroup><col style={{width:"5%"}}/><col style={{width:singleStage?"35%":"28%"}}/><col style={{width:singleStage?"22%":"19%"}}/>{!singleStage ? <col style={{width:"21%"}}/> : null}<col style={{width:singleStage?"38%":"27%"}}/></colgroup>
           <thead className="bg-blue-800 text-white"><tr>
             <th data-column-align="left" className="px-2 py-3 text-sm">Giai đoạn</th>

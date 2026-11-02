@@ -23,7 +23,7 @@ export default async function AdminActivityRegistrations({ activityId, requested
       <div className="overflow-x-auto rounded-none border border-slate-200">
         <DataTable className="activity-registrations-table">
           <colgroup><col style={{ width: '3.75rem' }}/><col/><col/><col style={{ width: '14rem' }}/><col/><col/>{showActions?<col/>:null}</colgroup>
-          <thead className="bg-blue-800 text-white" style={{ backgroundColor: "#1e40af", color: "#ffffff" }}><tr><th className="bg-blue-800 px-4 py-3 text-center text-sm text-white">STT</th>{['Họ tên', 'MSSV', 'Thời gian đăng ký', 'Trạng thái', 'Hình thức điểm danh', ...(showActions?['Thao tác']:[])].map(label => <th key={label} className="whitespace-nowrap bg-blue-800 px-4 py-3 text-left text-sm text-white">{label}</th>)}</tr></thead>
+          <thead className="bg-blue-800 text-white" style={{ backgroundColor: "#1e40af", color: "#ffffff" }}><tr><th className="bg-blue-800 px-4 py-3 text-center text-sm text-white" style={{ backgroundColor: "#1e40af", color: "#ffffff" }}>STT</th>{['Họ tên', 'MSSV', 'Thời gian đăng ký', 'Trạng thái', 'Hình thức điểm danh', ...(showActions?['Thao tác']:[])].map(label => <th key={label} className="whitespace-nowrap bg-blue-800 px-4 py-3 text-left text-sm text-white" style={{ backgroundColor: "#1e40af", color: "#ffffff" }}>{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-slate-100">{rows.map((row, index) => <tr key={row.id}>
             <td className="px-4 py-3 text-center text-sm">{(page - 1) * pageSize + index + 1}</td>
             <td className="px-4 py-3 text-sm">{row.full_name}</td><td className="px-4 py-3 text-sm">{row.mssv}</td>

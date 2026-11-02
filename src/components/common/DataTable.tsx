@@ -1,5 +1,5 @@
 import { Children, Fragment, cloneElement, isValidElement, type CSSProperties, type ReactNode, type TableHTMLAttributes } from "react";
-type CellProps={children?:ReactNode;className?:string;colSpan?:number;style?:CSSProperties;"data-column-align"?:"left"|"center"|"right"};
+type CellProps={children?:ReactNode;className?:string;colSpan?:number;style?:CSSProperties;"data-column-align"?:"left"|"center"|"right";"data-nowrap"?:boolean};
 function flat(children:ReactNode):ReactNode[]{return Children.toArray(children).flatMap(child=>isValidElement<CellProps>(child)&&child.type===Fragment?flat(child.props.children):[child]);}
 function text(node:ReactNode):string{return flat(node).map(child=>typeof child==="string"||typeof child==="number"?String(child):isValidElement<CellProps>(child)?text(child.props.children):"").join(" ").trim();}
 export function tableColumnAlignment(label:string):"left"|"center"|"right" {
@@ -9,6 +9,10 @@ export function tableColumnAlignment(label:string):"left"|"center"|"right" {
 function isStatusColumn(label:string) {
  const value=label.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[Ä‘Ä]/g,"d").toLowerCase().replace(/\s+/g," ").trim();
  return /^(?:trang thai|tinh trang)$/.test(value);
+}
+function isUnbreakableColumn(label:string) {
+ const value=label.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[ÄĐ]/g,"d").toLowerCase().replace(/\s+/g," ").trim();
+ return /^(?:stt|ma(?: |$)|mssv$|ma sv$|ma can bo$|lop$|khoa$|ngay(?: |$)|thoi gian(?: |$)|tu$|den$|trang thai$|tinh trang$|hinh thuc(?: |$)|diem danh$|thao tac$|vai tro$|doi tuong$|diem toi da$)/.test(value);
 }
 function statusLabel(value:ReactNode) {
  if(typeof value!=="string")return value;
@@ -29,10 +33,12 @@ export function alignTableChildren(children:ReactNode):ReactNode {
  const row=isValidElement<CellProps>(head)?flat(head.props.children).find(node=>isValidElement<CellProps>(node)&&node.type==='tr'):undefined;
  const alignments:Array<"left"|"center"|"right">=[];
  const statusColumns:boolean[]=[];
+ const noWrapColumns:boolean[]=[];
  if(isValidElement<CellProps>(row))for(const cell of flat(row.props.children))if(isValidElement<CellProps>(cell)){
    const alignment=cell.props['data-column-align']??tableColumnAlignment(text(cell.props.children));
    const status=isStatusColumn(text(cell.props.children));
-   for(let i=0;i<Number(cell.props.colSpan??1);i++){alignments.push(alignment);statusColumns.push(status)}
+   const noWrap=isUnbreakableColumn(text(cell.props.children));
+   for(let i=0;i<Number(cell.props.colSpan??1);i++){alignments.push(alignment);statusColumns.push(status);noWrapColumns.push(noWrap)}
  }
  function visit(node:ReactNode):ReactNode {
    if(!isValidElement<CellProps>(node))return node;
@@ -42,14 +48,15 @@ export function alignTableChildren(children:ReactNode):ReactNode {
        if(!isValidElement<CellProps>(cell)||!['td','th'].includes(String(cell.type)))return cell;
        const span=Number(cell.props.colSpan??1),alignment=cell.props['data-column-align']??(span>1?'center':alignments[column]??'center');
        column+=span;
-       const isStatus=String(cell.type)==='td' && statusColumns[column-span];
+       const index=column-span;
+       const isStatus=String(cell.type)==='td' && statusColumns[index];
        const rawLabel=statusLabel(cell.props.children);
        const content=isStatus && isValidElement<CellProps>(cell.props.children) && String(cell.props.children.type)==='span'
          ? cloneElement(cell.props.children,{className:`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass(text(cell.props.children.props.children))}`})
          : isStatus && !isValidElement(cell.props.children)
            ? <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadgeClass(String(rawLabel))}`}>{rawLabel}</span>
            : cell.props.children;
-       return cloneElement(cell,{'data-column-align':alignment,style:{...cell.props.style,textAlign:alignment,verticalAlign:'middle'}},content);
+       return cloneElement(cell,{'data-column-align':alignment,'data-nowrap':noWrapColumns[index]||undefined,style:{...cell.props.style,textAlign:alignment,verticalAlign:'middle'}},content);
      }));
    }
    if(['thead','tbody','tfoot'].includes(String(node.type)))return cloneElement(node,{},flat(node.props.children).map(visit));
@@ -57,4 +64,4 @@ export function alignTableChildren(children:ReactNode):ReactNode {
  }
  return sections.map(visit);
 }
-export default function DataTable({children,...props}:TableHTMLAttributes<HTMLTableElement>){return <table {...props}>{alignTableChildren(children)}</table>;}
+export default function DataTable({children,className,...props}:TableHTMLAttributes<HTMLTableElement>){return <table {...props} className={`responsive-data-table ${className??""}`.trim()}>{alignTableChildren(children)}</table>;}

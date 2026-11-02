@@ -184,6 +184,47 @@ body:has(.dashboard-shell) { overflow: hidden; }
   flex-wrap: nowrap !important;
 }
 
+/* Trạng thái phụ (ví dụ yêu cầu hỗ trợ) luôn nằm dưới nhãn trạng thái chính. */
+.dashboard-shell main table td > :is(span[class*="rounded-full"], span[class*="inline-flex"]) + div {
+  display: block !important;
+  clear: both;
+  width: 100%;
+  margin-top: .5rem !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.submission-support-note {
+  display: block;
+  clear: both;
+  width: 100%;
+  margin: .5rem 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #b45309 !important;
+  font-size: .75rem !important;
+  font-weight: 500 !important;
+  line-height: 1.25rem;
+  white-space: nowrap !important;
+}
+
+.submission-status-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+}
+
+.submission-status-stack .submission-support-note {
+  margin-top: 0 !important;
+}
+
 
 [data-table-frame] {
   border: 0;
@@ -361,9 +402,18 @@ div:has(> .filter-row) + div:has(table) {
 }
 
 .dashboard-shell main table.activity-registrations-table {
-  width: 100%;
-  min-width: 0;
-  table-layout: fixed !important;
+  width: max(100%, 58rem) !important;
+  min-width: 58rem !important;
+  max-width: none !important;
+  table-layout: auto !important;
+}
+
+/* Danh sách đăng ký hoạt động luôn bảo toàn cột trên cửa sổ hẹp. */
+.dashboard-shell main table.activity-registrations-table > thead,
+.dashboard-shell main table.activity-registrations-table > thead > tr,
+.dashboard-shell main table.activity-registrations-table > thead > tr > th {
+  background-color: #1e40af !important;
+  color: #fff !important;
 }
 
 table.activity-registrations-table thead tr::before,
@@ -400,6 +450,55 @@ table[data-no-row-number] tbody tr::before {
   display: none !important;
 }
 
+/* Bảng tiêu chuẩn và hành trình xét duyệt luôn giữ bề rộng dữ liệu thật.
+   Trên mobile, người dùng cuộn ngang bảng thay vì trình duyệt nén cột rồi chồng chữ. */
+table.criteria-definition-table {
+  width: 68rem !important;
+  min-width: 68rem !important;
+  table-layout: auto !important;
+}
+table.review-history-table {
+  width: 68rem !important;
+  min-width: 68rem !important;
+  table-layout: auto !important;
+}
+table.criteria-definition-table :is(th, td):nth-child(2),
+table.review-history-table :is(th, td):nth-child(2) {
+  white-space: nowrap !important;
+}
+table.criteria-definition-table :is(th, td):nth-child(4),
+table.criteria-definition-table :is(th, td):nth-child(5),
+table.review-history-table :is(th, td):nth-child(3) {
+  white-space: nowrap !important;
+}
+table.criteria-definition-table td span,
+table.review-history-table td span {
+  flex-shrink: 0;
+}
+
+/* Bảng tiêu chí đã dùng cột Mã và colgroup riêng; không chèn STT giả vì sẽ
+   làm lệch số cột, nén nội dung và hở nền ở ô tiêu đề cuối. */
+table.criteria-detail-table thead tr::before,
+table.criteria-detail-table tbody tr::before {
+  content: none !important;
+  display: none !important;
+}
+
+table.event-criteria-table thead tr::before,
+table.event-criteria-table tbody tr::before {
+  content: none !important;
+  display: none !important;
+}
+
+
+table.criteria-detail-table .criteria-status-label,
+table.criteria-detail-table .criteria-status-label * {
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  flex-shrink: 0 !important;
+}
+
 @media (max-width: 639px) {
   [data-table-results-footer] {
     padding-left: .25rem;
@@ -416,6 +515,57 @@ table[data-no-row-number] tbody tr::before {
   [data-table-results-footer] button {
     width: 1.5rem;
     min-width: 1.5rem;
+  }
+}
+
+/* Ở desktop thu hẹp, tablet và mobile: không co bảng để "vừa" màn hình.
+   Bảng nhiều cột cuộn ngang, nhờ vậy các ô không thể chồng/lấn chữ. */
+@media (max-width: 1023px) {
+  .dashboard-shell main :is(section, article, div):has(> table) {
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dashboard-shell main table.responsive-data-table {
+    width: max(100%, 48rem) !important;
+    min-width: 48rem !important;
+    max-width: none !important;
+    table-layout: auto !important;
+  }
+
+  .dashboard-shell main table.responsive-data-table:has(thead tr > :nth-child(6)) {
+    width: max(100%, 62rem) !important;
+    min-width: 62rem !important;
+  }
+
+  .dashboard-shell main table.responsive-data-table:has(thead tr > :nth-child(8)) {
+    width: max(100%, 72rem) !important;
+    min-width: 72rem !important;
+  }
+}
+
+/* Mã, ngày giờ và các nhãn thuộc một cụm luôn hiển thị nguyên vẹn. */
+.dashboard-shell main table :is(th, td)[data-nowrap="true"] {
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: keep-all !important;
+}
+
+.dashboard-shell main table td[data-nowrap="true"] :is(span, div, p, time, a) {
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: keep-all !important;
+}
+
+/* Bảng chi tiết tiêu chí có nhiều cột cố định; luôn ưu tiên cuộn ngang hơn
+   việc nén cột ở laptop hẹp và điện thoại. */
+@media (max-width: 1439px) {
+  .dashboard-shell main table.criteria-detail-table {
+    width: 76rem !important;
+    min-width: 76rem !important;
+    max-width: none !important;
+    table-layout: auto !important;
   }
 }
 
@@ -595,45 +745,51 @@ table td:last-child button:hover {
 .dashboard-shell main table [data-column-align="center"] > .flex { justify-content: center; }
 [data-back-link] { display: inline-flex !important; align-items: center; gap: .5rem; font-size: .875rem !important; font-weight: 400 !important; }
 [data-back-link] > span { margin-left: 0; font-weight: inherit; }
+[data-back-link] > svg { flex: 0 0 auto; }
+
+/* Các header có nút Quay về phải tự xuống dòng thay vì bóp hoặc cắt nút. */
+@media (max-width: 639px) {
+  .dashboard-shell main section:has([data-back-link]) > div:first-child {
+    flex-wrap: wrap;
+  }
+  .dashboard-shell main section:has([data-back-link]) > div:first-child > :first-child,
+  .dashboard-shell main section:has([data-back-link]) > div:first-child > :last-child {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .dashboard-shell main section:has([data-back-link]) > div:first-child > :last-child {
+    flex-wrap: wrap;
+  }
+  [data-back-link] {
+    flex: 0 0 auto !important;
+    width: max-content !important;
+    min-inline-size: max-content !important;
+    max-width: 100% !important;
+    min-height: 2.75rem;
+    white-space: nowrap !important;
+    overflow: visible !important;
+  }
+  [data-back-link] > span { white-space: nowrap !important; }
+
+  /* Không dùng định vị tuyệt đối cho nút xuất trên mobile: nút nằm sau tiêu đề,
+     trước bộ lọc nên không thể đè lên bất kỳ nội dung nào. */
+  .dashboard-shell main section:has(.filter-row):has(table) > div.mt-5.flex.justify-end {
+    position: static !important;
+    order: 1 !important;
+    width: 100%;
+    margin-top: .75rem !important;
+    margin-bottom: 0 !important;
+  }
+  .dashboard-shell main section:has(.filter-row):has(table) > div.mt-5.flex.justify-end > :is(button, a) {
+    max-width: 100%;
+    white-space: nowrap !important;
+  }
+}
 
 table.criteria-definition-table th:last-child,
 table.criteria-definition-table td:last-child {
   text-align: left !important;
 }
-
-@media (max-width: 639px) {
-  table.criteria-detail-table,
-  table.criteria-detail-table tbody,
-  table.criteria-detail-table tr,
-  table.criteria-detail-table td {
-    display: block;
-    width: 100% !important;
-  }
-  table.criteria-detail-table thead,
-  table.criteria-detail-table tr::before {
-    display: none !important;
-    content: none !important;
-  }
-  table.criteria-detail-table tr {
-    border-bottom: 1px solid #cbd5e1;
-    padding: .5rem .75rem;
-  }
-  table.criteria-detail-table td {
-    padding: .5rem 0 !important;
-    text-align: left !important;
-  }
-  table.criteria-detail-table td::before {
-    content: attr(data-label);
-    display: block;
-    margin-bottom: .25rem;
-    color: #64748b;
-    font-size: .75rem;
-    font-weight: 600;
-  }
-  table.criteria-detail-table td:empty::before { display: none; }
-  table.criteria-detail-table td :is(a, button, span) { max-width: 100%; }
-}
-
 
 /* Consistent blue headings for every data table, including sticky headers and STT. */
 table thead,
@@ -651,9 +807,10 @@ table thead :is(th, td) :is(span, div, a, button, svg) {
 .dashboard-shell button {
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 /* Không cho nội dung tương tác hoặc khung nhập tràn khỏi vùng hiển thị. */
@@ -663,8 +820,90 @@ table thead :is(th, td) :is(span, div, a, button, svg) {
 }
 
 .dashboard-shell main :is(button, a[role="button"]) {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+/* Trên màn hình nhỏ, dữ liệu được giữ nguyên cấu trúc bằng cuộn ngang.
+   Chỉ nội dung mô tả trong ô mới được xuống dòng; tiêu đề và nút không bị ép
+   chồng lên cột kế bên hoặc cắt mất chữ. Các bảng tiêu chí đã có giao diện
+   xếp chồng riêng nên không áp dụng bề rộng tối thiểu này. */
+@media (max-width: 639px) {
+  .dashboard-shell main :is(section, article, div):has(> table) {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dashboard-shell main table {
+    display: table !important;
+    width: max(100%, 44rem) !important;
+    min-width: 44rem !important;
+    max-width: none !important;
+    table-layout: auto !important;
+  }
+
+  /* Không có ngoại lệ chuyển bảng sang dạng thẻ trên mobile. Các phần của
+     bảng được khóa đúng display gốc để hàng tiêu đề luôn hiện đầy đủ. */
+  .dashboard-shell main table.responsive-data-table > thead {
+    display: table-header-group !important;
+    visibility: visible !important;
+    background-color: #1e40af !important;
+  }
+  .dashboard-shell main table.responsive-data-table > tbody {
+    display: table-row-group !important;
+  }
+  .dashboard-shell main table.responsive-data-table > :is(thead, tbody, tfoot) > tr {
+    display: table-row !important;
+  }
+  .dashboard-shell main table.responsive-data-table :is(th, td) {
+    display: table-cell !important;
+  }
+  .dashboard-shell main table.responsive-data-table > thead > tr > th {
+    background-color: #1e40af !important;
+    color: #fff !important;
+  }
+
+  .dashboard-shell main table td {
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  .dashboard-shell main table td :is(button, a, label) {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .dashboard-shell main table td:last-child :is(button, a) {
+    white-space: nowrap !important;
+  }
+}
+
+/* Hàng tiêu đề luôn là một dải xanh liền mạch, kể cả phần bù cuối bảng. */
+.dashboard-shell main table {
+  border-collapse: collapse;
+}
+
+.dashboard-shell main table thead,
+.dashboard-shell main table thead tr {
+  background-color: #1e40af !important;
+}
+
+.dashboard-shell main table thead tr > :last-child {
+  border-right-color: #1e40af !important;
+}
+
+/* Bảng đăng ký tự có STT nên không được chèn thêm ô STT giả của quy tắc chung.
+   Đặt sau quy tắc đánh số để luôn giữ đúng số cột và màu header trên mobile. */
+table.activity-registrations-table thead tr::before,
+table.activity-registrations-table tbody tr::before,
+table.audit-logs-table thead tr::before,
+table.audit-logs-table tbody tr::before,
+table[data-no-row-number] thead tr::before,
+table[data-no-row-number] tbody tr::before {
+  content: none !important;
+  display: none !important;
 }
 
 /* Textareas do not reserve an inline baseline below their content. */
@@ -743,3 +982,69 @@ textarea { display: block; }
 }
 
 @keyframes stat-card-led-border { to { --stat-card-led-angle: 1turn; } }
+
+/* Các bảng nhiều cột bắt buộc cuộn ngang trên viewport hẹp. Đặt ở cuối để
+   không bị các quy tắc bảng tổng quát nén lại về bề rộng màn hình. */
+table.criteria-definition-table,
+table.review-history-table,
+table.event-criteria-table,
+table.submission-criteria-table {
+  max-width: none !important;
+  table-layout: auto !important;
+}
+/* Desktop: bảng tiêu chí phủ trọn card. Bề rộng tối thiểu chỉ dành cho
+   màn hình hẹp, không được để lại khoảng trắng ở bên phải cột cuối. */
+@media (min-width: 1024px) {
+  table.criteria-definition-table,
+  table.event-criteria-table,
+  table.submission-criteria-table {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  /* Giữ các cột ngắn gần nhau; phần mô tả tiêu chí chỉ nhận phần rộng hợp lý. */
+  table.event-criteria-table col:nth-child(1) { width: 7% !important; }
+  table.event-criteria-table col:nth-child(2) { width: 9% !important; }
+  table.event-criteria-table col:nth-child(3) { width: 36% !important; }
+  table.event-criteria-table col:nth-child(4) { width: 16% !important; }
+  table.event-criteria-table col:nth-child(5) { width: 18% !important; }
+  table.event-criteria-table col:nth-child(6) { width: 14% !important; }
+}
+@media (max-width: 1023px) {
+  /* Bảng từ năm cột trở lên không được lấy bề rộng tối thiểu chung 44rem;
+     từng cột cần còn đủ chỗ cho nhãn, badge và mã không bị vỡ. */
+  .dashboard-shell main table.responsive-data-table:has(thead tr > :nth-child(5)) {
+    width: max(100%, 56rem) !important;
+    min-width: 56rem !important;
+  }
+  .dashboard-shell main table.responsive-data-table:has(thead tr > :nth-child(6)) {
+    width: max(100%, 62rem) !important;
+    min-width: 62rem !important;
+  }
+  .dashboard-shell main table.responsive-data-table:has(thead tr > :nth-child(8)) {
+    width: max(100%, 72rem) !important;
+    min-width: 72rem !important;
+  }
+  table.criteria-definition-table {
+    width: 68rem !important;
+    min-width: 68rem !important;
+  }
+  table.review-history-table {
+    width: 68rem !important;
+    min-width: 68rem !important;
+  }
+  table.event-criteria-table {
+    width: 60rem !important;
+    min-width: 60rem !important;
+  }
+  table.submission-criteria-table {
+    width: 76rem !important;
+    min-width: 76rem !important;
+  }
+}
+
+/* Đặt cuối stylesheet để không bị quy tắc STT tự động ghi đè. */
+table.event-criteria-table thead tr::before,
+table.event-criteria-table tbody tr::before {
+  content: none !important;
+  display: none !important;
+}

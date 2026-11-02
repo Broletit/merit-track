@@ -70,10 +70,12 @@ async function createActivityAction(
 export default function ActivityCreateForm({
   classes,
   categories,
+  historical = false,
 }: {
   classes: ActivityClassOption[];
   criteriaOptions: ActivityCriteriaOption[];
   categories: ConductCategoryOption[];
+  historical?: boolean;
 }) {
   const router = useRouter();
   const [audienceType, setAudienceType] = useState("student");
@@ -107,11 +109,12 @@ export default function ActivityCreateForm({
 
   return (
     <form key={state.revision} ref={formRef} action={formAction} className="space-y-6">
+      {historical ? <input type="hidden" name="historicalImport" value="1" /> : null}
       <ActionFeedback pending={pending} message={state.ok ? "" : state.message} ok={false} />
       <ActivityBasicInfoForm defaultTitle={values?.title} defaultDescription={values?.description} errorField={state.field} />
       <ActivityOrganizationForm classes={classes} defaultLevel={values?.organizerLevel} defaultClassIds={values?.classIds.map(Number)} defaultCohorts={values?.cohorts.map(Number)} errorField={state.field} />
       <ActivityAudienceStatusForm audience={audienceType} onAudienceChange={setAudienceType} status={values?.status} errorField={state.field}/>
-      <ActivityScheduleForm defaultValues={values} errorField={state.field} />
+      <ActivityScheduleForm defaultValues={values} errorField={state.field} allowPastRegistrationStart={historical} allowRegistrationDuringActivity={historical} />
       <ActivityConductForm categoryRequired={audienceType === "student"} maxRegistrations={values?.maxRegistrations??""} categories={categories} defaultCategoryId={Number(values?.conductCategoryId || 0) || undefined} defaultConductScore={Number(values?.conductScore ?? 0)} defaultQrCheckinEnabled={values?.qrCheckinEnabled ?? true} errorField={state.field} />
 
       <div className="flex justify-end">

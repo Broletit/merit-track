@@ -32,8 +32,8 @@ export default function DashboardLayout({
           roleLabel={getUiLabelByLoginContext(loginContext as never)}
         />
 
-        <main className="min-h-0 min-w-0 flex-1 overflow-auto">
-          <div className="flex min-h-full min-w-0 flex-col"><div className="min-w-0 flex-1 p-3 sm:p-6">{children}</div><SiteFooter /></div>
+        <main className="min-h-0 min-w-0 flex-1 overflow-auto bg-slate-50">
+          <div className="flex min-h-full min-w-0 flex-col bg-slate-50"><div className="min-w-0 flex-1 bg-slate-50 p-3 sm:p-6">{children}</div><SiteFooter /></div>
         </main>
       </div>
     </div>

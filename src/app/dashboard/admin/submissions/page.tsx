@@ -208,8 +208,10 @@ export default async function AdminStudentSubmissionsPage({
                     </td>
 
                     <td className="px-4 py-4 text-center align-middle">
-                      <SubmissionStatusBadge status={item.status} />
-                      {Number(item.has_support)===1 ? <div className="mt-1 text-xs text-amber-700">Có yêu cầu hỗ trợ</div> : null}
+                      <div className="submission-status-stack">
+                        <SubmissionStatusBadge status={item.status} />
+                        {Number(item.has_support)===1 ? <p className="submission-support-note">Có yêu cầu hỗ trợ</p> : null}
+                      </div>
                     </td>
 
                     <td className="px-4 py-4 align-top text-sm text-slate-700">

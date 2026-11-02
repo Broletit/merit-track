@@ -15,6 +15,8 @@
                     "db:init":  "tsx scripts/db-init.ts",
                     "db:migrate":  "tsx scripts/migrate-sqlite-to-mysql.ts",
                     "db:seed":  "tsx scripts/db-seed.ts",
+    "db:upgrade": "tsx scripts/db-upgrade.ts",
+    "reports:refresh-cache": "tsx scripts/refresh-report-assessment-cache.ts",
                     "storage:migrate-private":  "tsx scripts/migrate-public-uploads-to-private-storage.ts",
                     "typecheck":  "tsc --noEmit",
                     "storage:cleanup":  "tsx scripts/storage-cleanup.ts",
