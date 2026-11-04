@@ -106,9 +106,9 @@ export default function ConductCategoryManager({
             </form>
           ) : (
             <div className={`border-b border-slate-100 px-4 py-3 last:border-0 ${item.depth === 0 ? "bg-blue-800 text-white" : ""}`} style={{ paddingLeft: `${16 + item.depth * 24}px` }}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className={item.depth === 0 ? "font-semibold text-white" : "text-sm font-bold text-slate-700"}>{item.code}. {item.name}</div>
-                <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <div className="flex min-w-0 flex-nowrap items-start justify-between gap-3">
+                <div className={`min-w-0 flex-1 break-words ${item.depth === 0 ? "font-semibold text-white" : "text-sm font-bold text-slate-700"}`}>{item.code}. {item.name}</div>
+                <div className="ml-auto flex shrink-0 flex-nowrap items-center justify-end gap-2">
                   <span className={`text-sm font-semibold ${item.depth === 0 ? "text-white" : "text-blue-700"}`}>{item.scoreMax} điểm</span>
                   {canManage ? (
                     <>

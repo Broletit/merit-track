@@ -21,10 +21,11 @@ type ActivityRow = {
   registrations: number; registration_records: number; attended: number; created_at: string; registration_phase: string;
 };
 
-export default async function AdminActivityDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ registrationPage?: string }> }) {
+export default async function AdminActivityDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ registrationPage?: string; registrationKeyword?: string; registrationCohort?: string; registrationClassId?: string; registrationStatus?: string }> }) {
   await requireAdminContext();
   const { id } = await params;
-  const requestedPage = (await searchParams)?.registrationPage;
+  const registrationFilters = await searchParams;
+  const requestedPage = registrationFilters?.registrationPage;
   const activityId = await getDatabase().resolveRouteRecordId(id);
   if (!Number.isFinite(activityId) || activityId <= 0) notFound();
 
@@ -169,7 +170,7 @@ export default async function AdminActivityDetailPage({ params, searchParams }: 
       </section>
 
       <FacultyAttendanceImport activityId={activity.id} />
-      <AdminActivityRegistrations activityId={activity.id} requestedPage={requestedPage}/>
+      <AdminActivityRegistrations activityId={activity.id} requestedPage={requestedPage} filters={registrationFilters}/>
     </main>
   );
 }
