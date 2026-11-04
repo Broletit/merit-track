@@ -116,7 +116,7 @@ export default function ActivitiesTable({ page = 1,
 
                   <td className="px-4 py-4 text-center align-top">
                     <div className="flex justify-center gap-2">
-                    <TableActionLink href={`/dashboard/admin/activities/${item.id}`} variant="view">Xem</TableActionLink>
+                    <TableActionLink href={`/dashboard/admin/activities/${item.id}`} variant="view" hardReload>Xem</TableActionLink>
                     <TableActionLink
                       href={`/dashboard/admin/activities/${item.id}/edit`}
                       variant="edit"

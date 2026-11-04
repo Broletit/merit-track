@@ -1,13 +1,11 @@
 import DataTable from "@/components/common/DataTable";
 import { getDatabase } from "@/server/db/mysql";
-import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
 import CancelRegistrationControl from "./CancelRegistrationControl";
 import TableResultsFooter from "@/components/common/TableResultsFooter";
 import PaginationArrow from "@/components/common/PaginationArrow";
 import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 
 export default async function AdminActivityRegistrations({ activityId, requestedPage = '1' }: { activityId: number; requestedPage?: string }) {
-  (await ensureActivityConductScores());
   const db = getDatabase();
   const activity=(await db.first("SELECT CASE WHEN end_at IS NOT NULL AND CAST(end_at AS DATETIME(3))<=CURRENT_TIMESTAMP(3) THEN 1 ELSE 0 END AS ended FROM activities WHERE id=?", [activityId])) as {ended:number}|undefined;
   const showActions=Boolean(activity) && !activity?.ended;

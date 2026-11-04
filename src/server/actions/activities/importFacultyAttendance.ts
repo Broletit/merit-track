@@ -32,13 +32,22 @@ export async function importFacultyAttendance(activityId: number, formData: Form
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const hash = createHash("sha256").update(buffer).digest("hex");
+  const previousImport = (await db.first(`
+      SELECT id, file_name, imported_at
+      FROM activity_import_batches
+      WHERE activity_id = ? AND file_hash = ?
+      LIMIT 1
+      `, [activityId, hash])) as { id: number; file_name: string; imported_at: string } | undefined;
+  if (previousImport) {
+    throw new Error(`File “${file.name}” đã được nhập cho hoạt động này trước đó. Vui lòng chọn file khác; nếu cần cập nhật lại toàn bộ danh sách, hãy chỉnh sửa nội dung file rồi chọn “Thay thế danh sách”.`);
+  }
   const rows = parseAttendanceFile(buffer, file.name);
 
-  type ResolvedUser = { id: number; full_name: string; class_id: number | null; class_code: string | null; class_name: string | null };
+  type ResolvedUser = { id: number; full_name: string; is_active: number; class_id: number | null; class_code: string | null; class_name: string | null };
   const usersByMssv = new Map<string, ResolvedUser | undefined>();
   for (const row of rows) {
     if (!row.mssv || usersByMssv.has(row.mssv)) continue;
-    const user = (await db.first(`SELECT u.id,u.full_name,c.id class_id,c.code class_code,c.name class_name FROM users u LEFT JOIN class_members cm ON cm.user_id=u.id AND cm.left_at IS NULL LEFT JOIN classes c ON c.id=cm.class_id WHERE u.mssv=? AND u.is_active=1 LIMIT 1`, [row.mssv])) as ResolvedUser | undefined;
+    const user = (await db.first(`SELECT u.id,u.full_name,u.is_active,c.id class_id,c.code class_code,c.name class_name FROM users u LEFT JOIN class_members cm ON cm.user_id=u.id AND cm.left_at IS NULL LEFT JOIN classes c ON c.id=cm.class_id WHERE u.mssv=? LIMIT 1`, [row.mssv])) as ResolvedUser | undefined;
     usersByMssv.set(row.mssv, user);
   }
 
@@ -59,7 +68,8 @@ export async function importFacultyAttendance(activityId: number, formData: Form
   }
 
   const affectedUsers = new Set<number>();
-  const result = { total: rows.length, success: 0, invalid: 0, duplicate: 0 };
+  const result = { total: rows.length, success: 0, updated: 0, invalid: 0, duplicateInFile: 0 };
+  let batchId = 0;
   const tx = (async () => (await db.withTransaction(async () => {
     let conductPeriod = (await db.first(`SELECT id FROM conduct_periods WHERE academic_year=? AND semester=? LIMIT 1`, [term.academic_year, term.semester])) as {id:number}|undefined;
     if(!conductPeriod){
@@ -74,12 +84,13 @@ export async function importFacultyAttendance(activityId: number, formData: Form
       INSERT INTO activity_import_batches (activity_id, file_name, file_hash, import_mode, reason, total_rows, imported_by)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [activityId, file.name, hash, mode, reason, rows.length, admin.id]));
-    const batchId = Number(batch.insertId);
+    batchId = Number(batch.insertId);
     const seen = new Set<string>();
 
     for (const row of rows) {
       if (!row.mssv || seen.has(row.mssv)) {
-        result[row.mssv ? "duplicate" : "invalid"]++;
+        if (row.mssv) result.duplicateInFile++;
+        else result.invalid++;
         (await db.execute(`INSERT INTO activity_import_rows (batch_id,\`row_number\`,mssv,status,message) VALUES (?,?,?,?,?)`, [batchId, row.rowNumber, row.mssv || null, row.mssv ? "duplicate" : "invalid", row.mssv ? "MSSV trùng trong file" : "Thiếu MSSV"]));
         continue;
       }
@@ -87,7 +98,12 @@ export async function importFacultyAttendance(activityId: number, formData: Form
       const user = usersByMssv.get(row.mssv);
       if (!user) {
         result.invalid++;
-        (await db.execute(`INSERT INTO activity_import_rows (batch_id,\`row_number\`,mssv,status,message) VALUES (?,?,?,?,?)`, [batchId, row.rowNumber, row.mssv, "invalid", "Không tìm thấy sinh viên đang hoạt động"]));
+        (await db.execute(`INSERT INTO activity_import_rows (batch_id,\`row_number\`,mssv,status,message) VALUES (?,?,?,?,?)`, [batchId, row.rowNumber, row.mssv, "invalid", "Không tìm thấy MSSV trong hệ thống"]));
+        continue;
+      }
+      if (!Number(user.is_active)) {
+        result.invalid++;
+        (await db.execute(`INSERT INTO activity_import_rows (batch_id,\`row_number\`,mssv,user_id,status,message) VALUES (?,?,?,?,?,?)`, [batchId, row.rowNumber, row.mssv, user.id, "invalid", "Tài khoản sinh viên đã bị vô hiệu hóa"]));
         continue;
       }
       if (!user.class_id) {
@@ -116,15 +132,30 @@ export async function importFacultyAttendance(activityId: number, formData: Form
         VALUES (?, ?, 'activity', ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE period_id=VALUES(period_id),score_value=VALUES(score_value),note=VALUES(note),created_by=VALUES(created_by)
       `, [user.id, conductPeriod.id, activityId, Number(activity.conduct_score ?? 0), importNote, admin.id]));
-      result[existing ? "duplicate" : "success"]++;
+      result[existing ? "updated" : "success"]++;
       (await notifyActivityAttendance(db, activityId, user.id));
       affectedUsers.add(user.id);
       (await db.execute(`INSERT INTO activity_import_rows (batch_id,\`row_number\`,mssv,user_id,status,message) VALUES (?,?,?,?,?,?)`, [batchId, row.rowNumber, row.mssv, user.id, "imported", existing ? "Cập nhật bản ghi đã có" : null]));
     }
-    (await db.execute(`UPDATE activity_import_batches SET success_rows=?,error_rows=? WHERE id=?`, [result.success + result.duplicate, result.invalid, batchId]));
+    (await db.execute(`UPDATE activity_import_batches SET success_rows=?,error_rows=? WHERE id=?`, [result.success + result.updated, result.invalid + result.duplicateInFile, batchId]));
     (await writeAuditLog({ db, actorUserId: admin.id, action: "activity.attendance.import", entityType: "activity", entityId: activityId, reason, before: mode === "replace" ? "Danh sách nhập trước" : null, after: { ...result, title: String(activity.title ?? "") }, meta: { fileName: file.name, hash, mode, batchId } }));
   })));
-  (await tx());
+  try {
+    await tx();
+  } catch (error) {
+    if (error instanceof Error && /Duplicate entry .*activity_import_batches|uq_activity_import_batches_1/i.test(error.message)) {
+      throw new Error(`File “${file.name}” đã được nhập cho hoạt động này trước đó. Vui lòng chọn file khác; nếu cần cập nhật lại toàn bộ danh sách, hãy chỉnh sửa nội dung file rồi chọn “Thay thế danh sách”.`);
+    }
+    throw error;
+  }
+
+  const issueSummary = (await db.rows(`
+      SELECT status, message, COUNT(*) AS total, MIN(\`row_number\`) AS sample_row
+      FROM activity_import_rows
+      WHERE batch_id = ? AND status <> 'imported'
+      GROUP BY status, message
+      ORDER BY total DESC, sample_row ASC
+      `, [batchId])) as Array<{ status: string; message: string | null; total: number; sample_row: number }>;
 
   for (const userId of affectedUsers) {
     const submissions = (await db.rows(`SELECT s.id FROM submissions s INNER JOIN events e ON e.id=s.event_id WHERE s.user_id=? AND e.term_id=?`, [userId, activity.term_id])) as { id: number }[];
@@ -136,5 +167,5 @@ export async function importFacultyAttendance(activityId: number, formData: Form
   revalidatePath(`/dashboard/admin/activities/${activityId}`);
   revalidatePath("/dashboard/student/activities");
   revalidatePath("/dashboard/student/conduct-score");
-  return { ok: true as const, requiresConfirmation: false as const, message: `Đã xử lý ${result.total} dòng: ${result.success + result.duplicate} hợp lệ, ${result.invalid} lỗi.`, result };
+  return { ok: true as const, requiresConfirmation: false as const, message: `Đã xử lý ${result.total} dòng: ${result.success + result.updated} hợp lệ, ${result.invalid + result.duplicateInFile} lỗi.`, result, issueSummary };
 }

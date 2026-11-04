@@ -3,6 +3,7 @@ import SiteFooter from "./SiteFooter";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { getUiLabelByLoginContext } from "@/server/auth/role-context";
+import DashboardRouteViewport from "./DashboardRouteViewport";
 
 export default function DashboardLayout({
   children,
@@ -21,6 +22,7 @@ export default function DashboardLayout({
 
   return (
     <div className="dashboard-shell flex h-dvh overflow-hidden bg-slate-50">
+      <DashboardRouteViewport />
       <Sidebar role={loginContext} emailMissing={emailMissing} />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">

@@ -2,6 +2,7 @@ import { getDatabase } from "@/server/db/mysql";
 
 export async function ensureActivityConductScores() {
   const db = getDatabase();
+  try {
   (await (async () => (await db.withTransaction(async () => {
     (await db.execute(`UPDATE activity_registrations
       SET status='absent', note=COALESCE(note,'Vắng sau khi kết thúc hoạt động')
@@ -33,4 +34,11 @@ export async function ensureActivityConductScores() {
       ON DUPLICATE KEY UPDATE period_id=VALUES(period_id),score_value=VALUES(score_value),note=VALUES(note)`, [row.user_id, period.id, row.activity_id, absent ? -Number(row.conduct_score) : Number(row.conduct_score), (absent ? 'Trừ điểm do đăng ký nhưng không tham gia: ' : 'Cộng điểm từ hoạt động: ')+row.title]));
     }
   })))());
+  } catch (error) {
+    // This maintenance task is invoked lazily by several read pages. A concurrent
+    // import/check-in may already hold the write lock; never make a page fail just
+    // because that same score synchronization is in progress elsewhere.
+    if (error instanceof Error && /lock wait timeout|deadlock/i.test(error.message)) return;
+    throw error;
+  }
 }

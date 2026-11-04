@@ -16,6 +16,7 @@ import type {
   ActivityCriteriaOption,
   ConductCategoryOption,
 } from "./types";
+import type { AcademicTermView } from "@/server/academic-terms/getAcademicTermForView";
 
 const initialState: ActivityCreateState = {
   ok: false,
@@ -70,15 +71,20 @@ async function createActivityAction(
 export default function ActivityCreateForm({
   classes,
   categories,
+  defaultTermId,
   historical = false,
+  terms = [],
 }: {
   classes: ActivityClassOption[];
   criteriaOptions: ActivityCriteriaOption[];
   categories: ConductCategoryOption[];
+  defaultTermId?: number;
   historical?: boolean;
+  terms?: AcademicTermView[];
 }) {
   const router = useRouter();
   const [audienceType, setAudienceType] = useState("student");
+  const [historicalTermId, setHistoricalTermId] = useState(defaultTermId ?? 0);
   const [state, formAction, pending] = useActionState(
     createActivityAction,
     initialState
@@ -114,8 +120,17 @@ export default function ActivityCreateForm({
       <ActivityBasicInfoForm defaultTitle={values?.title} defaultDescription={values?.description} errorField={state.field} />
       <ActivityOrganizationForm classes={classes} defaultLevel={values?.organizerLevel} defaultClassIds={values?.classIds.map(Number)} defaultCohorts={values?.cohorts.map(Number)} errorField={state.field} />
       <ActivityAudienceStatusForm audience={audienceType} onAudienceChange={setAudienceType} status={values?.status} errorField={state.field}/>
-      <ActivityScheduleForm defaultValues={values} errorField={state.field} allowPastRegistrationStart={historical} allowRegistrationDuringActivity={historical} />
-      <ActivityConductForm categoryRequired={audienceType === "student"} maxRegistrations={values?.maxRegistrations??""} categories={categories} defaultCategoryId={Number(values?.conductCategoryId || 0) || undefined} defaultConductScore={Number(values?.conductScore ?? 0)} defaultQrCheckinEnabled={values?.qrCheckinEnabled ?? true} errorField={state.field} />
+      {historical ? (
+        <section className="rounded-2xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+          <label className="block max-w-xl text-sm font-medium text-slate-600">
+            Học kỳ
+            <select name="termId" required value={historicalTermId} onChange={(event) => setHistoricalTermId(Number(event.target.value))} className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500">
+              {terms.map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}
+            </select>
+          </label>
+        </section>
+      ) : <ActivityScheduleForm defaultValues={values} errorField={state.field} />}
+      <ActivityConductForm key={historical ? `historical-${historicalTermId}` : "current"} categoryRequired={audienceType === "student"} maxRegistrations={values?.maxRegistrations??""} categories={historical ? categories.filter((item) => item.termId === historicalTermId) : categories} defaultCategoryId={Number(values?.conductCategoryId || 0) || undefined} defaultConductScore={Number(values?.conductScore ?? 0)} defaultQrCheckinEnabled={values?.qrCheckinEnabled ?? true} errorField={state.field} />
 
       <div className="flex justify-end">
         <button

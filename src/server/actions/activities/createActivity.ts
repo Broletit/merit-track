@@ -17,7 +17,7 @@ export async function createActivity(formData: FormData) {
   const user = await requireAdminContext();
   const db = getDatabase();
   const historicalImport = String(formData.get("historicalImport") ?? "") === "1";
-  const term = (await getRequiredActiveTerm());
+  let term = historicalImport ? null : await getRequiredActiveTerm();
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -34,10 +34,31 @@ export async function createActivity(formData: FormData) {
   const qrCheckinEnabled =
     String(formData.get("qrCheckinEnabled") ?? "") === "on" ? 1 : 0;
 
-  const startAt = toIsoOrNull(formData.get("startAt"));
-  const endAt = toIsoOrNull(formData.get("endAt"));
-  const registrationStartAt = toIsoOrNull(formData.get("registrationStartAt"));
-  const registrationEndAt = toIsoOrNull(formData.get("registrationEndAt"));
+  let startAt = toIsoOrNull(formData.get("startAt"));
+  let endAt = toIsoOrNull(formData.get("endAt"));
+  let registrationStartAt = toIsoOrNull(formData.get("registrationStartAt"));
+  let registrationEndAt = toIsoOrNull(formData.get("registrationEndAt"));
+
+  if (historicalImport) {
+    const termId = Number(formData.get("termId") ?? 0);
+    const selectedTerm = termId > 0 ? (await db.first(`
+        SELECT id, academic_year, semester, name, start_at, end_at
+        FROM academic_terms WHERE id = ? LIMIT 1
+        `, [termId])) as { id:number; academic_year:string; semester:string; name:string; start_at:string; end_at:string } | undefined : undefined;
+    if (!selectedTerm) throw new Error("Vui lòng chọn học kỳ để nhập hoạt động quá khứ.");
+
+    term = { id:Number(selectedTerm.id), academicYear:String(selectedTerm.academic_year), semester:String(selectedTerm.semester), name:String(selectedTerm.name), startAt:String(selectedTerm.start_at), endAt:String(selectedTerm.end_at) };
+    const rangeStart = new Date(term.startAt).getTime();
+    const rangeEnd = new Date(term.endAt).getTime();
+    if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd) || rangeEnd - rangeStart < 3) throw new Error("Thời gian học kỳ không hợp lệ.");
+    const span = rangeEnd - rangeStart;
+    registrationStartAt = new Date(rangeStart).toISOString();
+    registrationEndAt = new Date(rangeStart + Math.floor(span / 3)).toISOString();
+    startAt = new Date(rangeStart + Math.floor((span * 2) / 3)).toISOString();
+    endAt = new Date(rangeEnd).toISOString();
+  }
+
+  if (!term) throw new Error("Chưa xác định được học kỳ của hoạt động.");
 
   if (!title) throw new Error("Vui lòng nhập tên hoạt động.");
   if (!description) throw new Error("Vui lòng nhập mô tả hoạt động.");

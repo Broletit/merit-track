@@ -3,7 +3,10 @@
 }
 .form {
   display: grid;
-  grid-template-columns: 14rem minmax(0, 1fr) minmax(0, 1fr) 15rem auto;
+  grid-template-columns: minmax(0, 8fr) minmax(0, 2fr);
+  grid-template-areas:
+    "parent score"
+    "name actions";
   align-items: start;
   gap: 12px;
   min-width: 0;
@@ -19,22 +22,39 @@
   font-size: 14px;
 }
 .actions {
+  grid-area: actions;
   align-self: start;
   margin-top: 28px;
   max-width: 100%;
 }
+button.actions {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+div.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.parent { grid-area: parent; }
+.name { grid-area: name; }
+.score { grid-area: score; }
 @container conduct-categories (max-width: 70rem) {
   .form {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 8fr) minmax(0, 2fr);
   }
-  .code { grid-column: 1; grid-row: 1; }
-  .score { grid-column: 2; grid-row: 1; }
-  .name { grid-column: 1; grid-row: 2; }
-  .parent { grid-column: 2; grid-row: 2; }
-  .actions { grid-column: 1 / -1; margin-top: 0; justify-self: end; }
 }
 @container conduct-categories (max-width: 36rem) {
-  .form { grid-template-columns: minmax(0, 1fr); }
-  .code, .score, .name, .parent { grid-column: 1; grid-row: auto; }
+  .form {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "parent"
+      "score"
+      "name"
+      "actions";
+  }
+  .actions { margin-top: 0; justify-self: end; }
   .form input, .form select { font-size: 16px; }
 }

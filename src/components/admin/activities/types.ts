@@ -15,6 +15,7 @@ export type ActivityCriteriaOption = {
 
 export type ConductCategoryOption = {
   id: number;
+  termId?: number;
   code: string;
   name: string;
   scoreMax: number;
