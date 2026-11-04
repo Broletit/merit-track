@@ -8,7 +8,7 @@ async function seed() {
   const db=getDatabase();
   await db.withTransaction(async()=>{
     if(await db.first("SELECT id FROM users WHERE mssv=?",[account]))throw new Error("Admin account already exists; seeding will not overwrite it.");
-    await db.execute("INSERT INTO users(mssv,full_name,password_hash,role,is_active,must_change_pw) VALUES(?,?,?,'admin',1,1)",[account,process.env.SEED_ADMIN_NAME||"Quản trị hệ thống",hashPasswordSync(password)]);
+    await db.execute("INSERT INTO users(mssv,full_name,password_hash,role,is_active,must_change_pw) VALUES(?,?,?,'admin',1,1)",[account,process.env.SEED_ADMIN_NAME||"Quản trị viên",hashPasswordSync(password)]);
   });
   console.log("Created administrator. No user data was overwritten.");
 }

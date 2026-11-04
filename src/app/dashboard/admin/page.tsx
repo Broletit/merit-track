@@ -1,5 +1,6 @@
 import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   Activity,
   AlertTriangle,
@@ -40,6 +41,11 @@ export default async function AdminDashboardPage({
   const params = await searchParams;
   const db = getDatabase();
   const terms = (await getAcademicTermsForSelect());
+
+  if (terms.length === 0) {
+    redirect("/dashboard/admin/academic-terms");
+  }
+
   const term = (await getAcademicTermForView(params.termId));
   const summary = (await getAdminOverviewSummary(term.id));
   const rates = calculateOverviewRates(summary);
@@ -82,7 +88,7 @@ export default async function AdminDashboardPage({
           icon={<UsersRound size={20} />}
           label="Sinh viên đang quản lý"
           value={summary.active_students}
-          hint="Bao gồm sinh viên và cán bộ lớp đang hoạt động"
+          hint="Bao gồm Sinh viên và Cán bộ đang hoạt động."
           href="/dashboard/admin/users"
         />
         <OverviewCard

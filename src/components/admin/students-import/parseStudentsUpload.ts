@@ -58,13 +58,22 @@ export async function parseStudentsUpload(file: File): Promise<StudentsUploadPre
   const firstRowNumber = sheet["!ref"] ? XLSX.utils.decode_range(sheet["!ref"]).s.r + headerIndex + 2 : headerIndex + 2;
   const parsedRows = rows.flatMap((row, index): ParsedImportStudentRow[] => {
     if (row.every((value) => !value.trim())) return [];
-    const hasStudentNumber = /^\d+$/.test(getValue(row, "mssv")) || /^\d+$/.test(getValue(row, "stt"));
-    const isFooter = row.some(value => /^(si_so(?:_|$)|sy_so(?:_|$)|tong_so(?:_|$)|tp_.*_ngay_|truong_khoa$)/.test(normalizeHeader(value)));
-    if (isFooter && !hasStudentNumber) return [];
-    const studentFields = ["mssv", "full_name", "last_name", "first_name", "email", "phone", "gender", "date_of_birth"];
-    if (!studentFields.some(field => getValue(row, field))) return [];
-    return [{ rowNumber: firstRowNumber + index, mssv: getValue(row, "mssv"),
-      full_name: getValue(row, "full_name") || [getValue(row, "last_name"), getValue(row, "first_name")].filter(Boolean).join(" "),
+    const mssv = getValue(row, "mssv");
+    const fullName = getValue(row, "full_name") || [getValue(row, "last_name"), getValue(row, "first_name")].filter(Boolean).join(" ");
+    const hasSupportingStudentData = ["email", "phone", "gender", "date_of_birth"].some((field) => Boolean(getValue(row, field)));
+    const hasMssvFormat = /^\d{6,}$/.test(mssv);
+
+    // Footer/signature rows may contain arbitrary text in columns such as gender
+    // or address. Treat a row as student data only when it has a real MSSV, or
+    // when a name is accompanied by another student field (so a missing MSSV is
+    // still reported clearly).
+    const isStudentDataRow =
+      (hasMssvFormat && (Boolean(fullName) || hasSupportingStudentData)) ||
+      (Boolean(fullName) && (Boolean(mssv) || hasSupportingStudentData));
+    if (!isStudentDataRow) return [];
+
+    return [{ rowNumber: firstRowNumber + index, mssv,
+      full_name: fullName,
       email: getValue(row, "email") || null, phone: getValue(row, "phone") || null,
       gender: getValue(row, "gender") || null, date_of_birth: normalizeBirthDate(getValue(row, "date_of_birth")) || null }];
   });

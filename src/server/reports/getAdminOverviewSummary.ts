@@ -27,7 +27,7 @@ export async function getAdminOverviewSummary(termId: number, cohortValue?: unkn
 
   return (await db.first(`
       SELECT
-        (SELECT COUNT(*) FROM users WHERE role IN ('student', 'class_officer') AND is_active = 1 AND ${cohortClause(cohortValue,"users.cohort")})
+        (SELECT COUNT(*) FROM users WHERE role IN ('student', 'class_officer', 'faculty_officer') AND is_active = 1 AND ${cohortClause(cohortValue,"users.cohort")})
           AS active_students,
         (SELECT COUNT(*) FROM classes WHERE is_active = 1 AND ${cohortClause(cohortValue,"classes.cohort")})
           AS active_classes,

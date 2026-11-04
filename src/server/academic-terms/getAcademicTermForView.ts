@@ -96,12 +96,35 @@ export async function getAcademicTermForView(termId?: string | number | null) {
 
   const active = (await getActiveAcademicTerm());
 
-  if (!active) {
-    throw new Error("Chưa có học kỳ đang áp dụng.");
+  if (active) {
+    return {
+      ...active,
+      isActive: true,
+    };
+  }
+
+  // Trang xem dữ liệu (dashboard, danh sách, báo cáo) vẫn cần hoạt động sau
+  // khi dữ liệu được chuyển sang hệ thống mới nhưng chưa chọn học kỳ hiện hành.
+  // Các thao tác cần ghi dữ liệu vẫn dùng getRequiredActiveTerm() và tiếp tục
+  // yêu cầu quản trị viên thiết lập học kỳ đang áp dụng.
+  const latest = (await db.first(`
+      SELECT id, academic_year, semester, name, start_at, end_at, is_active
+      FROM academic_terms
+      ORDER BY CAST(start_at AS DATETIME(3)) DESC, id DESC
+      LIMIT 1
+      `, [])) as Row | undefined;
+
+  if (!latest) {
+    throw new Error("Chưa có học kỳ trong hệ thống. Vui lòng tạo học kỳ trước.");
   }
 
   return {
-    ...active,
-    isActive: true,
+    id: Number(latest.id),
+    academicYear: String(latest.academic_year ?? ""),
+    semester: String(latest.semester ?? ""),
+    name: String(latest.name ?? ""),
+    startAt: String(latest.start_at ?? ""),
+    endAt: String(latest.end_at ?? ""),
+    isActive: false,
   };
 }
