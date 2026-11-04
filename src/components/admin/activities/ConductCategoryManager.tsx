@@ -65,7 +65,7 @@ export default function ConductCategoryManager({
           <label className={styles.name}><span className="mb-2 block text-sm font-medium text-slate-600">Tên mục<RequiredMark required={true}/></span><input name="name" required placeholder="Hoạt động đoàn thể và phong trào thanh niên" className="h-11 rounded-xl border border-slate-200 px-3" /></label>
           <label className={styles.parent}><span className="mb-2 block text-sm font-medium text-slate-600">Mục cha</span><select name="parentId" className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3">
             <option value="">Cấp 1 (không có mục cha)</option>
-            {items.map((item) => <option key={item.id} value={item.id}>{"— ".repeat(item.depth)}{item.code} {item.name}</option>)}
+            {items.map((item) => <option key={item.id} value={item.id}>{"— ".repeat(item.depth)}{item.code}. {item.name}</option>)}
           </select></label>
           <label className={styles.score}><span className="mb-2 block text-sm font-medium text-slate-600">Điểm tối đa<RequiredMark required={true}/></span><input name="scoreMax" type="number" min="0.5" step="0.5" required placeholder="10" className="h-11 rounded-xl border border-slate-200 px-3" /></label>
           <button disabled={pending} className={`${styles.actions} min-h-11 h-auto rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white disabled:opacity-60 py-2 max-w-full break-words`}>{pending ? "Đang lưu..." : "Thêm mục"}</button>
@@ -113,7 +113,7 @@ export default function ConductCategoryManager({
           ) : (
             <div className={`border-b border-slate-100 px-4 py-3 last:border-0 ${item.depth === 0 ? "bg-blue-800 text-white" : ""}`} style={{ paddingLeft: `${16 + item.depth * 24}px` }}>
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className={item.depth === 0 ? "font-semibold text-white" : "text-sm font-bold text-slate-700"}>{item.code} {item.name}</div>
+                <div className={item.depth === 0 ? "font-semibold text-white" : "text-sm font-bold text-slate-700"}>{item.code}. {item.name}</div>
                 <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
                   <span className={`text-sm font-semibold ${item.depth === 0 ? "text-white" : "text-blue-700"}`}>{item.scoreMax} điểm</span>
                   {canManage ? (

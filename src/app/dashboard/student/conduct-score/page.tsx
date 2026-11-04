@@ -182,7 +182,7 @@ export default async function StudentConductScorePage({
             const closingItems=scoreFrame.slice(0,index+1).filter((candidate)=>frameActivities.some((activity)=>activity.conduct_category_id===candidate.id)&&belongsToSubtree(item,candidate)&&!belongsToSubtree(nextItem,candidate)).sort((a,b)=>b.depth-a.depth);
             return <Fragment key={item.id}>
               <div className={`flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 ${item.depth===0 ? "bg-blue-800 text-white" : "bg-slate-50"}`} style={{paddingLeft:`${16+item.depth*24}px`}}>
-                <div className={item.depth===0?"font-semibold text-white":"text-sm font-medium text-slate-800"}>{item.code} {item.name}</div>
+                <div className={item.depth===0?"font-semibold text-white":"text-sm font-medium text-slate-800"}>{item.code}. {item.name}</div>
                 <div className={`shrink-0 font-semibold ${item.depth===0 ? "text-white" : "text-blue-700"}`}>{effective}/{item.score_max} điểm</div>
               </div>
               {closingItems.flatMap((owner)=>{
