@@ -4,7 +4,7 @@ type ActivityRate = {
   attended: number;
 };
 
-export default function ActivityAttendanceRateChart({ items }: { items: ActivityRate[] }) {
+export default function ActivityAttendanceRateChart({ items, labelHeader = "Hoạt động" }: { items: ActivityRate[]; labelHeader?: string }) {
   if (items.length === 0) {
     return <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 ring-1 ring-slate-100 shadow-md shadow-slate-200/60">Chưa có dữ liệu phù hợp.</div>;
   }
@@ -15,7 +15,7 @@ export default function ActivityAttendanceRateChart({ items }: { items: Activity
     <div className="max-h-[460px] overflow-auto rounded-xl ring-1 ring-slate-100">
       <div className="min-w-[760px]">
         <div className="sticky top-0 z-10 grid grid-cols-[minmax(220px,1.15fr)_minmax(320px,1.85fr)_72px] gap-3 border-b border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          <span>Hoạt động</span>
+          <span>{labelHeader}</span>
           <span>Số lượt</span>
           <span className="text-right">Tỷ lệ</span>
         </div>

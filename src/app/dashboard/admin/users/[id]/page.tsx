@@ -177,7 +177,7 @@ export default async function AdminUserDetailPage({
       </section>
 
       <section className="grid min-w-0 items-stretch gap-6 md:grid-cols-2">
-        <UserAccountAdminForm userId={user.id} currentRoles={effectiveRoles} currentActive={Number(user.is_active) === 1}/>
+        <UserAccountAdminForm key={`${user.id}-${effectiveRoles.join("-")}-${user.is_active}`} userId={user.id} currentRoles={effectiveRoles} currentActive={Number(user.is_active) === 1}/>
         <UserClassAdminForm userId={user.id} classes={transferClasses} currentClassId={user.class_id}/>
       </section>
       {effectiveRoles.includes('faculty_officer') ? <FacultyClassAssignmentForm facultyOfficerId={user.id} classes={classes} selectedClassIds={selectedClassIds}/> : null}

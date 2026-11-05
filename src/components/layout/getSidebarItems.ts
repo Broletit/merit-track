@@ -44,6 +44,7 @@ export function getSidebarGroups(role: string): SidebarGroup[] {
           { href: "/dashboard/admin/classes", label: "Lớp học", icon: School },
           { href: "/dashboard/admin/students-import", label: "Import sinh viên", icon: Upload },
           { href: "/dashboard/admin/academic-terms", label: "Học kỳ", icon: GraduationCap },
+          { href: "/dashboard/admin/conduct-score-frame", label: "Khung ĐRL", icon: Award },
         ],
       },
       {
@@ -51,7 +52,6 @@ export function getSidebarGroups(role: string): SidebarGroup[] {
         icon: ClipboardList,
         items: [
           { href: "/dashboard/admin/activities", label: "Hoạt động", icon: CalendarCheck2 },
-          { href: "/dashboard/admin/conduct-score-frame", label: "Khung tiêu chuẩn ĐRL", icon: Award },
           { href: "/dashboard/admin/events", label: "Đợt xét", icon: Trophy },
           { href: "/dashboard/admin/criteria-templates", label: "Bộ tiêu chuẩn", icon: ClipboardList },
         ],

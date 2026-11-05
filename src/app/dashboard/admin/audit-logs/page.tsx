@@ -28,6 +28,12 @@ type Row = { id: number; action: string; entity_type: string | null; entity_id: 
 
 function parseJson(value: string | null): unknown { if (!value) return null; try { return JSON.parse(value) as unknown; } catch { return null; } }
 function record(value: unknown) { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
+function auditRoleLabels(snapshot: Record<string, unknown> | null) {
+  const values = Array.isArray(snapshot?.roles) ? snapshot.roles.map(String) : snapshot?.role ? [String(snapshot.role)] : [];
+  const officers = values.filter((role) => role === "class_officer" || role === "faculty_officer");
+  const visible = officers.length ? officers : values;
+  return visible.length ? visible.map((role) => roleLabels[role] ?? role).join(", ") : "chưa xác định";
+}
 function targetName(row: Row) {
   if (row.target_full_name) return row.target_full_name;
   const before = record(parseJson(row.before_json));
@@ -42,7 +48,7 @@ function targetName(row: Row) {
 function changeSummary(row: Row, classNames: Map<number, string>) {
   const parsedBefore = parseJson(row.before_json); const before = record(parsedBefore); const after = record(parseJson(row.after_json));
   if (row.action === "user.class.transfer") { const old = Array.isArray(parsedBefore) ? record(parsedBefore[0]) : before; return `Chuyển từ ${classNames.get(Number(old?.class_id ?? 0)) ?? "lớp chưa xác định"} sang ${classNames.get(Number(after?.classId ?? 0)) ?? "lớp chưa xác định"}.`; }
-  if (row.action === "user.role.update") return `Vai trò: ${roleLabels[String(before?.role ?? "")] ?? "chưa xác định"} → ${roleLabels[String(after?.role ?? "")] ?? "chưa xác định"}.`;
+  if (row.action === "user.role.update") return `Vai trò: ${auditRoleLabels(before)} → ${auditRoleLabels(after)}.`;
   if (row.action === "user.status.update") return `Trạng thái: ${Number(before?.isActive) ? "Đang hoạt động" : "Đã khóa"} → ${Number(after?.isActive) ? "Đang hoạt động" : "Đã khóa"}.`;
   if (row.action === "criteria_template.clone") return `Tạo bộ “${String(after?.name ?? "Bản sao")}” từ bộ tiêu chuẩn có sẵn.`;
   if (row.action === "activity.attendance.import") return `Đã xử lý ${Number(after?.total ?? 0)} dòng; hợp lệ ${Number(after?.success ?? 0) + Number(after?.duplicate ?? 0)}, không hợp lệ ${Number(after?.invalid ?? 0)}.`;

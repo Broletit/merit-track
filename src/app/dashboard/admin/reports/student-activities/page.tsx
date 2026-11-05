@@ -1,6 +1,7 @@
 import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
 import { cohortClause } from "@/server/cohorts/sql";
 import { Activity, PieChart, Users } from "lucide-react";
+import Link from "next/link";
 import { requireAdminContext } from "@/server/auth/guards";
 import { getDatabase } from "@/server/db/mysql";
 import {
@@ -13,12 +14,12 @@ import ReportProgressBar from "@/components/admin/reports/ReportProgressBar";
 import StudentActivityReportFilter from "@/components/admin/reports/StudentActivityReportFilter";
 import ActivityAttendanceRateChart from "@/components/admin/reports/ActivityAttendanceRateChart";
 import ClassParticipationLineChart from "@/components/admin/reports/ClassParticipationLineChart";
-import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
 
 type SearchParams = Promise<{ cohort?: string;
   termId?: string;
   activityId?: string;
   classId?: string;
+  tab?: string;
 }>;
 
 type ActivityRow = {
@@ -41,13 +42,15 @@ export default async function StudentActivitiesReportPage({
 
   const params = await searchParams;
   const db = getDatabase();
-  (await ensureActivityConductScores());
   
   const terms = (await getAcademicTermsForSelect());
   const selectedTerm = (await getAcademicTermForView(params.termId));
 
   const activityId = Number(params.activityId ?? 0);
   const classId = Number(params.classId ?? 0);
+  const isOfficerReport = params.tab === "officer";
+  const audienceType = isOfficerReport ? "officer" : "student";
+  const registrationContextSql = isOfficerReport ? "ar.role_context IN ('class_officer','faculty_officer')" : "ar.role_context='student'";
 
   const classes = (await db.rows(`
       SELECT id, code, name
@@ -59,18 +62,12 @@ export default async function StudentActivitiesReportPage({
   const activities = (await db.rows(`
       SELECT id, title
       FROM activities
-      WHERE term_id = ? AND audience_type = 'student' AND status = 'published'
+      WHERE term_id = ? AND audience_type = ? AND status = 'published'
       ORDER BY CAST(start_at AS DATETIME(3)) DESC, id DESC
-      `, [selectedTerm.id])) as ActivityRow[];
+      `, [selectedTerm.id, audienceType])) as ActivityRow[];
 
   const activityFilter = activityId > 0 ? "AND a.id = ?" : "";
   const classFilter = classId > 0 ? "AND cm.class_id = ?" : "";
-  const filterValues = [
-    selectedTerm.id,
-    ...(activityId > 0 ? [activityId] : []),
-    ...(classId > 0 ? [classId] : []),
-  ];
-
   const summary = (await db.first(`
       SELECT
         COUNT(ar.id) AS registrations,
@@ -82,21 +79,21 @@ export default async function StudentActivitiesReportPage({
       LEFT JOIN users u ON u.id = ar.user_id
       LEFT JOIN class_members cm ON cm.user_id = u.id AND cm.left_at IS NULL
       WHERE a.term_id = ?
-        AND a.audience_type = 'student'
+        AND a.audience_type = ?
         AND a.status = 'published'
-        AND (u.role IN ('student', 'class_officer') OR u.id IS NULL)
+        AND (${registrationContextSql} OR ar.id IS NULL)
         AND (ar.id IS NULL OR ar.status != 'cancelled')
         ${activityFilter}
         ${classFilter}
         AND ${cohortClause(params.cohort,"u.cohort")}
-      `, [...filterValues])) as {
+      `, [selectedTerm.id, audienceType, ...(activityId > 0 ? [activityId] : []), ...(classId > 0 ? [classId] : [])])) as {
     registrations: number;
     attended: number;
     activities: number;
     students: number;
   };
 
-  const classChart = (await db.rows(`
+  const classChart = isOfficerReport ? [] : (await db.rows(`
       SELECT
         c.code AS label,
         COUNT(DISTINCT CASE WHEN a.id IS NOT NULL THEN u.id END) AS attended,
@@ -105,7 +102,8 @@ export default async function StudentActivitiesReportPage({
           NULLIF(COUNT(DISTINCT CASE WHEN u.is_active=1 THEN u.id END), 0)) AS value
       FROM classes c
       LEFT JOIN class_members cm ON cm.class_id = c.id AND cm.left_at IS NULL
-      LEFT JOIN users u ON u.id = cm.user_id AND u.role IN ('student','class_officer') AND u.is_active=1
+      LEFT JOIN users u ON u.id = cm.user_id AND u.is_active=1
+      LEFT JOIN user_role_assignments ura_student ON ura_student.user_id=u.id AND ura_student.role='student'
       LEFT JOIN activity_registrations ar
         ON ar.user_id = u.id
        AND ar.status = 'attended'
@@ -114,6 +112,7 @@ export default async function StudentActivitiesReportPage({
        AND a.term_id = ? AND a.audience_type='student' AND a.status='published'
        ${activityId > 0 ? "AND a.id = ?" : ""}
       WHERE c.is_active = 1
+        AND ura_student.user_id IS NOT NULL
         AND ${cohortClause(params.cohort,"u.cohort")}
         ${classId > 0 ? "AND c.id = ?" : ""}
       GROUP BY c.id
@@ -130,17 +129,34 @@ export default async function StudentActivitiesReportPage({
       LEFT JOIN activity_registrations ar
         ON ar.activity_id = a.id
       WHERE a.term_id = ?
-        AND a.audience_type='student'
+        AND a.audience_type=?
         AND a.status='published'
+        AND (${registrationContextSql} OR ar.id IS NULL)
         AND ${cohortClause(params.cohort,"(SELECT cohort FROM users WHERE id=ar.user_id)")}
         ${activityId > 0 ? "AND a.id = ?" : ""}
         ${classId > 0 ? "AND EXISTS (SELECT 1 FROM class_members cm WHERE cm.user_id=ar.user_id AND cm.class_id=? AND cm.left_at IS NULL)" : ""}
       GROUP BY a.id
       HAVING registrations > 0
       ORDER BY registrations DESC, a.title ASC
-      `, [selectedTerm.id, ...(activityId > 0 ? [activityId] : []), ...(classId > 0 ? [classId] : [])])) as Array<{ label: string; registrations: number; attended: number }>;
+       `, [selectedTerm.id, audienceType, ...(activityId > 0 ? [activityId] : []), ...(classId > 0 ? [classId] : [])])) as Array<{ label: string; registrations: number; attended: number }>;
 
-  const organizerDistribution = (await db.rows(`
+  const officerComparison = isOfficerReport ? ((await db.rows(`
+      SELECT u.full_name AS label, COUNT(*) AS registrations,
+        SUM(CASE WHEN ar.status='attended' THEN 1 ELSE 0 END) AS attended
+      FROM activity_registrations ar INNER JOIN activities a ON a.id=ar.activity_id
+      INNER JOIN users u ON u.id=ar.user_id
+      LEFT JOIN class_members cm ON cm.user_id=u.id AND cm.left_at IS NULL
+      WHERE a.term_id=? AND a.audience_type='officer' AND a.status='published'
+        AND ar.role_context IN ('class_officer','faculty_officer') AND ar.status!='cancelled'
+        ${activityId > 0 ? "AND a.id=?" : ""}
+        ${classId > 0 ? "AND cm.class_id=?" : ""}
+        AND ${cohortClause(params.cohort,"u.cohort")}
+      GROUP BY u.id,u.full_name ORDER BY registrations DESC,u.full_name
+    `, [selectedTerm.id, ...(activityId > 0 ? [activityId] : []), ...(classId > 0 ? [classId] : [])])) as Array<{label:string;registrations:number;attended:number}>) : [];
+
+  // Kept for backwards-compatible report query coverage; the chart is intentionally hidden.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const organizerDistribution = false ? (await db.rows(`
     SELECT
       CASE WHEN a.organizer_level = 'class' THEN 'Cấp lớp' ELSE 'Cấp khoa' END AS label,
       COUNT(DISTINCT a.id) AS value
@@ -153,7 +169,7 @@ export default async function StudentActivitiesReportPage({
       AND ${params.cohort ? `EXISTS(SELECT 1 FROM activity_registrations cohort_ar JOIN users cohort_u ON cohort_u.id=cohort_ar.user_id WHERE cohort_ar.activity_id=a.id AND ${cohortClause(params.cohort,"cohort_u.cohort")})` : "1=1"}
     GROUP BY a.organizer_level
     ORDER BY a.organizer_level ASC
-  `, [selectedTerm.id, ...(activityId > 0 ? [activityId] : []), ...(classId > 0 ? [classId] : [])])) as Array<{ label: string; value: number }>;
+  `, [selectedTerm.id, ...(activityId > 0 ? [activityId] : []), ...(classId > 0 ? [classId] : [])])) as Array<{ label: string; value: number }> : [];
 
   const attendedRate =
     Number(summary.registrations ?? 0) > 0
@@ -166,13 +182,17 @@ export default async function StudentActivitiesReportPage({
   return (
     <main className="space-y-6">
       <ReportPageHeader
-        title="Báo cáo hoạt động sinh viên"
+        title={isOfficerReport ? "Báo cáo hoạt động cán bộ" : "Báo cáo hoạt động sinh viên"}
         termSelect={<AcademicTermSelect variant="header" terms={terms} selectedTermId={selectedTerm.id} />}
       />
+      <nav className="flex w-fit border-b border-slate-200" aria-label="Loại báo cáo hoạt động">
+        <Link href={`?termId=${selectedTerm.id}&tab=student`} className={`px-4 py-3 text-sm font-semibold transition ${!isOfficerReport ? "border-b-2 border-blue-700 text-blue-700" : "text-slate-500 hover:text-slate-800"}`}>Hoạt động sinh viên</Link>
+        <Link href={`?termId=${selectedTerm.id}&tab=officer`} className={`px-4 py-3 text-sm font-semibold transition ${isOfficerReport ? "border-b-2 border-blue-700 text-blue-700" : "text-slate-500 hover:text-slate-800"}`}>Hoạt động cán bộ</Link>
+      </nav>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Stat icon={<Activity size={20} />} label="Hoạt động trong kỳ" value={summary.activities ?? 0} />
-        <Stat icon={<Users size={20} />} label="Sinh viên có dữ liệu" value={summary.students ?? 0} />
+        <Stat icon={<Users size={20} />} label={isOfficerReport ? "Cán bộ có dữ liệu" : "Sinh viên có dữ liệu"} value={summary.students ?? 0} />
         <Stat icon={<PieChart size={20} />} label="Lượt đăng ký" value={summary.registrations ?? 0} />
 
         <div className={[statCardStyles.card, "min-w-0"].join(" ")}>
@@ -193,9 +213,9 @@ export default async function StudentActivitiesReportPage({
           </ReportCard>
         <ReportCard
           icon={<Users size={20} />}
-          title="Tỷ lệ sinh viên tham gia theo lớp"
+          title={isOfficerReport ? "Mức độ tham gia của từng cán bộ" : "Tỷ lệ sinh viên tham gia theo lớp"}
         >
-          <ClassParticipationLineChart items={classChart.map((item)=>({label:item.label,value:Number(item.value??0),attended:Number(item.attended??0),total:Number(item.total??0)}))}/>
+          {isOfficerReport ? <ActivityAttendanceRateChart labelHeader="Cán bộ" items={officerComparison.map((item)=>({label:item.label,registrations:Number(item.registrations??0),attended:Number(item.attended??0)}))} /> : <ClassParticipationLineChart items={classChart.map((item)=>({label:item.label,value:Number(item.value??0),attended:Number(item.attended??0),total:Number(item.total??0)}))}/>} 
         </ReportCard>
       </section>
     </main>

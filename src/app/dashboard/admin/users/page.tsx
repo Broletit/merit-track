@@ -123,7 +123,7 @@ export default async function AdminUsersPage({
         u.role,
         GROUP_CONCAT(DISTINCT ura.role ORDER BY FIELD(ura.role,'student','class_officer','faculty_officer') SEPARATOR ',') AS roles,
         u.is_active,
-        GROUP_CONCAT(c.code SEPARATOR ', ') AS class_code
+        GROUP_CONCAT(DISTINCT c.code ORDER BY c.code SEPARATOR ', ') AS class_code
       FROM users u
       LEFT JOIN class_members cm ON cm.user_id = u.id AND cm.left_at IS NULL
       LEFT JOIN classes c ON c.id = cm.class_id

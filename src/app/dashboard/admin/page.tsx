@@ -88,7 +88,7 @@ export default async function AdminDashboardPage({
           icon={<UsersRound size={20} />}
           label="Sinh viên đang quản lý"
           value={summary.active_students}
-          details={<><span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">Sinh viên: {summary.active_student_only}</span><span className="rounded-full bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700">Cán bộ: {summary.active_officers}</span></>}
+          details={<><span className="whitespace-nowrap rounded-xl bg-blue-50 px-3 py-2 text-center text-xs font-semibold text-blue-700">{summary.active_student_only} Sinh viên</span><span className="whitespace-nowrap rounded-xl bg-violet-50 px-3 py-2 text-center text-xs font-semibold text-violet-700">{summary.active_officers} Cán bộ</span></>}
           href="/dashboard/admin/users"
         />
         <OverviewCard
@@ -250,7 +250,7 @@ function OverviewCard({ icon, label, value, hint, href, details }: {
       </div>
       <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div>
       {hint ? <div className={[statCardStyles.label, "mt-1 leading-5"].join(" ")}>{hint}</div> : null}
-      {details ? <div className="mt-2 flex flex-wrap gap-2">{details}</div> : null}
+      {details ? <div className="mt-3 grid grid-cols-2 gap-2">{details}</div> : null}
     </Link>
   );
 }
@@ -271,11 +271,11 @@ function SubmissionOverviewCard({ total, studentTotal, officerTotal, termId }: {
       </div>
       <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{total}</div>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Link href={`/dashboard/admin/submissions?termId=${termId}`} className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
-          {studentTotal} sinh viên
+        <Link href={`/dashboard/admin/submissions?termId=${termId}`} className="whitespace-nowrap rounded-xl bg-blue-50 px-3 py-2 text-center text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
+          {studentTotal} Sinh viên
         </Link>
-        <Link href={`/dashboard/admin/officer-reviews?termId=${termId}`} className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-100">
-          {officerTotal} cán bộ
+        <Link href={`/dashboard/admin/officer-reviews?termId=${termId}`} className="whitespace-nowrap rounded-xl bg-violet-50 px-3 py-2 text-center text-xs font-semibold text-violet-700 transition hover:bg-violet-100">
+          {officerTotal} Cán bộ
         </Link>
       </div>
     </article>
