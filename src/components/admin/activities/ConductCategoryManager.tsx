@@ -81,7 +81,7 @@ export default function ConductCategoryManager({
           return <Fragment key={item.id}>
           {editingId === item.id ? (
             <form
-              className={`${styles.form} border-b border-slate-100 bg-blue-50/50 p-4`}
+              className={`${styles.form} border-b border-amber-200 bg-amber-50 p-4`}
               onSubmit={(event) => {
                 event.preventDefault();
                 const data = new FormData(event.currentTarget);

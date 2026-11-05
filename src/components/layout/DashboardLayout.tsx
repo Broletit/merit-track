@@ -14,11 +14,12 @@ export default function DashboardLayout({
     full_name: string;
     email?: string | null;
     role: string;
+    roles?: string[];
     loginContext?: string;
   };
 }) {
   const loginContext = user.loginContext ?? "student";
-  const emailMissing = user.role !== "admin" && !isValidGmailAddress(user.email);
+  const emailMissing = !user.roles?.includes("admin") && user.role !== "admin" && !isValidGmailAddress(user.email);
 
   return (
     <div className="dashboard-shell flex h-dvh overflow-hidden bg-slate-50">
@@ -29,6 +30,7 @@ export default function DashboardLayout({
         <Topbar
           fullName={user.full_name}
           role={user.role}
+          roles={user.roles}
           loginContext={loginContext}
           emailMissing={emailMissing}
           roleLabel={getUiLabelByLoginContext(loginContext as never)}

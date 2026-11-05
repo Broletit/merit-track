@@ -21,10 +21,15 @@ function roleLabel(role: string) {
   return "Sinh viên";
 }
 
+function roleLabels(roles: string[]) {
+  const officerRoles = roles.filter((role) => role === "class_officer" || role === "faculty_officer");
+  return (officerRoles.length ? officerRoles : roles).map(roleLabel).join(", ");
+}
+
 export default async function ProfileContent() {
   const user = await requireLogin();
 
-  if (user.role === "admin") {
+  if (user.roles.includes("admin")) {
     redirect("/dashboard/admin");
   }
 
@@ -80,7 +85,7 @@ export default async function ProfileContent() {
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <Info label="Vai trò tài khoản" value={roleLabel(user.role)} />
+          <Info label="Vai trò tài khoản" value={roleLabels(user.roles)} />
           <Info
             label="Giao diện đang dùng"
             value={getUiLabelByLoginContext(user.loginContext as never)}

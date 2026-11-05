@@ -24,6 +24,7 @@ type Row = {
   full_name: string;
   email: string | null;
   role: string;
+  roles: string | null;
   is_active: number;
   class_code: string | null;
 };
@@ -41,6 +42,12 @@ function roleLabel(role: string) {
   if (role === "class_officer") return "Cán bộ lớp";
   if (role === "faculty_officer") return "Cán bộ khoa";
   return "Sinh viên";
+}
+
+function roleLabels(value: string | null, fallback: string) {
+  const roles = value?.split(",").filter(Boolean) ?? [fallback];
+  const officerRoles = roles.filter((role) => role === "class_officer" || role === "faculty_officer");
+  return (officerRoles.length ? officerRoles : roles).map(roleLabel).join(", ");
 }
 
 export default async function AdminUsersPage({
@@ -82,7 +89,7 @@ export default async function AdminUsersPage({
   }
 
   if (role) {
-    where.push(`u.role = ?`);
+    where.push(`EXISTS(SELECT 1 FROM user_role_assignments ura_filter WHERE ura_filter.user_id=u.id AND ura_filter.role=?)`);
     values.push(role);
   }
 
@@ -114,11 +121,13 @@ export default async function AdminUsersPage({
         u.full_name,
         u.email,
         u.role,
+        GROUP_CONCAT(DISTINCT ura.role ORDER BY FIELD(ura.role,'student','class_officer','faculty_officer') SEPARATOR ',') AS roles,
         u.is_active,
         GROUP_CONCAT(c.code SEPARATOR ', ') AS class_code
       FROM users u
       LEFT JOIN class_members cm ON cm.user_id = u.id AND cm.left_at IS NULL
       LEFT JOIN classes c ON c.id = cm.class_id
+      LEFT JOIN user_role_assignments ura ON ura.user_id=u.id
       ${whereSql}
       GROUP BY u.id
       ORDER BY u.id DESC
@@ -202,7 +211,7 @@ export default async function AdminUsersPage({
                   </td>
 
                   <td className="px-4 py-4 text-sm text-slate-700">
-                    {roleLabel(item.role)}
+                    {roleLabels(item.roles, item.role)}
                   </td>
 
                   <td className="px-4 py-4">

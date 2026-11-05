@@ -56,18 +56,21 @@ export function getUiLabelByLoginContext(role: LoginRoleContext) {
   }
 }
 
-export function getDefaultLoginContextAfterLogin(userRole: string): LoginRoleContext {
-  if (userRole === "admin") return "admin";
+function normalizeRoles(userRoles: string | string[]) {
+  return Array.isArray(userRoles) ? userRoles : [userRoles];
+}
+
+export function getDefaultLoginContextAfterLogin(userRoles: string | string[]): LoginRoleContext {
+  if (normalizeRoles(userRoles).includes("admin")) return "admin";
   return "student";
 }
 
-export function getAvailableLoginContexts(userRole: string): LoginRoleContext[] {
-  if (userRole === "admin") return ["admin"];
-  if (userRole === "faculty_officer") return ["student", "faculty_officer"];
-  if (userRole === "class_officer") return ["student", "class_officer"];
-  return ["student"];
+export function getAvailableLoginContexts(userRoles: string | string[]): LoginRoleContext[] {
+  const roles = normalizeRoles(userRoles);
+  if (roles.includes("admin")) return ["admin"];
+  return ["student", ...(roles.includes("class_officer") ? ["class_officer" as const] : []), ...(roles.includes("faculty_officer") ? ["faculty_officer" as const] : [])];
 }
 
-export function canUseLoginContext(userRole: string, context: LoginRoleContext) {
-  return getAvailableLoginContexts(userRole).includes(context);
+export function canUseLoginContext(userRoles: string | string[], context: LoginRoleContext) {
+  return getAvailableLoginContexts(userRoles).includes(context);
 }

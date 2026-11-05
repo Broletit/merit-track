@@ -39,7 +39,7 @@ export async function requireAdmin() {
   const user = await requireLogin();
   const loginContext = (user.loginContext ?? "student") as LoginRoleContext;
 
-  if (user.role !== "admin") {
+  if (!user.roles.includes("admin")) {
     redirect(getDashboardPathByContext(loginContext));
   }
 
@@ -50,7 +50,7 @@ export async function requireClassOfficer() {
   const user = await requireLogin();
   const loginContext = (user.loginContext ?? "student") as LoginRoleContext;
 
-  if (user.role !== "class_officer" && user.role !== "admin") {
+  if (!user.roles.includes("class_officer") && !user.roles.includes("admin")) {
     redirect(getDashboardPathByContext(loginContext));
   }
 
@@ -61,7 +61,7 @@ export async function requireFacultyOfficer() {
   const user = await requireLogin();
   const loginContext = (user.loginContext ?? "student") as LoginRoleContext;
 
-  if (user.role !== "faculty_officer" && user.role !== "admin") {
+  if (!user.roles.includes("faculty_officer") && !user.roles.includes("admin")) {
     redirect(getDashboardPathByContext(loginContext));
   }
 
@@ -86,7 +86,7 @@ export async function requireStudentContext() {
 export async function requireAdminContext() {
   const user = await requireLoginContext("admin");
 
-  if (user.role !== "admin") {
+  if (!user.roles.includes("admin")) {
     redirect("/dashboard/student");
   }
 
@@ -96,7 +96,7 @@ export async function requireAdminContext() {
 export async function requireClassOfficerContext() {
   const user = await requireLoginContext("class_officer");
 
-  if (user.role !== "class_officer" && user.role !== "admin") {
+  if (!user.roles.includes("class_officer") && !user.roles.includes("admin")) {
     redirect("/dashboard/student");
   }
 
@@ -106,7 +106,7 @@ export async function requireClassOfficerContext() {
 export async function requireFacultyOfficerContext() {
   const user = await requireLoginContext("faculty_officer");
 
-  if (user.role !== "faculty_officer" && user.role !== "admin") {
+  if (!user.roles.includes("faculty_officer") && !user.roles.includes("admin")) {
     redirect("/dashboard/student");
   }
 

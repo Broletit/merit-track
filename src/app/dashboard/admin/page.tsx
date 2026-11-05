@@ -88,7 +88,7 @@ export default async function AdminDashboardPage({
           icon={<UsersRound size={20} />}
           label="Sinh viên đang quản lý"
           value={summary.active_students}
-          hint="Bao gồm Sinh viên và Cán bộ đang hoạt động."
+          details={<><span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">Sinh viên: {summary.active_student_only}</span><span className="rounded-full bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700">Cán bộ: {summary.active_officers}</span></>}
           href="/dashboard/admin/users"
         />
         <OverviewCard
@@ -234,12 +234,13 @@ export default async function AdminDashboardPage({
   );
 }
 
-function OverviewCard({ icon, label, value, hint, href }: {
+function OverviewCard({ icon, label, value, hint, href, details }: {
   icon: React.ReactNode;
   label: string;
   value: number;
-  hint: string;
+  hint?: string;
   href: string;
+  details?: React.ReactNode;
 }) {
   return (
     <Link href={href} className={[statCardStyles.card, "min-w-0 transition"].join(" ")}>
@@ -248,7 +249,8 @@ function OverviewCard({ icon, label, value, hint, href }: {
         <div className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</div>
       </div>
       <div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div>
-      <div className={[statCardStyles.label, "mt-1 leading-5"].join(" ")}>{hint}</div>
+      {hint ? <div className={[statCardStyles.label, "mt-1 leading-5"].join(" ")}>{hint}</div> : null}
+      {details ? <div className="mt-2 flex flex-wrap gap-2">{details}</div> : null}
     </Link>
   );
 }

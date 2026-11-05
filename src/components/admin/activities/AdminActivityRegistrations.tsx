@@ -30,7 +30,7 @@ export default async function AdminActivityRegistrations({ activityId, requested
   const page = Math.min(totalPages, Number.isSafeInteger(candidatePage) ? Math.max(1, candidatePage) : 1);
   const rows = await db.rows(`SELECT ar.id,ar.status,ar.registered_at,ar.import_batch_id,(SELECT note FROM activity_attendance_logs al WHERE al.activity_id=ar.activity_id AND al.user_id=ar.user_id AND al.result='success' ORDER BY al.id DESC LIMIT 1) attendance_note,u.full_name,u.mssv FROM activity_registrations ar JOIN users u ON u.id=ar.user_id LEFT JOIN class_members cm ON cm.user_id=u.id AND cm.left_at IS NULL ${whereSql} ORDER BY ar.registered_at DESC,ar.id DESC LIMIT ? OFFSET ?`, [...values, pageSize, (page - 1) * pageSize]) as Array<{ id: number; status: string; import_batch_id: number | null; attendance_note: string | null; registered_at: string | null; full_name: string; mssv: string }>;
   const query = (nextPage: number) => `?${new URLSearchParams({ ...Object.fromEntries(Object.entries(filters).filter(([, value]) => Boolean(value))), registrationPage: String(nextPage) }).toString()}`;
-  const showActions = Boolean(activity) && !activity.ended;
+  const showActions = Boolean(activity) && !activity?.ended;
 
   return <section className="min-w-0 rounded-3xl bg-white p-4 shadow-md ring-1 ring-slate-100 shadow-slate-200/60 sm:p-6">
     <h2 className="text-lg font-semibold text-slate-900">Danh sách đăng ký</h2>

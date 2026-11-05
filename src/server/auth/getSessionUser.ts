@@ -37,7 +37,10 @@ export async function getSessionUser() {
       LIMIT 1
       `, [session.userId])) as DbUserRow | undefined;
 
-  if (!user || !user.is_active || !canUseLoginContext(user.role, session.loginContext)) {
+  if (!user) return null;
+  const roles = (await db.rows(`SELECT role FROM user_role_assignments WHERE user_id=? ORDER BY FIELD(role,'student','class_officer','faculty_officer','admin')`, [user.id]) as Array<{role:string}>).map((item) => item.role);
+  const effectiveRoles = roles.length ? roles : [String(user.role ?? "")];
+  if (!user.is_active || !canUseLoginContext(effectiveRoles, session.loginContext)) {
     return null;
   }
 
@@ -47,6 +50,7 @@ export async function getSessionUser() {
     full_name: String(user.full_name ?? ""),
     email: user.email ? String(user.email) : null,
     role: String(user.role ?? ""),
+    roles: effectiveRoles,
     is_active: Number(user.is_active ?? 0),
     must_change_pw: Number(user.must_change_pw ?? 0),
     loginContext: String(session.loginContext ?? "student"),

@@ -21,7 +21,7 @@ export async function switchLoginContext(formData: FormData) {
 
   const nextContext = normalizeLoginRoleContext(formData.get("loginContext"));
 
-  if (!canUseLoginContext(user.role, nextContext)) {
+  if (!canUseLoginContext(user.roles, nextContext)) {
     return {
       ok: false,
       message: "Tài khoản không có quyền chuyển sang giao diện này.",

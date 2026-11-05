@@ -3,6 +3,8 @@ import { getDatabase } from "@/server/db/mysql";
 
 export type AdminOverviewSummary = {
   active_students: number;
+  active_student_only: number;
+  active_officers: number;
   active_classes: number;
   term_activities: number;
   completed_activities: number;
@@ -29,6 +31,8 @@ export async function getAdminOverviewSummary(termId: number, cohortValue?: unkn
       SELECT
         (SELECT COUNT(*) FROM users WHERE role IN ('student', 'class_officer', 'faculty_officer') AND is_active = 1 AND ${cohortClause(cohortValue,"users.cohort")})
           AS active_students,
+        (SELECT COUNT(*) FROM users u WHERE u.is_active=1 AND EXISTS(SELECT 1 FROM user_role_assignments ura WHERE ura.user_id=u.id AND ura.role='student') AND NOT EXISTS(SELECT 1 FROM user_role_assignments ura WHERE ura.user_id=u.id AND ura.role IN ('class_officer','faculty_officer')) AND ${cohortClause(cohortValue,"u.cohort")}) AS active_student_only,
+        (SELECT COUNT(*) FROM users u WHERE u.is_active=1 AND EXISTS(SELECT 1 FROM user_role_assignments ura WHERE ura.user_id=u.id AND ura.role IN ('class_officer','faculty_officer')) AND ${cohortClause(cohortValue,"u.cohort")}) AS active_officers,
         (SELECT COUNT(*) FROM classes WHERE is_active = 1 AND ${cohortClause(cohortValue,"classes.cohort")})
           AS active_classes,
 

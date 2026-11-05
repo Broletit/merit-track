@@ -44,6 +44,11 @@ function roleLabel(role: string) {
   return role;
 }
 
+function roleLabels(roles: string[]) {
+  const officerRoles = roles.filter((role) => role === "class_officer" || role === "faculty_officer");
+  return (officerRoles.length ? officerRoles : roles).map(roleLabel).join("\n");
+}
+
 function valueOrDash(value: string | number | null | undefined) {
   const text = String(value ?? "").trim();
   return text || "Chưa cập nhật";
@@ -123,6 +128,8 @@ export default async function AdminUserDetailPage({
       ORDER BY class_id ASC
       `, [user.id]))
     .map((item) => Number((item as { class_id: number }).class_id));
+  const roles = (await db.rows(`SELECT role FROM user_role_assignments WHERE user_id=? ORDER BY FIELD(role,'student','class_officer','faculty_officer')`, [user.id]) as Array<{role:string}>).map((item) => item.role);
+  const effectiveRoles = roles.length ? roles : [user.role];
 
   return (
     <main className="space-y-6">
@@ -153,7 +160,7 @@ export default async function AdminUserDetailPage({
         <div className="mt-5 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
               <InfoItem label="Họ tên" value={user.full_name} />
               <InfoItem label="MSSV / Mã cán bộ" value={user.mssv} />
-              <InfoItem label="Vai trò" value={roleLabel(user.role)} />
+              <InfoItem label="Vai trò" value={roleLabels(effectiveRoles)} />
               <InfoItem
                 label="Trạng thái"
                 value={
@@ -170,10 +177,10 @@ export default async function AdminUserDetailPage({
       </section>
 
       <section className="grid min-w-0 items-stretch gap-6 md:grid-cols-2">
-        <UserAccountAdminForm userId={user.id} currentRole={user.role} currentActive={Number(user.is_active) === 1}/>
+        <UserAccountAdminForm userId={user.id} currentRoles={effectiveRoles} currentActive={Number(user.is_active) === 1}/>
         <UserClassAdminForm userId={user.id} classes={transferClasses} currentClassId={user.class_id}/>
       </section>
-      {user.role === 'faculty_officer' ? <FacultyClassAssignmentForm facultyOfficerId={user.id} classes={classes} selectedClassIds={selectedClassIds}/> : null}
+      {effectiveRoles.includes('faculty_officer') ? <FacultyClassAssignmentForm facultyOfficerId={user.id} classes={classes} selectedClassIds={selectedClassIds}/> : null}
     </main>
   );
 }

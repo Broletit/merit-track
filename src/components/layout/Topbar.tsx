@@ -30,12 +30,14 @@ function getNotificationHref(loginContext: string) {
 export default function Topbar({
   fullName,
   role,
+  roles,
   loginContext,
   roleLabel,
   emailMissing = false,
 }: {
   fullName: string;
   role: string;
+  roles?: string[];
   loginContext: string;
   roleLabel: string;
   emailMissing?: boolean;
@@ -76,7 +78,7 @@ export default function Topbar({
   const [error, setError] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const contexts = getAvailableLoginContexts(role);
+  const contexts = getAvailableLoginContexts(roles?.length ? roles : role);
   const canSwitch = contexts.length > 1;
 
   function handleLogout() {
@@ -158,7 +160,7 @@ export default function Topbar({
         {open ? (
           <div className="absolute right-0 top-full mt-2 max-h-[calc(100dvh-6rem)] w-64 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-2xl bg-white shadow-[0_20px_50px_rgba(15,23,42,0.15)] ring-1 ring-slate-100">
             <div className="flex flex-col py-2">
-              {role !== "admin" && loginContext !== "student" ? (
+              {!roles?.includes("admin") && role !== "admin" && loginContext !== "student" ? (
                 <Link
                   href={getProfileHref(loginContext)}
                   onClick={() => setOpen(false)}

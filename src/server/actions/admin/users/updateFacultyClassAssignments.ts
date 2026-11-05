@@ -26,7 +26,8 @@ export async function updateFacultyClassAssignments(
 
   if (!user) throw new Error("Không tìm thấy tài khoản.");
 
-  if (user.role !== "faculty_officer") {
+  const hasFacultyRole = Boolean(await db.first("SELECT 1 FROM user_role_assignments WHERE user_id=? AND role='faculty_officer' LIMIT 1", [facultyOfficerId]));
+  if (!hasFacultyRole && user.role !== "faculty_officer") {
     throw new Error("Chỉ có thể phân công lớp cho cán bộ khoa.");
   }
 
