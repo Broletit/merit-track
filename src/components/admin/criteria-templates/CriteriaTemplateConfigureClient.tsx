@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import CriteriaGroupCreateForm from "./CriteriaGroupCreateForm";
 import CriteriaTemplateStructureTable from "./CriteriaTemplateStructureTable";
@@ -16,15 +17,18 @@ export default function CriteriaTemplateConfigureClient({
   groups,
   criteria,
   activities,
+  saveControl,
 }: {
   templateId: number;
   templateForType: string;
   groups: CriteriaTemplateGroupItem[];
   criteria: CriteriaTemplateCriteriaItem[];
   activities: CriteriaTemplateActivityOption[];
+  saveControl?: ReactNode;
 }) {
   const [editingGroup, setEditingGroup] =
     useState<CriteriaTemplateGroupItem | null>(null);
+  const router = useRouter();
 
   const [groupFormOpen, setGroupFormOpen] = useState(false);
   function closeGroupForm() { setEditingGroup(null); setGroupFormOpen(false); }
@@ -39,6 +43,8 @@ export default function CriteriaTemplateConfigureClient({
         groups={groups}
         criteria={criteria}
         activities={activities}
+        saveControl={saveControl}
+        onDataChanged={() => router.refresh()}
         editingGroupCode={editingGroup?.code ?? null}
         onAddGroup={() => { setEditingGroup(null); setGroupFormOpen(true); }}
         groupForm={groupFormOpen ? <CriteriaGroupCreateForm key={editingGroup?.code ?? "create"}
@@ -48,7 +54,7 @@ export default function CriteriaTemplateConfigureClient({
         mandatoryCount={editingGroup ? criteria.filter(item=>item.groupCode===editingGroup.code && item.isRequired).length : 0}
         criteriaCount={editingGroup ? criteria.filter(item=>item.groupCode===editingGroup.code).length : 0}
         onCancelEdit={closeGroupForm}
-        onSaved={() => { closeGroupForm(); toast.success("Đã lưu tiêu chuẩn."); }}
+        onSaved={() => { closeGroupForm(); toast.success("Đã lưu tiêu chuẩn."); router.refresh(); }}
       /> : null}
         onEditGroup={group => { setEditingGroup(group); setGroupFormOpen(true); }}
         onCancelGroupEdit={closeGroupForm}

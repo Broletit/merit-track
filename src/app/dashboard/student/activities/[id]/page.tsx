@@ -5,7 +5,6 @@ import { getDatabase } from "@/server/db/mysql";
 import StudentActivityDetailCard from "@/components/student/activities/StudentActivityDetailCard";
 import StudentActivityDetailHeader from "@/components/student/activities/StudentActivityDetailHeader";
 import type { StudentActivityDetail } from "@/components/student/activities/types";
-import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
 
 type ActivityRow = {
   id: number;
@@ -59,7 +58,6 @@ export default async function StudentActivityDetailPage({
   if (!Number.isFinite(activityId)) notFound();
 
   const db = getDatabase();
-  (await ensureActivityConductScores());
 
   const row = (await db.first(`
       SELECT

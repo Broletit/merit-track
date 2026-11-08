@@ -97,7 +97,7 @@ export async function OfficerEventsPageView({
         ON s.event_id = e.id
        AND s.user_id = ?
       ${whereSql}
-      ORDER BY CAST(e.start_at AS DATETIME(3)) DESC, e.id DESC
+      ORDER BY e.start_at DESC, e.id DESC
       LIMIT ?
       OFFSET ?
       `, [user.id, ...values, PAGE_SIZE, offset])) as Row[];

@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, useRef, useState, type ReactNode } from "react";
+import { Children, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import TableResultsFooter from "@/components/common/TableResultsFooter";
 
 const GROUPS_PER_PAGE = 3;
@@ -9,15 +9,20 @@ export default function CriteriaGroupsPagination({ children, className = "", tot
   const groups = Children.toArray(children);
   const [requestedPage, setPage] = useState(1);
   const container = useRef<HTMLDivElement>(null);
+  const previousPage = useRef(1);
   const totalPages = Math.max(1, Math.ceil(totalGroups / GROUPS_PER_PAGE));
   const page = Math.min(requestedPage, totalPages);
+  useLayoutEffect(() => {
+    if (page === previousPage.current) return;
+    previousPage.current = page;
+    container.current?.scrollIntoView({
+      block: "start",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+    });
+  }, [page]);
   const start = (page - 1) * GROUPS_PER_PAGE;
   function changePage(next: number) {
     setPage(next);
-    requestAnimationFrame(() => container.current?.scrollIntoView({
-      block: "start",
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-    }));
   }
   const arrow = (direction: "left" | "right") => <button type="button"
     aria-label={direction === "left" ? "Trang trước" : "Trang sau"}

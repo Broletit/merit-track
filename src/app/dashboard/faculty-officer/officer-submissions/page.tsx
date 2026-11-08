@@ -66,8 +66,8 @@ export async function OfficerSubmissionsPageView({
   const whereSql = `WHERE ${where.join(" AND ")}`;
   const orderSql =
     sort === "oldest"
-      ? "CAST(s.updated_at AS DATETIME(3)) ASC, s.id ASC"
-      : "CAST(s.updated_at AS DATETIME(3)) DESC, s.id DESC";
+      ? "s.updated_at ASC, s.id ASC"
+      : "s.updated_at DESC, s.id DESC";
 
   const total = (await db.first(`
       SELECT COUNT(*) AS total

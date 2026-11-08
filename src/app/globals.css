@@ -512,6 +512,27 @@ table.event-criteria-table tbody tr::before {
   display: none !important;
 }
 
+/* Keep exactly one explicit STT column in the paginated criteria detail table. */
+table.criteria-definition-table thead tr::before,
+table.criteria-definition-table tbody tr::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* The criteria configuration table provides its own STT column. */
+table.criteria-template-structure-table thead tr::before,
+table.criteria-template-structure-table tbody tr::before {
+  content: none !important;
+  display: none !important;
+}
+
+table.criteria-definition-table thead tr::before,
+table.criteria-definition-table tbody tr::before {
+  width: 3rem;
+  padding-left: .5rem;
+  padding-right: .5rem;
+}
+
 
 table.criteria-detail-table .criteria-status-label,
 table.criteria-detail-table .criteria-status-label * {

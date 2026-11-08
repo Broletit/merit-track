@@ -1,7 +1,5 @@
 "use client";
 import FilterRow from "@/components/shared/filters/FilterRow";
-import CohortFilter from "@/components/shared/CohortFilter";
-
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -28,16 +26,21 @@ export default function ClassActivityParticipantsFilter() {
   }, [keyword]);
 
   return (
-    <FilterRow className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(280px,2fr)_repeat(2,minmax(180px,1fr))]">
-      <div className="relative">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-3">
+      <div data-filter-label="Tìm kiếm" className="relative">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="Tìm theo tên hoặc MSSV..." className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500" />
       </div>
-      <CohortFilter />
-      <select defaultValue={searchParams.get("status") ?? ""} onChange={(event) => updateParam("status", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500">
+      <select data-filter-label="Trạng thái" defaultValue={searchParams.get("status") ?? ""} onChange={(event) => updateParam("status", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500">
         <option value="">Tất cả sinh viên</option>
         <option value="registered">Đã đăng ký</option>
         <option value="attended">Đã tham gia</option>
+      </select>
+      <select data-filter-label="Hình thức điểm danh" defaultValue={searchParams.get("attendanceMethod") ?? ""} onChange={(event) => updateParam("attendanceMethod", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500">
+        <option value="">Tất cả hình thức</option>
+        <option value="qr">Quét mã QR</option>
+        <option value="manual">Thủ công</option>
+        <option value="import">Cập nhật từ danh sách</option>
       </select>
     </FilterRow>
   );

@@ -13,7 +13,7 @@ export async function cloneCriteriaTemplateToEvent({
   const submissionCount = (await db.first(`
       SELECT COUNT(*) AS total
       FROM submissions
-      WHERE event_id = ?
+      WHERE event_id = ? AND submitted_at IS NOT NULL
       `, [eventId])) as { total: number };
 
   if (Number(submissionCount.total ?? 0) > 0) {
@@ -66,6 +66,7 @@ export async function cloneCriteriaTemplateToEvent({
         score_max,
         evidence_type,
         is_required,
+        required_count,
         sort_order
       )
       SELECT
@@ -77,6 +78,7 @@ export async function cloneCriteriaTemplateToEvent({
         score_max,
         evidence_type,
         is_required,
+        required_count,
         sort_order
       FROM criteria_template_items
       WHERE template_id = ?

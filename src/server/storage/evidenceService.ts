@@ -21,12 +21,11 @@ export async function authorizeEvidenceWrite(user: EvidenceUser, submissionId: n
   await validateEvidenceCriteria(db, row.event_id, criteriaCodes);
   return row;
 }
-export async function replaceEvidenceMetadata(submissionId: number, criteriaCode: string, userId: number, file: {originalName: string; key: string; provider: StorageKind; metadata: ObjectMetadata}) {
+export async function createEvidenceUnitWithFile(submissionId: number, criteriaCode: string, userId: number, claimedCount: number, note: string | null, file: {originalName: string; key: string; provider: StorageKind; metadata: ObjectMetadata}) {
   const db = getDatabase();
-  const old = await db.rows<EvidenceObject>("SELECT object_key,storage_provider FROM submission_files WHERE submission_id=? AND criteria_code=? AND status='ready'", [submissionId, criteriaCode]);
-  await db.execute("UPDATE submission_files SET status='deleted',deleted_at=CURRENT_TIMESTAMP(3) WHERE submission_id=? AND criteria_code=? AND status='ready'", [submissionId, criteriaCode]);
-  const result = await db.execute(`INSERT INTO submission_files(submission_id,criteria_code,file_name,original_name,object_key,storage_provider,mime_type,size_bytes,status,uploaded_by,etag,checksum_sha256) VALUES(?,?,?,?,?,?,?,?,'ready',?,?,?)`, [submissionId, criteriaCode, file.originalName, file.originalName, file.key, file.provider, file.metadata.mimeType, file.metadata.size, userId, file.metadata.etag || null, file.metadata.checksumSha256 || null]);
-  return {id: result.insertId, old};
+  const unit = await db.execute(`INSERT INTO submission_evidence_units(submission_id,criteria_code,source_type,note,claimed_count,created_by) VALUES(?,?,'manual',?,?,?)`, [submissionId, criteriaCode, note, claimedCount, userId]);
+  const result = await db.execute(`INSERT INTO submission_files(submission_id,criteria_code,evidence_unit_id,file_name,original_name,object_key,storage_provider,mime_type,size_bytes,status,uploaded_by,etag,checksum_sha256) VALUES(?,?,?,?,?,?,?,?,?,'ready',?,?,?)`, [submissionId, criteriaCode, unit.insertId, file.originalName, file.originalName, file.key, file.provider, file.metadata.mimeType, file.metadata.size, userId, file.metadata.etag || null, file.metadata.checksumSha256 || null]);
+  return {id: result.insertId, evidenceUnitId: unit.insertId};
 }
 export async function removeEvidenceObjects(objects: EvidenceObject[]) {
   for (const object of objects) {
@@ -46,12 +45,10 @@ export async function saveEvidence(user: EvidenceUser, submissionId: number, for
   const codes = formData.getAll("criteriaCode").map(String).map(value => value.trim()).filter(Boolean);
   const submission = await authorizeEvidenceWrite(user, submissionId, codes);
   if (submission.type !== kind) throw new Error("Loại hồ sơ không hợp lệ.");
-  const notes = await db.rows<{criteria_code: string; content_text: string}>("SELECT criteria_code,COALESCE(content_text,'') content_text FROM submission_items WHERE submission_id=?", [submissionId]);
-  const noteMap = new Map(notes.map(note => [note.criteria_code, note.content_text.trim()]));
-  const changed = codes.filter(code => String(formData.get(`note_${code}`) || "").trim() !== (noteMap.get(code) || ""));
+  const changed = codes.filter(code => String(formData.get(`note_${code}`) || "").trim().length > 0);
+  const claimedCount=(code:string)=>{const value=Number(formData.get(`claimedCount_${code}`)??1);if(!Number.isInteger(value)||value<1||value>50)throw new Error(`Số lượt minh chứng của tiêu chí ${code} phải từ 1 đến 50.`);return value;};
   const provider = getStorageProvider();
   const prepared: {code: string; originalName: string; key: string; metadata: ObjectMetadata}[] = [];
-  const old: EvidenceObject[] = [];
   let committed = false;
   try {
     for (const code of codes) {
@@ -67,19 +64,19 @@ export async function saveEvidence(user: EvidenceUser, submissionId: number, for
     if (!changed.length && !prepared.length) throw new Error("Bạn chưa thêm hoặc thay đổi minh chứng nào để lưu.");
     await db.withTransaction(async () => {
       await authorizeEvidenceWrite(user, submissionId, codes);
-      for (const code of changed) {
+      const fileCodes=new Set(prepared.map(file=>file.code));
+      for (const code of changed.filter(code=>!fileCodes.has(code))) {
         const text = String(formData.get(`note_${code}`) || "").trim();
-        await db.execute("INSERT INTO submission_items(submission_id,criteria_code,content_text) VALUES(?,?,?) ON DUPLICATE KEY UPDATE content_text=VALUES(content_text),updated_at=CURRENT_TIMESTAMP(3)", [submissionId, code, text]);
+        await db.execute("INSERT INTO submission_evidence_units(submission_id,criteria_code,source_type,note,claimed_count,created_by) VALUES(?,?,'manual',?,?,?)", [submissionId, code, text, claimedCount(code), user.id]);
       }
       for (const file of prepared) {
-        const replaced = await replaceEvidenceMetadata(submissionId, file.code, user.id, {originalName:file.originalName, key:file.key, provider:provider.kind, metadata:file.metadata});
-        old.push(...replaced.old);
+        const note=String(formData.get(`note_${file.code}`)||"").trim()||null;
+        await createEvidenceUnitWithFile(submissionId, file.code, user.id, claimedCount(file.code), note, {originalName:file.originalName, key:file.key, provider:provider.kind, metadata:file.metadata});
       }
       await db.execute("UPDATE submissions SET updated_at=CURRENT_TIMESTAMP(3) WHERE id=?", [submissionId]);
       await refreshEvidenceEvaluation(submissionId);
     });
     committed = true;
-    await removeEvidenceObjects(old);
     return submission;
   } finally {
     if (!committed) await removeEvidenceObjects(prepared.map(file => ({object_key:file.key, storage_provider:provider.kind})));

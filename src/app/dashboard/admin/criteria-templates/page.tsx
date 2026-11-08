@@ -39,7 +39,7 @@ export default async function AdminCriteriaTemplatesPage({
   const keyword = String(params.keyword ?? "").trim();
   const forType = String(params.forType ?? "").trim();
 
-  const where: string[] = [];
+  const where: string[] = ["NOT EXISTS (SELECT 1 FROM criteria_template_edit_drafts draft WHERE draft.draft_template_id=ct.id)"];
   const values: unknown[] = [];
 
   if (keyword) {

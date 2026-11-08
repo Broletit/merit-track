@@ -137,7 +137,7 @@ export default async function ClassOfficerDashboardPage({ searchParams }: { sear
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <Panel title="Mức độ tham gia theo hoạt động" icon={<BarChart3 size={20} />}>
+        <Panel title="Mức độ tham gia theo hoạt động" icon={<BarChart3 size={20} />} paginationScrollTarget>
           <div className="mt-5 space-y-5">
             {activityRows.length ? activityRows.map((item) => (
               <div key={item.id}>
@@ -198,8 +198,8 @@ function Stat({ icon, label, value, detail }: { icon: React.ReactNode; label: st
   return <div className={[statCardStyles.card, "min-w-0"].join(" ")}><div className="flex items-center justify-between gap-3"><span className={statCardStyles.label}>{label}</span><span className={[statCardStyles.icon, "flex items-center justify-center"].join(" ")}>{icon}</span></div><div className={[statCardStyles.value, "text-slate-900"].join(" ")}>{value}</div><div className={[statCardStyles.label, "mt-1"].join(" ")}>{detail}</div></div>;
 }
 
-function Panel({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
-  return <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60"><div className="flex items-center gap-2 text-slate-900"><span className="text-blue-700">{icon}</span><h2 className="text-xl font-semibold">{title}</h2></div>{children}</section>;
+function Panel({ title, icon, children, paginationScrollTarget = false }: { title: string; icon: React.ReactNode; children: React.ReactNode; paginationScrollTarget?: boolean }) {
+  return <section data-pagination-scroll-target={paginationScrollTarget || undefined} className="scroll-mt-4 rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60"><div className="flex items-center gap-2 text-slate-900"><span className="text-blue-700">{icon}</span><h2 className="text-xl font-semibold">{title}</h2></div>{children}</section>;
 }
 
 function Empty({ text }: { text: string }) { return <div className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 shadow-md shadow-slate-200/60">{text}</div>; }

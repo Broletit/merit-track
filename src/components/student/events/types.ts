@@ -23,6 +23,7 @@ export type StudentEventCriteriaItem = {
   groupTitle: string;
   minRequired?: number;
   isRequired: boolean;
+  requiredCount: number;
   autoPassed: boolean;
   autoMessage: string | null;
 };

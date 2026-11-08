@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pencil, SquareX } from "lucide-react";
 import CriteriaTable from "@/components/shared/criteria/CriteriaTable";
 import CriteriaGroupsPagination from "@/components/shared/criteria/CriteriaGroupsPagination";
@@ -53,8 +53,8 @@ function getEvidenceClass(item: CriteriaItem) {
 }
 
 
-export default function StudentSubmissionCriteriaList({ items, editable, editHref }: {
-  items: CriteriaItem[]; editable: boolean; editHref?: string;
+export default function StudentSubmissionCriteriaList({ items, editable, editHref, headerAction }: {
+  items: CriteriaItem[]; editable: boolean; editHref?: string; headerAction?: ReactNode;
 }) {
   const groups = Array.from(new Map(items.map(item => [item.group_code, item.group_title])).entries());
   const [viewedEvidence, setViewedEvidence] = useState<{code: string; content: string} | null>(null);
@@ -67,8 +67,8 @@ export default function StudentSubmissionCriteriaList({ items, editable, editHre
   }, [viewedEvidence]);
   return <section className="min-w-0 rounded-3xl bg-white p-4 shadow-md ring-1 ring-slate-100 sm:p-6 shadow-slate-200/60">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="text-xl font-semibold text-slate-900">Chi tiết tiêu chí</h2>
-      {editable && editHref ? <Link href={editHref} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><Pencil size={15}/>Chỉnh sửa</Link> : null}
+      <h2 className="text-xl font-semibold text-slate-900">Minh chứng hồ sơ</h2>
+      <div className="flex flex-wrap items-center gap-2">{headerAction}{editable && editHref ? <Link href={editHref} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><Pencil size={15}/>Chỉnh sửa</Link> : null}</div>
     </div>
     <CriteriaGroupsPagination totalGroups={groups.length} className="mt-6">
       {groups.map(([groupCode, groupTitle]) => {

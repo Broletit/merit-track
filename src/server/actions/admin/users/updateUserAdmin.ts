@@ -41,5 +41,6 @@ export async function updateUserAdmin(userId: number, formData: FormData) {
     if (isActive !== Number(target.is_active)) await writeAuditLog({ db, actorUserId: admin.id, action: "user.status.update", entityType: "user", entityId: userId, reason, before, after });
   });
   revalidatePath("/dashboard/admin/users"); revalidatePath(`/dashboard/admin/users/${userId}`); revalidatePath("/dashboard/faculty-officer"); revalidatePath("/dashboard/class-officer");
+  revalidatePath("/dashboard/admin/classes");
   return { ok: true, message: "Đã cập nhật quyền và trạng thái tài khoản." };
 }

@@ -14,7 +14,6 @@ import {
 import { getSubmissionStatusLabel } from "@/lib/submissions/submissionStatus";
 import { getRequiredActiveTerm } from "@/server/academic-terms/getRequiredActiveTerm";
 import { requireStudentContext } from "@/server/auth/guards";
-import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
 import { getDatabase } from "@/server/db/mysql";
 
 type DashboardSummary = {
@@ -91,7 +90,6 @@ function getEventBadge(item: UpcomingEvent) {
 export default async function StudentDashboardPage() {
   const user = await requireStudentContext();
   const db = getDatabase();
-  (await ensureActivityConductScores());
   const term = (await getRequiredActiveTerm());
 
   const visibilitySql = activityVisibleSql("a", String(user.id));
@@ -337,7 +335,7 @@ function AttentionItem({ href, title, badge, badgeClass, meta, detail }: {
   detail: string;
 }) {
   return (
-    <Link href={href} className="group block rounded-2xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50/40">
+    <Link href={href} prefetch={false} className="group block rounded-2xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50/40">
       <div className="flex items-start justify-between gap-3">
         <h3 className="line-clamp-2 font-semibold text-slate-900 group-hover:text-blue-800">{title}</h3>
         <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeClass}`}>{badge}</span>

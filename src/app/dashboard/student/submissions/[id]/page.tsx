@@ -15,6 +15,8 @@ import StudentSubmissionCriteriaList from "@/components/student/submissions/Stud
 import ReviewHistory from "@/components/shared/reviews/ReviewHistory";
 import { getSubmissionTimeline } from "@/server/submissions/getSubmissionTimeline";
 import { formatAutoCriteriaMessage } from "@/components/shared/criteria/AutoCriteriaAchievement";
+import { getPagePublicId } from "@/server/auth/publicPageRoute";
+import SubmissionExportButtons from "@/components/student/submissions/SubmissionExportButtons";
 
 type Params = Promise<{
   id: string;
@@ -103,6 +105,7 @@ export default async function StudentSubmissionDetailPage({
   if (!submission) {
     notFound();
   }
+  const exportToken=await getPagePublicId(db,`/api/submissions/${submission.id}/export`);
 
   const criteria = (await db.rows(`
       SELECT
@@ -181,6 +184,11 @@ export default async function StudentSubmissionDetailPage({
   }));
   const firstMissingCriterion=criteria.find((item)=>Number(item.auto_passed??0)!==1&&!String(item.content_text??"").trim()&&Number(item.file_count??0)===0);
   const editHref=`/dashboard/student/events/${submission.event_id}?edit=1${firstMissingCriterion?`#criterion-${firstMissingCriterion.code}`:"#minh-chung-can-bo-sung"}`;
+  const detailItems=criteria.map((criterion) => ({
+    ...criterion,
+    auto_message: formatAutoCriteriaMessage(criterion.auto_message,criterion.matched_activity_titles),
+    files: files.filter((file) => file.criteria_code === criterion.code).map((file) => ({id:Number(file.id),fileName:String(file.file_name ?? ""),mimeType:String(file.mime_type ?? "")})),
+  })).filter((criterion) => Number(criterion.is_required) === 1 || Number(criterion.auto_passed ?? 0) === 1 || Boolean(criterion.content_text?.trim()) || criterion.files.length > 0);
 
   return (
     <main className="space-y-6">
@@ -233,6 +241,7 @@ export default async function StudentSubmissionDetailPage({
 
       <SubmissionSupportCard submissionId={submissionId} isDraft={!submission.submitted_at}/>
 
+
       <ReviewHistory
         items={reviewItems}
         timeline={timeline}
@@ -242,22 +251,10 @@ export default async function StudentSubmissionDetailPage({
       />
 
       <StudentSubmissionCriteriaList
-        items={criteria.map((criterion) => ({
-          ...criterion,
-          auto_message: formatAutoCriteriaMessage(
-            criterion.auto_message,
-            criterion.matched_activity_titles,
-          ),
-          files: files
-            .filter((file) => file.criteria_code === criterion.code)
-            .map((file) => ({
-              id: Number(file.id),
-              fileName: String(file.file_name ?? ""),
-              mimeType: String(file.mime_type ?? ""),
-            })),
-        }))}
+        items={detailItems}
         editable={editable}
         editHref={editable ? editHref : undefined}
+        headerAction={exportToken?<SubmissionExportButtons url={`/api/submissions/${exportToken}/export`}/>:null}
       />
 
     </main>

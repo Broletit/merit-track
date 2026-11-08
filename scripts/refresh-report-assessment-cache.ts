@@ -3,7 +3,7 @@ import { closeDatabase, getDatabase } from "../src/server/db/mysql";
 import { evaluateAutoCriteria } from "../src/server/events/evaluateAutoCriteria";
 
 type EventRow = { id: number; type: "student" | "officer" };
-type CriterionRow = { code: string; group_code: string; is_required: number; min_required: number };
+type CriterionRow = { code: string; group_code: string; group_title: string; is_required: number; min_required: number };
 type UserRow = { id: number };
 
 function argument(name: string) {
@@ -12,9 +12,11 @@ function argument(name: string) {
 }
 
 function assessment(criteria: CriterionRow[], passed: Set<string>) {
-  const groups = new Map<string, { achieved: number; min: number; missingMandatory: number }>();
+  const groups = new Map<string, { title: string; achieved: number; total: number; min: number; mandatory: number; missingMandatory: number }>();
   for (const criterion of criteria) {
-    const group = groups.get(criterion.group_code) ?? { achieved: 0, min: Number(criterion.min_required), missingMandatory: 0 };
+    const group = groups.get(criterion.group_code) ?? { title: criterion.group_title, achieved: 0, total: 0, min: Number(criterion.min_required), mandatory: 0, missingMandatory: 0 };
+    group.total += 1;
+    if (Number(criterion.is_required) === 1) group.mandatory += 1;
     if (passed.has(criterion.code)) group.achieved += 1;
     else if (Number(criterion.is_required) === 1) group.missingMandatory += 1;
     groups.set(criterion.group_code, group);
@@ -23,7 +25,16 @@ function assessment(criteria: CriterionRow[], passed: Set<string>) {
     (total, group) => total + group.missingMandatory + Math.max(0, group.min - group.achieved - group.missingMandatory),
     0,
   );
-  return { achieved: passed.size, total: criteria.length, missingRequired };
+  const standardProgress = Array.from(groups, ([code, group]) => {
+    const required = Math.max(group.min, group.mandatory);
+    const credited = Math.min(group.achieved, required);
+    return { code, title: group.title, achieved: group.achieved, total: group.total, required, credited, missingMandatory: group.missingMandatory, percent: required > 0 ? Math.round((credited / required) * 100) : 100 };
+  });
+  const requiredTotal = standardProgress.reduce((sum, group) => sum + group.required, 0);
+  const creditedTotal = standardProgress.reduce((sum, group) => sum + group.credited, 0);
+  const progressPercent = requiredTotal > 0 ? Math.round((creditedTotal / requiredTotal) * 10000) / 100 : 0;
+  const isEligible = criteria.length > 0 && missingRequired === 0 && progressPercent >= 100;
+  return { achieved: passed.size, total: criteria.length, missingRequired, progressPercent, standardProgress, isEligible };
 }
 
 async function run() {
@@ -37,13 +48,13 @@ async function run() {
   const events = await db.rows<EventRow>(`SELECT id,type FROM events WHERE ${conditions.join(" AND ")} ORDER BY id`, values);
 
   for (const event of events) {
-    const criteria = await db.rows<CriterionRow>(`SELECT i.code,i.group_code,i.is_required,g.min_required FROM event_criteria_items i INNER JOIN event_criteria_groups g ON g.event_id=i.event_id AND g.code=i.group_code WHERE i.event_id=? ORDER BY g.sort_order,i.sort_order`, [event.id]);
+    const criteria = await db.rows<CriterionRow>(`SELECT i.code,i.group_code,g.title group_title,i.is_required,g.min_required FROM event_criteria_items i INNER JOIN event_criteria_groups g ON g.event_id=i.event_id AND g.code=i.group_code WHERE i.event_id=? ORDER BY g.sort_order,i.sort_order`, [event.id]);
     const roles = event.type === "student" ? ["student", "class_officer"] : ["class_officer", "faculty_officer"];
     const users = await db.rows<UserRow>(`SELECT id FROM users WHERE is_active=1 AND role IN (?,?) ORDER BY id`, roles);
     for (const user of users) {
       const passed = new Set((await evaluateAutoCriteria({ eventId: event.id, userId: user.id })).filter((item) => item.passed).map((item) => item.criteriaCode));
       const result = assessment(criteria, passed);
-      await db.execute(`INSERT INTO report_assessment_cache(event_id,user_id,assessment_type,achieved_criteria,total_criteria,missing_required,is_eligible,refreshed_at) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP(3)) ON DUPLICATE KEY UPDATE assessment_type=VALUES(assessment_type),achieved_criteria=VALUES(achieved_criteria),total_criteria=VALUES(total_criteria),missing_required=VALUES(missing_required),is_eligible=VALUES(is_eligible),refreshed_at=CURRENT_TIMESTAMP(3)`, [event.id, user.id, event.type, result.achieved, result.total, result.missingRequired, result.missingRequired === 0]);
+      await db.execute(`INSERT INTO report_assessment_cache(event_id,user_id,assessment_type,achieved_criteria,total_criteria,missing_required,is_eligible,progress_percent,standard_progress_json,refreshed_at) VALUES(?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP(3)) ON DUPLICATE KEY UPDATE assessment_type=VALUES(assessment_type),achieved_criteria=VALUES(achieved_criteria),total_criteria=VALUES(total_criteria),missing_required=VALUES(missing_required),is_eligible=VALUES(is_eligible),progress_percent=VALUES(progress_percent),standard_progress_json=VALUES(standard_progress_json),refreshed_at=CURRENT_TIMESTAMP(3)`, [event.id, user.id, event.type, result.achieved, result.total, result.missingRequired, result.isEligible, result.progressPercent, JSON.stringify(result.standardProgress)]);
     }
     await db.execute(`INSERT INTO report_cache_state(cache_key,revision,refreshed_at) VALUES(?,1,CURRENT_TIMESTAMP(3)) ON DUPLICATE KEY UPDATE revision=revision+1,refreshed_at=CURRENT_TIMESTAMP(3)`, [`event:${event.id}`]);
     console.log(`Refreshed event ${event.id} (${event.type}).`);

@@ -12,7 +12,7 @@ export default function ActivityAttendanceRateChart({ items, labelHeader = "Hoáº
   const max = Math.max(1, ...items.flatMap((item) => [item.registrations, item.attended]));
 
   return (
-    <div className="max-h-[460px] overflow-auto rounded-xl ring-1 ring-slate-100">
+    <div className="max-h-[460px] min-w-0 max-w-full overflow-auto rounded-xl ring-1 ring-slate-100">
       <div className="min-w-[760px]">
         <div className="sticky top-0 z-10 grid grid-cols-[minmax(220px,1.15fr)_minmax(320px,1.85fr)_72px] gap-3 border-b border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <span>{labelHeader}</span>

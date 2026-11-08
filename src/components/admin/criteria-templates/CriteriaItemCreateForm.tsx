@@ -144,6 +144,11 @@ export default function CriteriaItemCreateForm({
         </div>
 
         <div>
+          <label className="mb-2 block text-sm font-medium text-slate-600">Số lượng cần đạt</label>
+          <input name="requiredCount" type="number" min={1} step={1} defaultValue={1} className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-blue-500" />
+        </div>
+
+        <div>
           <label className="mb-2 block text-sm font-medium text-slate-600">
             Bắt buộc hay tự chọn
           </label>

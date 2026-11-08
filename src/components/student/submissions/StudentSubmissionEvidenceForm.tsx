@@ -1,8 +1,7 @@
 "use client";
 import RequiredMark from "@/components/common/RequiredMark";
 
-
-import { useActionState, useState, type ChangeEvent } from "react";
+import { useActionState, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Upload } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -12,6 +11,9 @@ import { requestSubmissionSupport } from "@/server/actions/submissions/requestSu
 import ActionFeedback from "@/components/shared/ActionFeedback";
 import { AutoCriteriaBadge, AutoCriteriaMessage } from "@/components/shared/criteria/AutoCriteriaAchievement";
 import { getUserFacingActionError } from "@/lib/errors/getUserFacingActionError";
+import CriteriaGroupsPagination from "@/components/shared/criteria/CriteriaGroupsPagination";
+import Link from "next/link";
+import TableResultsFooter from "@/components/common/TableResultsFooter";
 
 type CriteriaItem = {
   code: string;
@@ -20,6 +22,7 @@ type CriteriaItem = {
   groupCode: string;
   groupTitle: string;
   minRequired: number;
+  requiredCount: number;
   isRequired: boolean;
   autoPassed: boolean;
   autoMessage: string | null;
@@ -37,15 +40,31 @@ const allowedFileExtensions = [".pdf", ".png"];
 const maxFileSize = 10 * 1024 * 1024;
 const maxRequestFileSize = 45 * 1024 * 1024;
 type FileState = Record<string, { name: string; error: string }>;
+function CriteriaItemPager({items,children}:{items:CriteriaItem[];children:(item:CriteriaItem)=>ReactNode}){
+  const[page,setPage]=useState(1);
+  const top=useRef<HTMLSpanElement>(null);
+  const previousPage=useRef(1);
+  const totalPages=Math.max(1,Math.ceil(items.length/5));
+  const current=Math.min(page,totalPages);
+  const start=(current-1)*5;
+  useLayoutEffect(()=>{
+    if(previousPage.current===current)return;
+    previousPage.current=current;
+    top.current?.scrollIntoView({block:"start",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});
+  },[current]);
+  return <><span ref={top} className="block scroll-mt-4"/>{items.slice(start,start+5).map(children)}{items.length>5?<TableResultsFooter totalResults={items.length} resultLabel="tiêu chí"><button type="button" onClick={()=>setPage(value=>Math.max(1,value-1))} disabled={current===1} className="px-3 disabled:text-slate-300">‹</button><span className="text-sm text-slate-500">Trang {current}/{totalPages}</span><button type="button" onClick={()=>setPage(value=>Math.min(totalPages,value+1))} disabled={current===totalPages} className="px-3 disabled:text-slate-300">›</button></TableResultsFooter>:null}</>;
+}
 
 export default function StudentSubmissionEvidenceForm({
   submissionId,
   criteria,
   canEdit,
+  viewHref,
 }: {
   submissionId: number;
   criteria: CriteriaItem[];
   canEdit: boolean;
+  viewHref?: string;
 }) {
   const router = useRouter();
   const [fileStates, setFileStates] = useState<FileState>({});
@@ -172,15 +191,15 @@ export default function StudentSubmissionEvidenceForm({
           </h2>
         </div>
 
-        {!canEdit && (
-          <span className="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-500">
-            Không thể chỉnh sửa
-          </span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {viewHref ? <Link href={viewHref} className="inline-flex items-center rounded-xl border border-blue-700 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">Xem hồ sơ</Link> : null}
+          {canEdit ? <button type="submit" form="student-evidence-form" disabled={saving} className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60">{saving ? "Đang lưu..." : "Lưu minh chứng"}</button> : null}
+          {!canEdit && <span className="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-500">Không thể chỉnh sửa</span>}
+        </div>
       </div>
 
-      <form action={saveFormAction} className="mt-5 space-y-5">
-        {Object.entries(grouped).map(([groupTitle, items]) => (
+      <form id="student-evidence-form" action={saveFormAction} className="mt-4 space-y-3">
+        <CriteriaGroupsPagination totalGroups={Object.keys(grouped).length} className="space-y-3">{Object.entries(grouped).map(([groupTitle, items]) => (
             <div
               key={groupTitle}
               className="overflow-hidden rounded-none border border-slate-200"
@@ -192,7 +211,7 @@ export default function StudentSubmissionEvidenceForm({
             </div>
 
             <div className="divide-y divide-slate-100">
-                {items.map((item) => (
+                <CriteriaItemPager items={items}>{(item) => (
                 <div key={item.code} id={`criterion-${item.code}`} className="scroll-mt-24 p-5">
                   <div className="flex justify-between items-start gap-3">
                     <div className="flex-1">
@@ -202,6 +221,9 @@ export default function StudentSubmissionEvidenceForm({
                       <div className="text-sm text-slate-500 mt-1">
                         {item.description || "Chưa có mô tả"}
                       </div>
+                      {!item.autoPassed && item.autoMessage ? (
+                        <div className="mt-2 text-xs font-medium text-amber-700">{item.autoMessage}</div>
+                      ) : null}
                     </div>
 
                     {item.autoPassed ? (
@@ -223,7 +245,7 @@ export default function StudentSubmissionEvidenceForm({
                   {item.autoPassed ? (
                     <AutoCriteriaMessage message={item.autoMessage} />
                   ) : (
-                    <div className="mt-4 space-y-3">
+                    <div className={`mt-4 grid gap-3 ${item.requiredCount > 1 ? "lg:grid-cols-20" : "lg:grid-cols-10"}`}>
                       <input type="hidden" name="criteriaCode" value={item.code} />
 
                       <textarea
@@ -231,12 +253,18 @@ export default function StudentSubmissionEvidenceForm({
                         defaultValue={item.contentText ?? ""}
                         placeholder="Nhập mô tả minh chứng..."
                         disabled={!canEdit || evidenceNotNeeded(item)}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50"
+                        rows={2}
+                        className={`order-2 h-20 min-h-20 max-h-20 w-full resize-y overflow-y-auto rounded-none border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50 ${item.requiredCount > 1 ? "lg:col-span-9" : "lg:col-span-5"}`}
 
                       />
 
+                      {item.requiredCount > 1 ? <label className="order-1 block text-sm font-medium text-slate-700 lg:col-span-3">
+                        Số minh chứng
+                        <input type="number" name={`claimedCount_${item.code}`} min={1} max={50} defaultValue={1} disabled={!canEdit || evidenceNotNeeded(item)} className="mt-1 h-11 w-full rounded-none border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50" />
+                      </label> : <input type="hidden" name={`claimedCount_${item.code}`} value="1" />}
+
                       <div
-                        className={`rounded-none border p-3 ${
+                        className={`order-3 rounded-none border p-3 ${item.requiredCount > 1 ? "lg:col-span-8" : "lg:col-span-5"} ${
                           fileStates[item.code]?.error
                             ? "border-red-500 bg-red-50"
                             : fileStates[item.code]?.name
@@ -283,32 +311,22 @@ export default function StudentSubmissionEvidenceForm({
                           </p>
                         ) : (
                           <p className="mt-2 text-xs text-slate-500">
-                            Chỉ nhận PDF hoặc PNG; dung lượng tối đa 10 MB.
+                            Chỉ nhận PDF/PNG ≤ 10 MB.
                           </p>
                         )}
                       </div>
                     </div>
                   )}
                 </div>
-              ))}
+              )}</CriteriaItemPager>
             </div>
           </div>
-        ))}
-
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={!canEdit || saving}
-            className="rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-60"
-          >
-            {saving ? "Đang lưu..." : "Lưu minh chứng"}
-          </button>
-        </div>
+        ))}</CriteriaGroupsPagination>
 
       </form>
 
-      <div className="mt-5 grid gap-4 rounded-none border border-amber-200 bg-amber-50/60 p-4 lg:grid-cols-[1fr_auto] shadow-md shadow-slate-200/60">
-      <form action={supportFormAction} className="flex flex-col items-start gap-3 sm:flex-row"><label className="required-field-control w-full min-w-0 flex-1"><span className="mb-2 block text-sm font-medium text-slate-600">Nội dung cần hỗ trợ<RequiredMark required={true}/></span><textarea name="supportNote" required minLength={10} placeholder="Mô tả tiêu chí hoặc minh chứng bạn cần khoa hỗ trợ..." className="min-h-20 flex-1 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500"/></label><button disabled={!canEdit||supporting} className="shrink-0 self-end sm:self-start sm:mt-7 rounded-xl border border-amber-500 bg-white px-4 py-2.5 text-sm font-semibold text-amber-800 disabled:opacity-60">{supporting?"Đang gửi...":"Cần hỗ trợ"}</button></form>
+      <div className="mt-3 grid gap-3 rounded-none border border-amber-200 bg-amber-50/60 p-4 lg:grid-cols-[1fr_auto] shadow-md shadow-slate-200/60">
+      <form action={supportFormAction} className="flex flex-col items-start gap-3 sm:flex-row sm:items-end"><label className="required-field-control w-full min-w-0 flex-1"><span className="mb-2 block text-sm font-medium text-slate-600">Nội dung cần hỗ trợ<RequiredMark required={true}/></span><textarea name="supportNote" required minLength={10} placeholder="Mô tả tiêu chí hoặc minh chứng bạn cần khoa hỗ trợ..." className="min-h-20 flex-1 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500"/></label><button disabled={!canEdit||supporting} className="shrink-0 self-end rounded-xl border border-amber-500 bg-white px-4 py-2.5 text-sm font-semibold text-amber-800 disabled:opacity-60">{supporting?"Đang gửi...":"Cần hỗ trợ"}</button></form>
       <form action={submitFormAction} className="flex items-end justify-end">
         <button
           disabled={!canEdit || submitting}

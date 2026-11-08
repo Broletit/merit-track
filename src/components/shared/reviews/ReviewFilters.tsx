@@ -11,6 +11,8 @@ export default function ReviewFilters({
   showStatus = true,
   showRound = false,
   showSort = true,
+  showCohort = true,
+  compactLayout = false,
   eventOptions = [],
   showEventFilter = true,
   searchPlaceholder = "Tìm sinh viên / MSSV / đợt xét...",
@@ -19,6 +21,8 @@ export default function ReviewFilters({
   showStatus?: boolean;
   showRound?: boolean;
   showSort?: boolean;
+  showCohort?: boolean;
+  compactLayout?: boolean;
   showEventFilter?: boolean;
   searchPlaceholder?: string;
   eventOptions?: Array<{ id: number; title: string }>;
@@ -32,6 +36,14 @@ export default function ReviewFilters({
   const [keyword, setKeyword] = useState(searchParams.get("keyword") ?? "");
 
   const gridClass = useMemo(() => {
+    if (compactLayout) {
+      return eventOptions.length > 0
+        ? "xl:grid-cols-[minmax(12rem,1fr)_6.5rem_minmax(11rem,1.15fr)_8rem_8rem]"
+        : "xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]";
+    }
+    if (showRound && eventOptions.length > 0) {
+      return showCohort || classOptions.length > 0 ? "xl:grid-cols-5" : "xl:grid-cols-4";
+    }
     if (showRound && classOptions.length > 0) return "xl:grid-cols-5";
     if (eventOptions.length > 0 && showStatus && classOptions.length > 0) return "xl:grid-cols-[minmax(260px,2fr)_repeat(4,minmax(155px,1fr))]";
     if (eventOptions.length > 0 && !showRound && classOptions.length === 0) return "xl:grid-cols-3";
@@ -48,7 +60,7 @@ export default function ReviewFilters({
     }
 
     return "lg:grid-cols-[minmax(320px,2fr)_minmax(220px,1fr)]";
-  }, [showStatus, showRound, classOptions.length, eventOptions.length]);
+  }, [compactLayout, showStatus, showRound, showCohort, classOptions.length, eventOptions.length]);
 
   function updateParam(key: string, value: string) {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -92,7 +104,7 @@ export default function ReviewFilters({
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-      <div className="filter-field"><label>Khóa</label><CohortFilter /></div>
+      {showCohort ? <div className="filter-field"><label>Khóa</label><CohortFilter /></div> : null}
       {showEventFilter && eventOptions.length > 0 ? (
         <select data-filter-label="Đợt xét" defaultValue={searchParams.get("eventId") ?? ""} onChange={(event) => updateParam("eventId", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500">
           <option value="">Tất cả đợt xét</option>

@@ -7,7 +7,6 @@ import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
 import StudentActivitiesHeader from "@/components/student/activities/StudentActivitiesHeader";
 import StudentActivitiesTable from "@/components/student/activities/StudentActivitiesTable";
 import type { StudentActivityItem } from "@/components/student/activities/types";
-import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
 import {
   getAcademicTermForView,
   getAcademicTermsForSelect,
@@ -47,7 +46,6 @@ export default async function StudentActivitiesPage({
   const params = await searchParams;
 
   const db = getDatabase();
-  (await ensureActivityConductScores());
   
   const terms = (await getAcademicTermsForSelect());
   const selectedTerm = (await getAcademicTermForView(params.termId));

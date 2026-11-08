@@ -14,7 +14,6 @@ import type {
   FacultyOfficerActivityDetail,
   FacultyOfficerActivityRegistrationItem,
 } from "@/components/faculty-officer/activities/types";
-import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
 
 type SearchParams = Promise<{ cohort?: string;
   page?: string;
@@ -76,7 +75,6 @@ export default async function FacultyOfficerActivityDetailPage({
 
   const sp = await searchParams;
   const db = getDatabase();
-  (await ensureActivityConductScores());
 
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
   const pageSize = 10;

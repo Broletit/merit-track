@@ -1,4 +1,5 @@
 import { getDatabase } from "@/server/db/mysql";
+import { evaluateSubmissionRequirements } from "./evaluateSubmissionRequirements";
 
 export async function evaluateSubmission(submissionId: number) {
   const db = getDatabase();
@@ -61,15 +62,8 @@ export async function evaluateSubmission(submissionId: number) {
     group_sort_order: number;
   }[];
 
-  const auto = (await db.rows(`
-      SELECT criteria_code
-      FROM submission_auto_results
-      WHERE submission_id = ? AND passed = 1
-      `, [submissionId])) as { criteria_code: string }[];
-
-  const autoSet = new Set(auto.map((x) => x.criteria_code));
-  const approvedRows = (await db.rows(`SELECT criteria_code FROM submission_criteria_reviews WHERE submission_id=? AND round=? AND decision='pass'`, [submissionId, Number(submission.review_round)===2?2:1])) as Array<{criteria_code:string}>;
-  const approvedSet = new Set(approvedRows.map((item) => item.criteria_code));
+  const requirementResult = await evaluateSubmissionRequirements(db, submissionId, "approved");
+  const satisfiedCriteria = new Set(requirementResult.criterionProgress.filter(item => item.satisfied).map(item => item.code));
 
   const autoScores = (await db.rows(`
     SELECT rule.criteria_code,
@@ -86,12 +80,10 @@ export async function evaluateSubmission(submissionId: number) {
   const groupScores = new Map<string, { score: number; max: number }>();
 
   for (const item of criteria) {
-    const passed = approvedSet.has(item.code) || autoSet.has(item.code);
+    const passed = satisfiedCriteria.has(item.code);
 
     if (passed) {
-      const criterionScore = autoSet.has(item.code)
-        ? Math.min(Number(item.score_max ?? 0), autoScoreMap.get(item.code) ?? Number(item.score_max ?? 0))
-        : Number(item.score_max ?? 0);
+      const criterionScore = Math.min(Number(item.score_max ?? 0), autoScoreMap.get(item.code) ?? Number(item.score_max ?? 0));
       const group = groupScores.get(item.group_code) ?? { score: 0, max: Number(item.group_score_max ?? 0) };
       group.score = group.max > 0 ? Math.min(group.max, group.score + criterionScore) : group.score + criterionScore;
       groupScores.set(item.group_code, group);

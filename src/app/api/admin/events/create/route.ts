@@ -6,6 +6,7 @@ type CriteriaInput = {
   code: string;
   title: string;
   evidence_type: "manual" | "auto" | "both";
+  required_count?: number;
   min_score?: number;
   activity_ids?: number[];
 };
@@ -54,6 +55,7 @@ export async function POST(req: Request) {
         const code = String(item.code ?? "").trim();
         const itemTitle = String(item.title ?? "").trim();
         const evidenceType = String(item.evidence_type ?? "manual").trim();
+        const requiredCount = Math.max(1, Number(item.required_count ?? 1));
 
         if (!code || !itemTitle) continue;
 
@@ -63,10 +65,11 @@ export async function POST(req: Request) {
             code,
             title,
             evidence_type,
+            required_count,
             sort_order
           )
-          VALUES (?, ?, ?, ?, ?)
-        `, [eventId, code, itemTitle, evidenceType, i + 1]));
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [eventId, code, itemTitle, evidenceType, requiredCount, i + 1]));
 
         if (Array.isArray(item.activity_ids) && item.activity_ids.length > 0) {
           for (const activityId of item.activity_ids) {

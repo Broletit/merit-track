@@ -164,6 +164,11 @@ export default function CriteriaInlineItemCreateForm({
           </label>
         </div>
 
+        <div className="md:col-span-1">
+          <label className="mb-1 block text-xs font-medium text-slate-500">Cần đạt</label>
+          <input name="requiredCount" type="number" min={1} step={1} defaultValue={editingItem?.requiredCount ?? 1} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500" />
+        </div>
+
         {isOfficer ? (
           <div className="md:col-span-1">
             <label className="mb-1 block text-xs font-medium text-slate-500">
@@ -181,7 +186,16 @@ export default function CriteriaInlineItemCreateForm({
           <input name="scoreMax" type="hidden" value="0" />
         )}
 
-        <div className={isOfficer ? "relative md:col-span-6" : "relative md:col-span-6"}>
+        <div className="md:col-span-2">
+          <label className="mb-1 block text-xs font-medium text-slate-500">Nguồn đạt</label>
+          <select name="evidenceType" defaultValue={editingItem?.evidenceType ?? "manual"} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500">
+            <option value="auto">Tự động</option>
+            <option value="manual">Minh chứng</option>
+            <option value="both">Kết hợp</option>
+          </select>
+        </div>
+
+        <div className={isOfficer ? "relative md:col-span-4" : "relative md:col-span-4"}>
           <label className="mb-1 block text-xs font-medium text-slate-500">
             Hoạt động đáp ứng
           </label>
@@ -220,14 +234,15 @@ export default function CriteriaInlineItemCreateForm({
                     return (
                       <label
                         key={activity.id}
-                        className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm text-slate-700 transition-colors ${checked ? "border-blue-200 bg-blue-50" : "border-transparent hover:border-slate-200 hover:bg-slate-50"}`}
                       >
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleActivity(activity.id)}
+                          className="h-4 w-4 shrink-0"
                         />
-                        <span className="line-clamp-1">{activity.title}</span>
+                        <span className="min-w-0 flex-1 break-words leading-5">{activity.title}</span>
                       </label>
                     );
                   })

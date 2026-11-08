@@ -32,7 +32,6 @@ export default function StudentEventDetailCard({
         }
 
         router.push(`/dashboard/student/events/${item.id}?edit=1#minh-chung-can-bo-sung`);
-        router.refresh();
       } catch (error) {
         setMessage(
           error instanceof Error ? error.message : "Không thể tạo hồ sơ."

@@ -14,4 +14,9 @@ export async function assertTemplateReady(db:Database,templateId:number){
   if(!group.total)throw new Error("Tiêu chuẩn "+group.code+" chưa có tiêu chí.");
   if(!Number.isInteger(group.min_required)||group.min_required<0||group.min_required>group.total)throw new Error("Tiêu chuẩn "+group.code+" yêu cầu số tiêu chí tối thiểu không hợp lệ; hiện có "+group.total+" tiêu chí.");
  }
+ const invalidAuto=(await db.rows(`SELECT i.code,i.required_count,COUNT(r.id) rule_count
+   FROM criteria_template_items i LEFT JOIN criteria_activity_rules r ON r.template_id=i.template_id AND r.criteria_code=i.code
+   WHERE i.template_id=? AND i.evidence_type='auto'
+   GROUP BY i.code,i.required_count HAVING rule_count < i.required_count`, [templateId])) as Array<{code:string;required_count:number;rule_count:number}>;
+ if(invalidAuto.length)throw new Error(`Tiêu chí tự động ${invalidAuto[0].code} cần ${invalidAuto[0].required_count} hoạt động đáp ứng nhưng mới cấu hình ${invalidAuto[0].rule_count}.`);
 }

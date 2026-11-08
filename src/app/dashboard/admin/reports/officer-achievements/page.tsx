@@ -17,7 +17,6 @@ import CriteriaAchievementComparisonChart from "@/components/admin/reports/Crite
 import ReportTabs from "@/components/admin/reports/ReportTabs";
 import SubmissionReportTableFilter from "@/components/admin/reports/SubmissionReportTableFilter";
 import FilteredListExportButton from "@/components/admin/reports/FilteredListExportButton";
-import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
 import { evaluateAutoCriteria } from "@/server/events/evaluateAutoCriteria";
 import {
   getAcademicTermForView,
@@ -95,7 +94,6 @@ export default async function OfficerAchievementsReportPage({
 
   const params = await searchParams;
   const db = getDatabase();
-  (await ensureActivityConductScores());
   
   const terms = (await getAcademicTermsForSelect());
   const selectedTerm = (await getAcademicTermForView(params.termId));
@@ -269,7 +267,7 @@ export default async function OfficerAchievementsReportPage({
     ? events.filter((event) => event.id === eventId)
     : events;
 
-  const potentialRows: PotentialOfficerRow[] = (await Promise.all(eligibleOfficersForPotential
+  const potentialRows: PotentialOfficerRow[] = activeTab === "tables" ? (await Promise.all(eligibleOfficersForPotential
     .map(async (officer) => {
       let best: PotentialOfficerRow | null = null;
 
@@ -384,7 +382,7 @@ export default async function OfficerAchievementsReportPage({
       a.missing_required - b.missing_required
       || b.potential_score - a.potential_score
       || a.full_name.localeCompare(b.full_name, "vi")
-    );
+    ) : [];
   const assessment = ["ready", "potential"].includes(String(params.potentialStatus))
     ? String(params.potentialStatus)
     : ["ready", "potential"].includes(String(params.assessment))

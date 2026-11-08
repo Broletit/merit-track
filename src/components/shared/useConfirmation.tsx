@@ -5,7 +5,7 @@ import RequiredMark from "@/components/common/RequiredMark";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-type Confirmation = { title: string; message: string; confirmLabel?: string; requireReason?: boolean };
+type Confirmation = { title: string; message: string; confirmLabel?: string; cancelLabel?: string; requireReason?: boolean };
 export default function useConfirmation() {
   const [request, setRequest] = useState<Confirmation | null>(null);
   const resolver = useRef<((reason: string | null) => void) | null>(null);
@@ -48,7 +48,7 @@ export default function useConfirmation() {
           className="mt-2 w-full resize-y rounded-lg border border-slate-200 p-3 text-sm" placeholder="Nhập lý do (tối thiểu 10 ký tự)" />
       </div> : null}
       <div className="mt-5 flex justify-end gap-2">
-        <button type="button" onClick={() => finish(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">Đóng</button>
+        <button type="button" onClick={() => finish(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">{request.cancelLabel ?? 'Đóng'}</button>
         <button type="submit" className="rounded-lg px-3 py-2 text-sm font-semibold text-rose-700">{request.confirmLabel ?? 'Xác nhận'}</button>
       </div>
     </form>

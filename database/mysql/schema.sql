@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS `user_role_assignments` (
 
 CREATE TABLE IF NOT EXISTS `activities` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `title` VARCHAR(768) NOT NULL,
+  `title` VARCHAR(500) NOT NULL,
   `description` TEXT NULL,
   `audience_type` VARCHAR(191) NOT NULL DEFAULT 'student',
   `status` VARCHAR(191) NOT NULL DEFAULT 'draft',
@@ -332,6 +332,26 @@ CREATE TABLE IF NOT EXISTS `criteria_templates` (
 
 -- @statement
 
+CREATE TABLE IF NOT EXISTS `criteria_template_edit_drafts` (
+  `original_template_id` BIGINT NOT NULL,
+  `draft_template_id` BIGINT NOT NULL,
+  `created_by` BIGINT NOT NULL,
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `status` VARCHAR(16) NOT NULL DEFAULT 'editing',
+  `stage` VARCHAR(16) NOT NULL DEFAULT 'submissions',
+  `submission_cursor` BIGINT NOT NULL DEFAULT 0,
+  `cache_event_cursor` BIGINT NOT NULL DEFAULT 0,
+  `cache_user_cursor` BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`original_template_id`),
+  UNIQUE KEY `uq_criteria_template_edit_drafts_draft` (`draft_template_id`),
+  CONSTRAINT `fk_criteria_template_edit_drafts_original` FOREIGN KEY (`original_template_id`) REFERENCES `criteria_templates`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_criteria_template_edit_drafts_draft` FOREIGN KEY (`draft_template_id`) REFERENCES `criteria_templates`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_criteria_template_edit_drafts_author` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+-- @statement
+
 CREATE TABLE IF NOT EXISTS `events` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `title` VARCHAR(768) NOT NULL,
@@ -525,6 +545,7 @@ CREATE TABLE IF NOT EXISTS `criteria_template_groups` (
   PRIMARY KEY (`id`),
   KEY `idx_criteria_template_groups_template_id` (`template_id`),
   UNIQUE KEY `uq_criteria_template_groups_1` (`template_id`, `code`),
+  UNIQUE KEY `uq_criteria_template_groups_title` (`template_id`, `title`),
   CONSTRAINT `fk_criteria_template_groups_0` FOREIGN KEY (`template_id`) REFERENCES `criteria_templates`(`id`) ON UPDATE RESTRICT ON DELETE CASCADE,
   CONSTRAINT `ck_criteria_template_groups_0` CHECK (min_required >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -542,6 +563,7 @@ CREATE TABLE IF NOT EXISTS `criteria_template_items` (
   `score_max` DECIMAL(12,3) NOT NULL DEFAULT 0,
   `evidence_type` VARCHAR(768) NOT NULL DEFAULT 'manual',
   `is_required` TINYINT(1) NOT NULL DEFAULT 0,
+  `required_count` BIGINT NOT NULL DEFAULT 1,
   `sort_order` BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   KEY `idx_criteria_template_items_template_id` (`template_id`),
@@ -549,6 +571,7 @@ CREATE TABLE IF NOT EXISTS `criteria_template_items` (
   CONSTRAINT `fk_criteria_template_items_0` FOREIGN KEY (`template_id`) REFERENCES `criteria_templates`(`id`) ON UPDATE RESTRICT ON DELETE CASCADE,
   CONSTRAINT `ck_criteria_template_items_0` CHECK (evidence_type IN ('auto','manual','both')),
   CONSTRAINT `ck_criteria_template_items_1` CHECK (is_required IN (0,1))
+  ,CONSTRAINT `ck_criteria_template_items_2` CHECK (required_count >= 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -603,6 +626,7 @@ CREATE TABLE IF NOT EXISTS `event_criteria_items` (
   `score_max` DECIMAL(12,3) NOT NULL DEFAULT 0,
   `evidence_type` VARCHAR(768) NOT NULL DEFAULT 'manual',
   `is_required` TINYINT(1) NOT NULL DEFAULT 0,
+  `required_count` BIGINT NOT NULL DEFAULT 1,
   `sort_order` BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   KEY `idx_event_criteria_items_event_id` (`event_id`),
@@ -610,6 +634,7 @@ CREATE TABLE IF NOT EXISTS `event_criteria_items` (
   CONSTRAINT `fk_event_criteria_items_0` FOREIGN KEY (`event_id`) REFERENCES `events`(`id`) ON UPDATE RESTRICT ON DELETE CASCADE,
   CONSTRAINT `ck_event_criteria_items_0` CHECK (evidence_type IN ('auto','manual','both')),
   CONSTRAINT `ck_event_criteria_items_1` CHECK (is_required IN (0,1))
+  ,CONSTRAINT `ck_event_criteria_items_2` CHECK (required_count >= 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
@@ -814,6 +839,7 @@ CREATE TABLE IF NOT EXISTS `submission_auto_results` (
   `submission_id` BIGINT NOT NULL,
   `criteria_code` VARCHAR(191) NOT NULL,
   `passed` TINYINT(1) NOT NULL DEFAULT 0,
+  `matched_count` BIGINT NOT NULL DEFAULT 0,
   `matched_activity_ids` TEXT NULL,
   `matched_activity_titles` TEXT NULL,
   `evaluated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -850,10 +876,35 @@ CREATE TABLE IF NOT EXISTS `submission_criteria_reviews` (
 
 -- @statement
 
+CREATE TABLE IF NOT EXISTS `submission_evidence_units` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `submission_id` BIGINT NOT NULL,
+  `criteria_code` VARCHAR(191) NOT NULL,
+  `source_type` VARCHAR(16) NOT NULL DEFAULT 'manual',
+  `related_activity_id` BIGINT NULL,
+  `note` TEXT NULL,
+  `claimed_count` INT NOT NULL DEFAULT 1,
+  `created_by` BIGINT NULL,
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_submission_evidence_units_submission_criteria` (`submission_id`, `criteria_code`),
+  KEY `idx_submission_evidence_units_activity` (`related_activity_id`),
+  UNIQUE KEY `uq_submission_evidence_units_activity` (`submission_id`, `criteria_code`, `related_activity_id`),
+  CONSTRAINT `fk_submission_evidence_units_submission` FOREIGN KEY (`submission_id`) REFERENCES `submissions`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_submission_evidence_units_activity` FOREIGN KEY (`related_activity_id`) REFERENCES `activities`(`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_submission_evidence_units_creator` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE SET NULL,
+  CONSTRAINT `ck_submission_evidence_units_source_type` CHECK (`source_type` IN ('manual'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+-- @statement
+
 CREATE TABLE IF NOT EXISTS `submission_files` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `submission_id` BIGINT NOT NULL,
   `criteria_code` VARCHAR(768) NOT NULL,
+  `evidence_unit_id` BIGINT NULL,
   `file_name` VARCHAR(768) NOT NULL,
   `file_path` VARCHAR(768) NULL,
   `original_name` VARCHAR(255) NOT NULL,
@@ -871,10 +922,36 @@ CREATE TABLE IF NOT EXISTS `submission_files` (
   `uploaded_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (`id`),
   KEY `idx_submission_files_submission_id` (`submission_id`),
+  KEY `idx_submission_files_evidence_unit` (`evidence_unit_id`),
   CONSTRAINT ck_submission_file_status CHECK(status IN ('pending','ready','deleted')),
   CONSTRAINT ck_submission_file_provider CHECK(storage_provider IN ('local','onedrive')),
   CONSTRAINT fk_submission_file_uploader FOREIGN KEY(uploaded_by) REFERENCES users(id) ON DELETE SET NULL,
-  CONSTRAINT `fk_submission_files_0` FOREIGN KEY (`submission_id`) REFERENCES `submissions`(`id`) ON UPDATE RESTRICT ON DELETE CASCADE
+  CONSTRAINT `fk_submission_files_0` FOREIGN KEY (`submission_id`) REFERENCES `submissions`(`id`) ON UPDATE RESTRICT ON DELETE CASCADE,
+  CONSTRAINT `fk_submission_files_evidence_unit` FOREIGN KEY (`evidence_unit_id`) REFERENCES `submission_evidence_units`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+-- @statement
+
+CREATE TABLE IF NOT EXISTS `submission_evidence_reviews` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `submission_id` BIGINT NOT NULL,
+  `evidence_unit_id` BIGINT NOT NULL,
+  `round` BIGINT NOT NULL,
+  `reviewer_id` BIGINT NOT NULL,
+  `decision` VARCHAR(16) NOT NULL,
+  `approved_count` INT NOT NULL DEFAULT 1,
+  `note` TEXT NULL,
+  `reviewed_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_submission_evidence_reviews_submission_round` (`submission_id`, `round`),
+  KEY `idx_submission_evidence_reviews_unit` (`evidence_unit_id`, `round`),
+  UNIQUE KEY `uq_submission_evidence_reviews_unit_round` (`evidence_unit_id`, `round`),
+  CONSTRAINT `fk_submission_evidence_reviews_submission` FOREIGN KEY (`submission_id`) REFERENCES `submissions`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_submission_evidence_reviews_unit` FOREIGN KEY (`evidence_unit_id`) REFERENCES `submission_evidence_units`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_submission_evidence_reviews_reviewer` FOREIGN KEY (`reviewer_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT,
+  CONSTRAINT `ck_submission_evidence_reviews_round` CHECK (`round` IN (1,2)),
+  CONSTRAINT `ck_submission_evidence_reviews_decision` CHECK (`decision` IN ('pass','fail'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 

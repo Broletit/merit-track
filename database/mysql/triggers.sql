@@ -84,5 +84,5 @@ END;
 -- @statement
 CREATE TRIGGER audit_logs_reasoned_admin_only BEFORE INSERT ON audit_logs FOR EACH ROW
 BEGIN
-  IF NEW.action NOT IN ('activity.delete','event.delete','conduct.category.delete','criteria_template.delete','criteria_group.delete','criteria_item.delete','user.class.transfer','user.access.update','user.role.update','user.status.update','activity.attendance.import') OR CHAR_LENGTH(TRIM(COALESCE(NEW.reason,'')))<10 OR NOT EXISTS(SELECT 1 FROM users WHERE id=NEW.actor_user_id AND role='admin') THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='REASONED_ADMIN_AUDIT_REQUIRED'; END IF;
+  IF NEW.action NOT IN ('activity.delete','event.delete','conduct.category.delete','criteria_template.delete','criteria_template.apply','criteria_group.delete','criteria_item.delete','user.class.transfer','user.access.update','user.role.update','user.status.update','activity.attendance.import') OR CHAR_LENGTH(TRIM(COALESCE(NEW.reason,'')))<10 OR NOT EXISTS(SELECT 1 FROM users WHERE id=NEW.actor_user_id AND role='admin') THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='REASONED_ADMIN_AUDIT_REQUIRED'; END IF;
 END;

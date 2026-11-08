@@ -30,6 +30,11 @@ export async function createCriteriaGroup(
   if (!title) {
     throw new Error("Vui lòng nhập tên tiêu chuẩn.");
   }
+  const duplicate = await db.first<{ id: number }>(
+    "SELECT id FROM criteria_template_groups WHERE template_id=? AND LOWER(title)=LOWER(?) LIMIT 1",
+    [templateId, title],
+  );
+  if (duplicate) throw new Error("Tên tiêu chuẩn đã tồn tại trong bộ tiêu chuẩn này.");
 
   if (!Number.isInteger(minRequired) || minRequired < 0) {
     throw new Error("Số tiêu chí cần đạt không hợp lệ.");

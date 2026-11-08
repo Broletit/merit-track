@@ -6,9 +6,10 @@ import { getDatabase } from "@/server/db/mysql";
 import { evaluateSubmission } from "@/server/submissions/evaluateSubmission";
 import { assertSubmissionReviewAccess } from "@/server/auth/submissionReviewAccess";
 
-export async function reviewSubmissionCriterion(submissionId:number,criteriaCode:string,decision:"pass"|"fail"){
+export async function reviewSubmissionCriterion(submissionId:number,criteriaCode:string,decision:"pass"|"fail",approvedCount=1){
   const user=await requireLogin();
   const db=getDatabase();
+  if(!Number.isInteger(approvedCount)||approvedCount<0||approvedCount>50)throw new Error("Số lượt công nhận phải từ 0 đến 50.");
   if(!["pass","fail"].includes(decision))throw new Error("Kết quả tiêu chí không hợp lệ.");
   const row=(await db.first(`SELECT s.status,s.class_id,i.code,i.is_required,e.type event_type,
     CASE WHEN e.status='published' AND CAST(e.end_at AS DATETIME(3))>=CURRENT_TIMESTAMP(3) THEN 1 ELSE 0 END review_open,
@@ -36,6 +37,10 @@ export async function reviewSubmissionCriterion(submissionId:number,criteriaCode
   }else if(user.role!=="admin")throw new Error("Bạn không có quyền đánh giá tiêu chí ở vòng này.");
   (await db.execute(`INSERT INTO submission_criteria_reviews(submission_id,criteria_code,round,reviewer_id,decision,reviewed_at)
     VALUES(?,?,?,?,?,CURRENT_TIMESTAMP(3)) ON DUPLICATE KEY UPDATE reviewer_id=VALUES(reviewer_id),decision=VALUES(decision),reviewed_at=CURRENT_TIMESTAMP(3)`, [submissionId, criteriaCode, round, user.id, decision]));
+  await db.execute(`INSERT INTO submission_evidence_reviews(submission_id,evidence_unit_id,round,reviewer_id,decision,approved_count,reviewed_at)
+    SELECT eu.submission_id,eu.id,?,?,?,CASE WHEN ?='pass' THEN LEAST(GREATEST(1,COALESCE(eu.claimed_count,1)),?) ELSE 0 END,CURRENT_TIMESTAMP(3)
+    FROM submission_evidence_units eu WHERE eu.submission_id=? AND eu.criteria_code=?
+    ON DUPLICATE KEY UPDATE reviewer_id=VALUES(reviewer_id),decision=VALUES(decision),approved_count=VALUES(approved_count),reviewed_at=CURRENT_TIMESTAMP(3)`, [round,user.id,decision,decision,approvedCount,submissionId,criteriaCode]);
   if(row.event_type==="officer")(await evaluateSubmission(submissionId));
   revalidatePath(`/dashboard/class-officer/reviews/${submissionId}`);
   revalidatePath(`/dashboard/faculty-officer/reviews/${submissionId}`);

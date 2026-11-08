@@ -1,6 +1,5 @@
 import CriteriaDefinitionTable from "@/components/shared/criteria/CriteriaDefinitionTable";
 import PaginatedTable from "@/components/common/PaginatedTable";
-import { addCohortFilter } from "@/server/cohorts/sql";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -34,8 +33,8 @@ export default async function ClassOfficerEventDetailPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ cohort?: string; id: string }>;
-  searchParams: Promise<{ cohort?: string; termId?: string; keyword?: string; status?: string }>;
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ termId?: string; keyword?: string; status?: string }>;
 }) {
   const user = await requireClassOfficerContext();
   const [{ id }, sp] = await Promise.all([params, searchParams]);
@@ -73,7 +72,6 @@ export default async function ClassOfficerEventDetailPage({
   const submissionStatus = String(sp.status ?? "").trim();
   const submissionWhere = ["s.event_id = ?", "s.class_id = ?", "s.submitted_at IS NOT NULL"];
   const submissionValues: unknown[] = [event.id, officerClass.class_id];
-  addCohortFilter(submissionWhere,submissionValues,sp.cohort,"u.cohort");
   if (keyword) { submissionWhere.push("(u.full_name LIKE ? OR u.mssv LIKE ?)"); submissionValues.push(`%${keyword}%`, `%${keyword}%`); }
   if (submissionStatus) { submissionWhere.push("s.status = ?"); submissionValues.push(submissionStatus); }
   const submissions = (await db.rows(`
@@ -114,7 +112,7 @@ export default async function ClassOfficerEventDetailPage({
 <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60"><h2 className="text-xl font-semibold">Thông tin đợt xét</h2><div className="mt-5 grid items-stretch gap-4 md:grid-cols-2"><div className="min-w-0 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 shadow-md shadow-slate-200/60"><h3 className="text-sm font-medium text-slate-600">Mô tả</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{event.description||"Chưa có mô tả."}</p></div><div className="min-w-0 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 shadow-md shadow-slate-200/60"><h3 className="mb-2 text-sm font-medium text-slate-600">Trạng thái tiếp nhận</h3><EventSubmissionPhaseBadge event={{status:event.status,startAt:event.start_at,endAt:event.end_at,allowLate:Boolean(event.allow_late)}}/></div></div></section>
 
       <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
-        <div><EventSubmissionFilters /></div>
+        <div><EventSubmissionFilters showCohort={false} /></div>
 
       <h2 className="mt-5 text-xl font-semibold text-slate-900">Hồ sơ sinh viên lớp</h2>
 

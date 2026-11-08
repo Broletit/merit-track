@@ -5,6 +5,7 @@ import { requireStudentContext } from "@/server/auth/guards";
 import { getDatabase } from "@/server/db/mysql";
 import { assertEventAcceptsSubmissions } from "@/lib/events/eventSubmissionPhase";
 import { evaluateSubmissionAuto } from "@/server/events/evaluateSubmissionAuto";
+import { cloneCriteriaTemplateToEvent } from "@/server/events/cloneCriteriaTemplateToEvent";
 import {
   canEditSubmission,
   getSubmissionStatusLabel,
@@ -16,6 +17,7 @@ type EventRow = {
   start_at: string;
   end_at: string;
   allow_late: number;
+  criteria_template_id: number | null;
 };
 
 type ClassRow = {
@@ -32,7 +34,7 @@ export async function ensureStudentSubmissionDraft(eventId: number) {
   const db = getDatabase();
 
   const event = (await db.first(`
-      SELECT id, status, start_at, end_at, allow_late
+      SELECT id, status, start_at, end_at, allow_late, criteria_template_id
       FROM events
       WHERE id = ?
         AND type = 'student'
@@ -54,6 +56,11 @@ export async function ensureStudentSubmissionDraft(eventId: number) {
     endAt: event.end_at,
     allowLate: Number(event.allow_late ?? 0) === 1,
   });
+
+  const eventCriteriaCount = Number((await db.first<{total:number}>("SELECT COUNT(*) total FROM event_criteria_items WHERE event_id=?", [eventId]))?.total ?? 0);
+  if (eventCriteriaCount === 0 && Number(event.criteria_template_id) > 0) {
+    await cloneCriteriaTemplateToEvent({ eventId, templateId: Number(event.criteria_template_id) });
+  }
 
   const existed = (await db.first(`
       SELECT id, status

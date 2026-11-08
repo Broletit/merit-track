@@ -36,6 +36,7 @@ export type CriteriaTemplateCriteriaItem = {
   scoreMax: number;
   evidenceType: string;
   isRequired: boolean;
+  requiredCount: number;
   sortOrder: number;
   activityRules: CriteriaTemplateActivityRule[];
   conductRule: CriteriaTemplateConductRule | null;

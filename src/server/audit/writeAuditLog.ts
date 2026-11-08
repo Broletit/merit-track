@@ -2,7 +2,7 @@ import type { Database } from "@/server/db/mysql";
 
 export const REASONED_ADMIN_ACTIONS = [
   "activity.delete", "event.delete", "conduct.category.delete", "criteria_template.delete",
-  "criteria_group.delete", "criteria_item.delete", "user.class.transfer", "user.access.update", "user.role.update", "user.status.update", "activity.attendance.import",
+  "criteria_group.delete", "criteria_item.delete", "criteria_template.apply", "user.class.transfer", "user.access.update", "user.role.update", "user.status.update", "activity.attendance.import",
 ] as const;
 const allowedActions = new Set<string>(REASONED_ADMIN_ACTIONS);
 

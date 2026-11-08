@@ -64,7 +64,7 @@ export default async function ClassOfficerOfficerActivitiesPage({
 
   const summary = (await db.first(`
     SELECT COUNT(*) AS total,
-      COUNT(CASE WHEN CAST(a.start_at AS DATETIME(3))>CURRENT_TIMESTAMP(3) THEN 1 END) AS upcoming,
+      COUNT(CASE WHEN a.start_at>CURRENT_TIMESTAMP(3) THEN 1 END) AS upcoming,
       COUNT(CASE WHEN ar.status='registered' THEN 1 END) AS registered,
       COUNT(CASE WHEN ar.status='attended' THEN 1 END) AS attended
     FROM activities a LEFT JOIN activity_registrations ar ON ar.activity_id=a.id AND ar.user_id=?
@@ -81,17 +81,17 @@ export default async function ClassOfficerOfficerActivitiesPage({
 
   if (status === "open") {
     where.push("ar.status IS NULL");
-    where.push("CAST(a.registration_start_at AS DATETIME(3)) <= CURRENT_TIMESTAMP(3)");
-    where.push("CAST(a.registration_end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)");
+    where.push("a.registration_start_at <= CURRENT_TIMESTAMP(3)");
+    where.push("a.registration_end_at >= CURRENT_TIMESTAMP(3)");
   }
 
   if (status === "attended") where.push("ar.status = 'attended'");
-  if (status === "expired") where.push("CAST(a.registration_end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)");
-  if (time === "upcoming") where.push("CAST(a.start_at AS DATETIME(3)) > CURRENT_TIMESTAMP(3)");
+  if (status === "expired") where.push("a.registration_end_at < CURRENT_TIMESTAMP(3)");
+  if (time === "upcoming") where.push("a.start_at > CURRENT_TIMESTAMP(3)");
   if (time === "ongoing") {
-    where.push("CAST(a.start_at AS DATETIME(3)) <= CURRENT_TIMESTAMP(3) AND CAST(a.end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)");
+    where.push("a.start_at <= CURRENT_TIMESTAMP(3) AND a.end_at >= CURRENT_TIMESTAMP(3)");
   }
-  if (time === "ended") where.push("CAST(a.end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)");
+  if (time === "ended") where.push("a.end_at < CURRENT_TIMESTAMP(3)");
 
   const whereSql = `WHERE ${where.join(" AND ")}`;
 
@@ -122,7 +122,7 @@ export default async function ClassOfficerOfficerActivitiesPage({
         ON ar.activity_id = a.id
        AND ar.user_id = ?
       ${whereSql}
-      ORDER BY CAST(a.start_at AS DATETIME(3)) DESC, a.id DESC
+      ORDER BY a.start_at DESC, a.id DESC
       LIMIT ?
       OFFSET ?
       `, [user.id, ...values, PAGE_SIZE, offset])) as Row[];

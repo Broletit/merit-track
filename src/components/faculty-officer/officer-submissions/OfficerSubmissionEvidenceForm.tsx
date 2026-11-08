@@ -220,6 +220,11 @@ export default function OfficerSubmissionEvidenceForm({
                             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50"
                           />
 
+                          <label className="block max-w-xs text-sm font-medium text-slate-700">
+                            Số lượt minh chứng trong nội dung đã nộp
+                            <input type="number" name={`claimedCount_${item.code}`} min={1} max={50} defaultValue={1} disabled={!canEdit || pending || evidenceNotNeeded(item)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50" />
+                          </label>
+
                           <div className={`rounded-none border p-3 ${fileStates[item.code]?.error ? "border-red-500 bg-red-50" : fileStates[item.code]?.name ? "border-emerald-500 bg-emerald-50" : item.file_name ? "border-blue-300 bg-blue-50/50" : "border-slate-200 bg-slate-50"}`}>
                             <div className="flex flex-wrap items-center gap-3">
                             <label className={`flex cursor-pointer items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold ${canEdit ? "bg-blue-700 text-white" : "bg-slate-200 text-slate-400"}`}>

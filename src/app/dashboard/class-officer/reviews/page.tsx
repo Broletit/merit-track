@@ -1,13 +1,12 @@
-import { addCohortFilter } from "@/server/cohorts/sql";
 import { requireClassOfficerContext } from "@/server/auth/guards";
 import { getDatabase } from "@/server/db/mysql";
 import ClassOfficerReviewsTable from "@/components/class-officer/reviews/ClassOfficerReviewsTable";
 import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
 import { getAcademicTermForView, getAcademicTermsForSelect } from "@/server/academic-terms/getAcademicTermForView";
 
-type SearchParams = Promise<{ cohort?: string;
-  keyword?: string;
+type SearchParams = Promise<{ keyword?: string;
   status?: string;
+  round?: string;
   sort?: string;
   termId?: string;
   page?: string;
@@ -52,6 +51,7 @@ export default async function ClassOfficerReviewsPage({
 
   const keyword = String(params.keyword ?? "").trim();
   const status = String(params.status ?? "").trim();
+  const round = ["1", "2"].includes(String(params.round)) ? String(params.round) : "";
   const eventId = Number(params.eventId ?? 0);
   const sort = String(params.sort ?? "latest").trim();
   const page = Math.max(1, Number(params.page ?? "1") || 1);
@@ -64,7 +64,6 @@ export default async function ClassOfficerReviewsPage({
     "s.submitted_at IS NOT NULL",
   ];
   const values: unknown[] = [officerClass.class_id, selectedTerm.id];
-  addCohortFilter(where,values,params.cohort,"u.cohort");
   const eventOptions = (await db.rows(`SELECT DISTINCT e.id,e.title,e.start_at FROM submissions s INNER JOIN events e ON e.id=s.event_id WHERE s.class_id=? AND e.term_id=? AND s.submitted_at IS NOT NULL ORDER BY CAST(e.start_at AS DATETIME(3)) DESC`, [officerClass.class_id, selectedTerm.id])) as Array<{id:number;title:string}>;
 
   if (eventId > 0) { where.push("e.id = ?"); values.push(eventId); }
@@ -77,6 +76,7 @@ export default async function ClassOfficerReviewsPage({
       values.push(status);
     }
   }
+  if (round) { where.push("s.review_round = ?"); values.push(Number(round)); }
 
   if (keyword) {
     where.push("(e.title LIKE ? OR u.full_name LIKE ? OR u.mssv LIKE ?)");
@@ -144,9 +144,9 @@ export default async function ClassOfficerReviewsPage({
         totalResults={Number(total.total ?? 0)}
         page={page}
         totalPages={totalPages}
-        searchParams={{ cohort: params.cohort,
-          keyword,
+        searchParams={{ keyword,
           status,
+          round,
           sort,
           termId: String(selectedTerm.id),
           eventId: eventId > 0 ? String(eventId) : "",

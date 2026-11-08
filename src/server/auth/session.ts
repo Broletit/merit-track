@@ -10,7 +10,10 @@ export type SessionPayload = {
 };
 
 const SESSION_COOKIE = "merit_track_session";
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+// Persistent login is deliberately limited to one day. The database expiry and
+// the HttpOnly cookie use the same value, so an expired browser cookie cannot
+// revive a server-side session.
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24;
 
 type SessionRow = {
   user_id: number;

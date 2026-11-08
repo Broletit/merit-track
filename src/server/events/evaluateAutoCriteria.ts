@@ -3,6 +3,7 @@ import { getDatabase } from "@/server/db/mysql";
 export type AutoCriteriaResult = {
   criteriaCode: string;
   passed: boolean;
+  matchedCount: number;
   matchedActivityIds: number[];
   matchedActivityTitles: string[];
 };
@@ -10,6 +11,7 @@ export type AutoCriteriaResult = {
 type CriteriaRow = {
   code: string;
   evidence_type: string;
+  required_count: number;
 };
 
 type ConductRuleRow = {
@@ -20,6 +22,7 @@ type ConductRuleRow = {
 type MatchRow = {
   activity_id: number;
   activity_title: string;
+  activity_start_at: string;
 };
 
 export async function evaluateAutoCriteria({
@@ -49,7 +52,7 @@ export async function evaluateAutoCriteria({
   }
 
   const criteriaRows = (await db.rows(`
-      SELECT code, evidence_type
+      SELECT code, evidence_type, required_count
       FROM event_criteria_items
       WHERE event_id = ?
         AND evidence_type IN ('auto', 'both')
@@ -59,9 +62,10 @@ export async function evaluateAutoCriteria({
   const results: AutoCriteriaResult[] = [];
   for (const criteria of criteriaRows) {
     const matches = (await db.rows(`
-        SELECT
+        SELECT DISTINCT
           a.id AS activity_id,
-          a.title AS activity_title
+          a.title AS activity_title,
+          a.start_at AS activity_start_at
         FROM criteria_activity_rules r
         INNER JOIN activities a ON a.id = r.activity_id
         INNER JOIN activity_registrations ar
@@ -70,7 +74,7 @@ export async function evaluateAutoCriteria({
          AND ar.status = 'attended'
         WHERE r.template_id = ?
           AND r.criteria_code = ?
-        ORDER BY CAST(a.start_at AS DATETIME(3)) DESC, a.id DESC
+        ORDER BY activity_start_at DESC, activity_id DESC
         `, [userId, event.criteria_template_id, criteria.code])) as MatchRow[];
 
     const conductRule = (await db.first(`
@@ -103,9 +107,13 @@ export async function evaluateAutoCriteria({
       conductPassed = Number(scoreRow?.total_score ?? 0) >= Number(conductRule.min_score);
     }
 
+    // Each attended activity is an independent automatic unit. A conduct rule
+    // contributes one separate unit when satisfied.
+    const matchedCount = matches.length + (conductPassed ? 1 : 0);
     results.push({
       criteriaCode: criteria.code,
-      passed: matches.length > 0 || conductPassed,
+      passed: matchedCount >= Math.max(1, Number(criteria.required_count ?? 1)),
+      matchedCount,
       matchedActivityIds: matches.map((item) => Number(item.activity_id)),
       matchedActivityTitles: matches.map((item) =>
         String(item.activity_title ?? "")

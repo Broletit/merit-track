@@ -17,17 +17,19 @@ export async function saveAutoCriteriaResults({
           submission_id,
           criteria_code,
           passed,
+          matched_count,
           matched_activity_ids,
           matched_activity_titles,
           evaluated_at
         )
-        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))
         ON DUPLICATE KEY UPDATE
           passed = VALUES(passed),
+          matched_count = VALUES(matched_count),
           matched_activity_ids = VALUES(matched_activity_ids),
           matched_activity_titles = VALUES(matched_activity_titles),
           evaluated_at = VALUES(evaluated_at)
-        `, [submissionId, item.criteriaCode, item.passed ? 1 : 0, JSON.stringify(item.matchedActivityIds), JSON.stringify(item.matchedActivityTitles)]));
+        `, [submissionId, item.criteriaCode, item.passed ? 1 : 0, item.matchedCount, JSON.stringify(item.matchedActivityIds), JSON.stringify(item.matchedActivityTitles)]));
     }
   })));
 

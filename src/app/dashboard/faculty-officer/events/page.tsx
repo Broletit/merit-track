@@ -26,8 +26,8 @@ export default async function FacultyOfficerEventsPage({ searchParams }: { searc
   const page = Math.max(1, Number(params.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
   const assigned = `EXISTS (SELECT 1 FROM faculty_class_assignments fca WHERE fca.faculty_officer_id=? AND fca.class_id=s.class_id)`;
-  const where = ["e.type='student'", "e.status='published'", "e.term_id=?", `EXISTS (SELECT 1 FROM faculty_class_assignments fca WHERE fca.faculty_officer_id=?)`];
-  const values: unknown[] = [selectedTerm.id, officer.id];
+  const where = ["e.type='student'", "e.status='published'", "e.term_id=?"];
+  const values: unknown[] = [selectedTerm.id];
   if (keyword) { where.push("e.title LIKE ?"); values.push(`%${keyword}%`); }
   if (status) { where.push(`EXISTS (SELECT 1 FROM submissions s WHERE s.event_id=e.id AND ${assigned} AND s.status=?)`); values.push(officer.id, status); }
   const phaseFilter = getEventSubmissionPhaseFilter(phase);

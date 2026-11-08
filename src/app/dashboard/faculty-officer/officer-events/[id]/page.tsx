@@ -40,6 +40,7 @@ type CriteriaRow = {
   min_required: number;
   score_max: number;
   is_required: number;
+  required_count: number;
   matched_activity_count: number;
   matched_activity_score: number;
   matched_activity_titles: string | null;
@@ -139,6 +140,7 @@ export async function OfficerEventDetailPageView({
         g.min_required,
         i.score_max,
         i.is_required,
+        i.required_count,
         (
           SELECT COUNT(*)
           FROM criteria_activity_rules car
@@ -199,6 +201,7 @@ export async function OfficerEventDetailPageView({
       minRequired: Number(item.min_required ?? 0),
       scoreMax: Number(item.score_max ?? 0),
       isRequired: Number(item.is_required ?? 0) === 1,
+      requiredCount: Math.max(1, Number(item.required_count ?? 1)),
       autoPassed,
       autoMessage: autoPassed
         ? `Đạt tự động từ hoạt động: ${String(item.matched_activity_titles ?? "").split("||").filter(Boolean).join(", ")}`

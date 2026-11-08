@@ -51,6 +51,7 @@ export default async function StudentNotificationsPage({ searchParams }: {
         </div>
       </section>
 
+      <div data-pagination-scroll-target className="scroll-mt-4">
       <section className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100">
         <div className="divide-y divide-slate-100">
           {rows.length > 0 ? (await Promise.all(rows.map(async (item) => (
@@ -81,6 +82,7 @@ export default async function StudentNotificationsPage({ searchParams }: {
         </div>
       </section>
       <Pagination totalResults={total} resultLabel="thông báo" page={page} totalPages={totalPages} />
+      </div>
     </main>
   );
 }

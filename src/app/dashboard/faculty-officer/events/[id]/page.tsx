@@ -20,7 +20,7 @@ export default async function Page({params,searchParams}:{params:Promise<{ cohor
   const [{id},sp]=await Promise.all([params,searchParams]);
   const eventId=await getDatabase().resolveRouteRecordId(id); if(!Number.isFinite(eventId)||eventId<=0)notFound();
   const db=getDatabase();
-  const event=(await db.first(`SELECT e.id,e.title,e.description,e.status,e.start_at,e.end_at,e.allow_late FROM events e WHERE e.id=? AND e.type='student' AND e.status='published' AND EXISTS(SELECT 1 FROM faculty_class_assignments fca WHERE fca.faculty_officer_id=?) LIMIT 1`, [eventId, officer.id])) as EventRow|undefined;
+  const event=(await db.first(`SELECT e.id,e.title,e.description,e.status,e.start_at,e.end_at,e.allow_late FROM events e WHERE e.id=? AND e.type='student' AND e.status='published' LIMIT 1`, [eventId])) as EventRow|undefined;
   if(!event)notFound();
   const keyword=String(sp.keyword??"").trim(), status=String(sp.status??"").trim(), classId=Number(sp.classId??0);
   const where=["s.event_id=?","s.submitted_at IS NOT NULL","EXISTS(SELECT 1 FROM faculty_class_assignments fca WHERE fca.faculty_officer_id=? AND fca.class_id=s.class_id)"];

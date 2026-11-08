@@ -45,20 +45,15 @@ export default async function StudentConductScorePage({
   const user = await requireStudentContext();
   const params = await searchParams;
   const db = getDatabase();
-  (await ensureActivityConductScores());
-
   const terms = (await getAcademicTermsForSelect());
   const selectedTerm = (await getAcademicTermForView(params.termId));
+  await ensureActivityConductScores({ userId: user.id, termId: selectedTerm.id });
   const scoreFrame = (await db.rows(`WITH RECURSIVE tree AS (
     SELECT id,parent_id,code,name,score_max,sort_order,0 depth,CAST(CONCAT(LPAD(CAST(sort_order AS CHAR), 8, '0'), code) AS CHAR(4096)) path FROM conduct_score_categories WHERE term_id=? AND parent_id IS NULL
     UNION ALL SELECT c.id,c.parent_id,c.code,c.name,c.score_max,c.sort_order,tree.depth+1,CONCAT(CONCAT(CONCAT(tree.path, '/'), LPAD(CAST(c.sort_order AS CHAR), 8, '0')), c.code) FROM conduct_score_categories c JOIN tree ON c.parent_id=tree.id)
-    SELECT tree.id,tree.parent_id,tree.code,tree.name,tree.score_max,tree.depth,tree.path,
-      COALESCE(SUM(CASE WHEN cs.user_id=? THEN cs.score_value ELSE 0 END),0) AS raw_score
-    FROM tree
-    LEFT JOIN activities a ON a.conduct_category_id=tree.id
-    LEFT JOIN conduct_scores cs ON cs.source_type='activity' AND cs.source_id=a.id
-    GROUP BY tree.id,tree.parent_id,tree.code,tree.name,tree.score_max,tree.depth,tree.path ORDER BY tree.path
-  `, [selectedTerm.id, user.id])) as Array<{id:number;parent_id:number|null;code:string;name:string;score_max:number;raw_score:number;depth:number}>;
+    SELECT tree.id,tree.parent_id,tree.code,tree.name,tree.score_max,tree.depth,tree.path
+    FROM tree ORDER BY tree.path
+  `, [selectedTerm.id])) as Array<{id:number;parent_id:number|null;code:string;name:string;score_max:number;depth:number}>;
   const frameActivities = (await db.rows(`SELECT a.id,a.title,a.conduct_category_id,a.conduct_score,a.absence_penalty,COALESCE(cs.score_value,0) earned FROM activities a LEFT JOIN conduct_scores cs ON cs.source_type='activity' AND cs.source_id=a.id AND cs.user_id=? WHERE a.term_id=? AND a.conduct_category_id IS NOT NULL AND a.status='published' AND a.audience_type='student' AND ${activityVisibleSql("a",String(user.id))} ORDER BY CAST(a.created_at AS DATETIME(3)),a.id`, [user.id, selectedTerm.id])) as Array<{id:number;title:string;conduct_category_id:number;conduct_score:number;absence_penalty:number;earned:number}>;
   const effectiveScores=new Map<number,number>();
   [...scoreFrame].sort((a,b)=>b.depth-a.depth).forEach((item)=>{
@@ -187,7 +182,7 @@ export default async function StudentConductScorePage({
               </div>
               {closingItems.flatMap((owner)=>{
                 const lastChildIndex=scoreFrame.filter((candidate)=>candidate.parent_id===owner.id).reduce((highest,candidate)=>{const numericCode=Number(candidate.code);return Number.isInteger(numericCode)&&numericCode>highest?numericCode:highest;},0);
-                return frameActivities.filter((activity)=>activity.conduct_category_id===owner.id).map((activity,activityIndex)=><div key={activity.id} className="flex justify-between gap-3 border-b border-slate-100 px-4 py-2 text-sm text-slate-600" style={{paddingLeft:`${40+(owner.depth+1)*24}px`}}><span>{owner.code}.{lastChildIndex+activityIndex+1}. {activity.title} ({activity.conduct_score} điểm)</span><span className={activity.earned>0?"font-semibold text-emerald-700":activity.earned<0?"font-semibold text-rose-700":"text-slate-400"}>{activity.earned>0?`Đã cộng ${activity.earned}đ`:activity.earned<0?`Đã trừ ${Math.abs(activity.earned)}đ`:"Chưa ghi nhận"}</span></div>);
+                return frameActivities.filter((activity)=>activity.conduct_category_id===owner.id).map((activity,activityIndex)=><div key={activity.id} className="flex min-w-0 items-start justify-between gap-3 border-b border-slate-100 px-4 py-2 text-sm text-slate-600" style={{paddingLeft:`${40+(owner.depth+1)*24}px`}}><span className="min-w-0 flex-1 break-words">{owner.code}.{lastChildIndex+activityIndex+1}. {activity.title} ({activity.conduct_score} điểm)</span><span className={`shrink-0 whitespace-nowrap ${activity.earned>0?"font-semibold text-emerald-700":activity.earned<0?"font-semibold text-rose-700":"text-slate-400"}`}>{activity.earned>0?`Đã cộng ${activity.earned}đ`:activity.earned<0?`Đã trừ ${Math.abs(activity.earned)}đ`:"Chưa ghi nhận"}</span></div>);
               })}
             </Fragment>;
           })}

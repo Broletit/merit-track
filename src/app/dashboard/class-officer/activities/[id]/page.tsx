@@ -1,6 +1,5 @@
 import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
 import NumberedTable from "@/components/common/NumberedTable";
-import { addCohortFilter } from "@/server/cohorts/sql";
 import { classActivityVisibleSql } from "@/server/cohorts/sql";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,9 +10,9 @@ import { formatDateTimeVN } from "@/lib/utils/formatDateTimeVN";
 import Pagination from "@/components/common/Pagination";
 import ClassActivityParticipantsFilter from "@/components/class-officer/activities/ClassActivityParticipantsFilter";
 
-type SearchParams = Promise<{ cohort?: string; keyword?: string; status?: string; termId?: string; page?: string }>;
+type SearchParams = Promise<{ keyword?: string; status?: string; attendanceMethod?: string; termId?: string; page?: string }>;
 type ActivityRow = { id: number; title: string; description: string | null; organizer_level: string; start_at: string; end_at: string; registration_start_at: string; registration_end_at: string; conduct_score: number };
-type StudentRow = { id: number; full_name: string; mssv: string; registration_status: string; registered_at: string; checked_in_at: string | null };
+type StudentRow = { id: number; full_name: string; mssv: string; registration_status: string; registered_at: string; checked_in_at: string | null; import_batch_id: number | null; attendance_note: string | null };
 type SummaryRow = { class_total: number; registered: number; attended: number };
 const PAGE_SIZE = 10;
 
@@ -25,6 +24,13 @@ function mapRegistrationStatus(status: string) {
 function getRegistrationStatusClass(status: string) {
   if (status === "attended") return "bg-emerald-50 text-emerald-700";
   return "bg-blue-50 text-blue-700";
+}
+
+function getAttendanceMethod(row: Pick<StudentRow, "registration_status" | "import_batch_id" | "attendance_note">) {
+  if (row.registration_status !== "attended") return "—";
+  if (row.import_batch_id != null) return "Cập nhật từ danh sách";
+  if (row.attendance_note?.includes("thủ công")) return "Thủ công";
+  return row.attendance_note ? "Quét mã QR" : "—";
 }
 
 export default async function ClassOfficerActivityDetailPage({ params, searchParams }: { params: Promise<{ cohort?: string; id: string }>; searchParams: SearchParams }) {
@@ -56,6 +62,7 @@ export default async function ClassOfficerActivityDetailPage({ params, searchPar
 
   const keyword = String(sp.keyword ?? "").trim();
   const status = ["registered", "attended"].includes(String(sp.status)) ? String(sp.status) : "";
+  const attendanceMethod = ["qr", "manual", "import"].includes(String(sp.attendanceMethod)) ? String(sp.attendanceMethod) : "";
   const page = Math.max(1, Number(sp.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
   const summary = (await db.first(`
@@ -71,13 +78,20 @@ export default async function ClassOfficerActivityDetailPage({ params, searchPar
 
   const where = ["ar.activity_id = ?", "cm.class_id = ?", "cm.left_at IS NULL", "u.role IN ('student','class_officer')", "u.is_active = 1", "ar.status IN ('registered','attended')"];
   const values: unknown[] = [activity.id, officerClass.id];
-  addCohortFilter(where,values,sp.cohort,"u.cohort");
   if (keyword) { where.push("(u.full_name LIKE ? OR u.mssv LIKE ?)"); values.push(`%${keyword}%`, `%${keyword}%`); }
   if (status) { where.push("ar.status = ?"); values.push(status); }
+  if (attendanceMethod === "import") {
+    where.push("ar.status = 'attended' AND ar.import_batch_id IS NOT NULL");
+  } else if (attendanceMethod === "manual") {
+    where.push("ar.status = 'attended' AND ar.import_batch_id IS NULL AND EXISTS (SELECT 1 FROM activity_attendance_logs al WHERE al.activity_id=ar.activity_id AND al.user_id=ar.user_id AND al.result='success' AND al.note LIKE '%thủ công%')");
+  } else if (attendanceMethod === "qr") {
+    where.push("ar.status = 'attended' AND ar.import_batch_id IS NULL AND EXISTS (SELECT 1 FROM activity_attendance_logs al WHERE al.activity_id=ar.activity_id AND al.user_id=ar.user_id AND al.result='success' AND (al.note IS NULL OR al.note NOT LIKE '%thủ công%'))");
+  }
   const whereSql = `WHERE ${where.join(" AND ")}`;
   const totalRow = (await db.first(`SELECT COUNT(*) AS total FROM activity_registrations ar INNER JOIN users u ON u.id=ar.user_id INNER JOIN class_members cm ON cm.user_id=u.id ${whereSql}`, [...values])) as { total: number };
   const students = (await db.rows(`
-    SELECT ar.id,u.full_name,u.mssv,ar.status AS registration_status,ar.registered_at,ar.checked_in_at
+    SELECT ar.id,u.full_name,u.mssv,ar.status AS registration_status,ar.registered_at,ar.checked_in_at,ar.import_batch_id,
+      (SELECT al.note FROM activity_attendance_logs al WHERE al.activity_id=ar.activity_id AND al.user_id=ar.user_id AND al.result='success' ORDER BY al.id DESC LIMIT 1) AS attendance_note
     FROM activity_registrations ar INNER JOIN users u ON u.id=ar.user_id INNER JOIN class_members cm ON cm.user_id=u.id ${whereSql}
     ORDER BY CASE ar.status WHEN 'attended' THEN 1 WHEN 'registered' THEN 2 ELSE 3 END, CAST(COALESCE(ar.checked_in_at,ar.registered_at) AS DATETIME(3)) DESC,ar.id DESC
     LIMIT ? OFFSET ?
@@ -118,13 +132,13 @@ export default async function ClassOfficerActivityDetailPage({ params, searchPar
         <div data-table-frame className="mt-5 min-w-0 overflow-hidden rounded-none border border-slate-200 bg-white">
 <div className="overflow-x-auto rounded-none border border-slate-200">
           <NumberedTable page={page} className="w-full min-w-0 table-fixed divide-y divide-slate-200">
-            <thead className="bg-slate-50"><tr><th className="w-[32%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Sinh viên</th><th className="w-[18%] px-4 py-3 text-left text-sm font-semibold text-slate-700">MSSV</th><th className="w-[18%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Trạng thái</th><th className="w-[16%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Đăng ký</th><th className="w-[16%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Điểm danh</th></tr></thead>
+            <thead className="bg-slate-50"><tr><th className="w-[29%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Sinh viên</th><th className="w-[17%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Trạng thái</th><th className="w-[20%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Hình thức điểm danh</th><th className="w-[17%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Đăng ký</th><th className="w-[17%] px-4 py-3 text-left text-sm font-semibold text-slate-700">Điểm danh</th></tr></thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {students.length ? students.map((item) => <tr key={item.id} className="transition hover:bg-slate-50/70"><td className="px-4 py-4 text-sm font-semibold text-slate-900">{item.full_name}</td><td className="px-4 py-4 text-sm text-slate-700">{item.mssv}</td><td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${getRegistrationStatusClass(item.registration_status)}`}>{mapRegistrationStatus(item.registration_status)}</span></td><td className="px-4 py-4 text-sm text-slate-700">{formatDateTimeVN(item.registered_at)}</td><td className="px-4 py-4 text-sm text-slate-700">{item.checked_in_at ? formatDateTimeVN(item.checked_in_at) : "—"}</td></tr>) : <tr><td colSpan={5} className="px-4 py-12 text-center"><div className="text-sm font-semibold text-slate-700">Chưa có sinh viên tham gia phù hợp</div></td></tr>}
+              {students.length ? students.map((item) => <tr key={item.id} className="transition hover:bg-slate-50/70"><td className="px-4 py-4 align-top"><div className="text-sm font-semibold text-slate-900">{item.full_name}</div><div className="mt-1 text-xs text-slate-500">{item.mssv}</div></td><td className="px-4 py-4 align-top"><span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${getRegistrationStatusClass(item.registration_status)}`}>{mapRegistrationStatus(item.registration_status)}</span></td><td className="px-4 py-4 align-top text-sm text-slate-700">{getAttendanceMethod(item)}</td><td className="px-4 py-4 align-top text-sm text-slate-700">{formatDateTimeVN(item.registered_at)}</td><td className="px-4 py-4 align-top text-sm text-slate-700">{item.checked_in_at ? formatDateTimeVN(item.checked_in_at) : "—"}</td></tr>) : <tr><td colSpan={5} className="px-4 py-12 text-center"><div className="text-sm font-semibold text-slate-700">Chưa có sinh viên tham gia phù hợp</div></td></tr>}
             </tbody>
           </NumberedTable>
         </div>
-<div className="mt-5"><Pagination totalResults={Number(totalRow.total ?? 0)} resultLabel="sinh viên" page={page} totalPages={totalPages} searchParams={{ cohort: sp.cohort, keyword, status, termId: sp.termId }} /></div>
+<div className="mt-5"><Pagination totalResults={Number(totalRow.total ?? 0)} resultLabel="sinh viên" page={page} totalPages={totalPages} searchParams={{ keyword, status, attendanceMethod, termId: sp.termId }} /></div>
 </div>
       </section>
     </main>

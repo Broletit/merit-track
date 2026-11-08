@@ -1,7 +1,5 @@
 import statCardStyles from "@/components/shared/statistics/StatCard.module.css";
 import NumberedTable from "@/components/common/NumberedTable";
-import { activityCohortSql } from "@/server/cohorts/sql";
-import { parseCohort } from "@/lib/cohorts/cohorts";
 import { classActivityVisibleSql } from "@/server/cohorts/sql";
 import { Activity, CalendarClock, CheckCircle2, Users } from "lucide-react";
 import { requireClassOfficerContext } from "@/server/auth/guards";
@@ -13,7 +11,7 @@ import TableActionLink from "@/components/shared/TableActionLink";
 import AcademicTermSelect from "@/components/shared/AcademicTermSelect";
 import { getAcademicTermForView, getAcademicTermsForSelect } from "@/server/academic-terms/getAcademicTermForView";
 
-type SearchParams = Promise<{ cohort?: string; keyword?: string; level?: string; attendance?: string; termId?: string; page?: string }>;
+type SearchParams = Promise<{ keyword?: string; level?: string; attendance?: string; termId?: string; page?: string }>;
 type Row = { id: number; title: string; description: string | null; organizer_level: string; start_at: string; end_at: string; participants: number; attended: number };
 type SummaryRow = { total_activities: number; upcoming: number; class_registered: number; class_attended: number; faculty_attended: number };
 const PAGE_SIZE = 10;
@@ -45,10 +43,6 @@ export default async function ClassOfficerActivitiesPage({ searchParams }: { sea
     `${classActivityVisibleSql("a", String(officerClass.id))}`,
   ];
   const values: unknown[] = [selectedTerm.id];
-  const cohort = parseCohort(params.cohort);
-  if (params.cohort && !cohort) where.push("0=1");
-  if (cohort) { where.push(`(${activityCohortSql("a")})`); values.push(cohort,cohort); }
-
   if (keyword) {
     where.push("a.title LIKE ?");
     values.push(`%${keyword}%`);
@@ -71,7 +65,7 @@ export default async function ClassOfficerActivitiesPage({ searchParams }: { sea
   const summary = (await db.first(`
     SELECT
       COUNT(DISTINCT a.id) AS total_activities,
-      COUNT(DISTINCT CASE WHEN CAST(a.start_at AS DATETIME(3))>CURRENT_TIMESTAMP(3) THEN a.id END) AS upcoming,
+      COUNT(DISTINCT CASE WHEN a.start_at>CURRENT_TIMESTAMP(3) THEN a.id END) AS upcoming,
       COUNT(DISTINCT CASE WHEN ar.status IN ('registered','attended') THEN ar.user_id END) AS class_registered,
       COUNT(DISTINCT CASE WHEN ar.status='attended' THEN ar.user_id END) AS class_attended,
       (SELECT COUNT(DISTINCT all_ar.user_id)
@@ -105,8 +99,8 @@ export default async function ClassOfficerActivitiesPage({ searchParams }: { sea
          AND EXISTS (SELECT 1 FROM class_members cm WHERE cm.user_id=u.id AND cm.class_id=? AND cm.left_at IS NULL)
          AND ar.status='attended') AS attended
     FROM activities a ${whereSql}
-    ORDER BY CASE WHEN CAST(a.start_at AS DATETIME(3))<=CURRENT_TIMESTAMP(3) AND CAST(a.end_at AS DATETIME(3))>=CURRENT_TIMESTAMP(3) THEN 0 WHEN CAST(a.start_at AS DATETIME(3))>CURRENT_TIMESTAMP(3) THEN 1 ELSE 2 END,
-      CAST(a.start_at AS DATETIME(3)) DESC, a.id DESC
+    ORDER BY CASE WHEN a.start_at<=CURRENT_TIMESTAMP(3) AND a.end_at>=CURRENT_TIMESTAMP(3) THEN 0 WHEN a.start_at>CURRENT_TIMESTAMP(3) THEN 1 ELSE 2 END,
+      a.start_at DESC, a.id DESC
     LIMIT ? OFFSET ?
   `, [classId, classId, ...values, PAGE_SIZE, offset])) as Row[];
   const totalPages = Math.max(1, Math.ceil(Number(total.total ?? 0) / PAGE_SIZE));
@@ -162,7 +156,7 @@ export default async function ClassOfficerActivitiesPage({ searchParams }: { sea
             </tbody>
           </NumberedTable>
         </div>
-<div className="mt-5"><ReviewPagination totalResults={Number(total.total ?? 0)} resultLabel="hoạt động" page={page} totalPages={totalPages} basePath="/dashboard/class-officer/activities" searchParams={{ cohort: params.cohort, keyword, level, attendance, termId: String(selectedTerm.id) }} /></div>
+<div className="mt-5"><ReviewPagination totalResults={Number(total.total ?? 0)} resultLabel="hoạt động" page={page} totalPages={totalPages} basePath="/dashboard/class-officer/activities" searchParams={{ keyword, level, attendance, termId: String(selectedTerm.id) }} /></div>
 </div>
       </section>
     </main>

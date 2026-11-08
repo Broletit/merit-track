@@ -246,7 +246,7 @@ export default async function FacultyOfficerDashboardPage({
       : 0;
 
   return (
-    <main className="space-y-6">
+    <main className="min-w-0 space-y-6">
       <section className="rounded-2xl bg-linear-to-r from-blue-900 to-blue-800 p-6 text-white shadow-[0_14px_36px_rgba(30,64,175,0.24)] shadow-slate-200/60">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -283,18 +283,18 @@ export default async function FacultyOfficerDashboardPage({
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60 xl:col-span-2">
+      <section className="grid min-w-0 gap-6 xl:grid-cols-2">
+        <div className="min-w-0 max-w-full rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60 xl:col-span-2">
           <div className="flex items-center gap-2 text-slate-900"><span className="text-blue-700"><CalendarCheck size={20} /></span><h2 className="text-xl font-semibold">Hiệu quả tham gia hoạt động</h2></div>
-          <div className="mt-5"><ActivityAttendanceRateChart items={activityComparison.map((item) => ({ label: item.label, registrations: Number(item.registrations ?? 0), attended: Number(item.attended ?? 0) }))} /></div>
+          <div className="mt-5 min-w-0 max-w-full"><ActivityAttendanceRateChart items={activityComparison.map((item) => ({ label: item.label, registrations: Number(item.registrations ?? 0), attended: Number(item.attended ?? 0) }))} /></div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 xl:col-span-2">
-          <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60"><h2 className="text-xl font-semibold text-slate-900">Tiến độ xét duyệt hồ sơ</h2><div className="mt-5"><DonutChart items={submissionProgress.map((item) => ({label:item.label,value:Number(item.value ?? 0),className:item.label === "Đạt" ? "#16a34a" : item.label === "Không đạt" ? "#ef4444" : item.label === "Cần bổ sung" ? "#f59e0b" : "#2563eb"}))} /></div></div>
-          <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60"><h2 className="text-xl font-semibold text-slate-900">Cơ cấu hoạt động theo cấp</h2><div className="mt-5"><DonutChart items={activityLevels.map((item) => ({label:item.label,value:Number(item.value ?? 0),className:item.label === "Cấp chi đoàn" ? "#2563eb" : "#16a34a"}))} centerLabel="hoạt động" /></div></div>
+        <div className="grid min-w-0 gap-6 md:grid-cols-2 xl:col-span-2">
+          <div className="min-w-0 max-w-full rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60"><h2 className="text-xl font-semibold text-slate-900">Tiến độ xét duyệt hồ sơ</h2><div className="mt-5 min-w-0 max-w-full overflow-x-auto"><DonutChart items={submissionProgress.map((item) => ({label:item.label,value:Number(item.value ?? 0),className:item.label === "Đạt" ? "#16a34a" : item.label === "Không đạt" ? "#ef4444" : item.label === "Cần bổ sung" ? "#f59e0b" : "#2563eb"}))} /></div></div>
+          <div className="min-w-0 max-w-full rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60"><h2 className="text-xl font-semibold text-slate-900">Cơ cấu hoạt động theo cấp</h2><div className="mt-5 min-w-0 max-w-full overflow-x-auto"><DonutChart items={activityLevels.map((item) => ({label:item.label,value:Number(item.value ?? 0),className:item.label === "Cấp chi đoàn" ? "#2563eb" : "#16a34a"}))} centerLabel="hoạt động" /></div></div>
         </div>
 
-        <div className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
+        <div className="min-w-0 max-w-full rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
           <h2 className="text-xl font-semibold text-slate-900">
             Hồ sơ cần duyệt
           </h2>

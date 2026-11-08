@@ -49,7 +49,7 @@ export default async function AdminClassesPage({ searchParams }: { searchParams:
     values.push(major);
   }
 
-  const officerCountSql = `(SELECT COUNT(*) FROM class_members cm2 INNER JOIN users u2 ON u2.id=cm2.user_id WHERE cm2.class_id=c.id AND cm2.left_at IS NULL AND u2.role='class_officer' AND u2.is_active=1)`;
+  const officerCountSql = `(SELECT COUNT(DISTINCT cm2.user_id) FROM class_members cm2 INNER JOIN users u2 ON u2.id=cm2.user_id INNER JOIN user_role_assignments ura2 ON ura2.user_id=u2.id AND ura2.role='class_officer' WHERE cm2.class_id=c.id AND cm2.left_at IS NULL AND u2.is_active=1)`;
   if (officerStatus === "vacant") where.push(`${officerCountSql} = 0`);
   if (officerStatus === "partial") where.push(`${officerCountSql} BETWEEN 1 AND 7`);
   if (officerStatus === "full") where.push(`${officerCountSql} >= 8`);
@@ -60,7 +60,7 @@ export default async function AdminClassesPage({ searchParams }: { searchParams:
     SELECT c.id,c.code,c.name,c.faculty,c.intake_year,c.cohort,c.is_active,
       (SELECT COUNT(*) FROM class_members cm1 INNER JOIN users u1 ON u1.id=cm1.user_id WHERE cm1.class_id=c.id AND cm1.left_at IS NULL AND u1.is_active=1 AND u1.role IN ('student','class_officer')) student_count,
       ${officerCountSql} officer_count,
-      (SELECT GROUP_CONCAT(CONCAT(CONCAT(CONCAT(u3.full_name, ' ('), u3.mssv), ')') SEPARATOR ' • ') FROM class_members cm3 INNER JOIN users u3 ON u3.id=cm3.user_id WHERE cm3.class_id=c.id AND cm3.left_at IS NULL AND u3.role='class_officer' AND u3.is_active=1 ORDER BY u3.full_name) officer_names
+      (SELECT GROUP_CONCAT(DISTINCT CONCAT(u3.full_name, ' (', u3.mssv, ')') ORDER BY u3.full_name SEPARATOR ' • ') FROM class_members cm3 INNER JOIN users u3 ON u3.id=cm3.user_id INNER JOIN user_role_assignments ura3 ON ura3.user_id=u3.id AND ura3.role='class_officer' WHERE cm3.class_id=c.id AND cm3.left_at IS NULL AND u3.is_active=1) officer_names
     FROM classes c
     ${whereSql}
     ORDER BY CASE WHEN ${officerCountSql}=0 THEN 0 WHEN ${officerCountSql}<8 THEN 1 ELSE 2 END, c.code

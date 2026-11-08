@@ -23,7 +23,6 @@ export default function FacultyOfficerReviewsTable({
   totalPages,
   classOptions,
   searchParams,
-  eventOptions,
 }: {
   items: ReviewRow[];
   totalResults: number;
@@ -31,12 +30,11 @@ export default function FacultyOfficerReviewsTable({
   totalPages: number;
   classOptions: string[];
   searchParams: Record<string, string | undefined>;
-  eventOptions: Array<{ id: number; title: string }>;
 }) {
   return (
     <section className="flex flex-col rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div className="order-2 mt-5">
-        <ReviewFilters classOptions={classOptions} showStatus showSort={false} eventOptions={eventOptions} />
+        <ReviewFilters classOptions={classOptions} showStatus showSort={false} searchPlaceholder="Tên, MSSV hoặc tên đợt xét..." compactLayout />
       </div>
 
       <div className="order-1">

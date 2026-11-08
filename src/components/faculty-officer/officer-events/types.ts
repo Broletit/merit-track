@@ -32,6 +32,7 @@ export type OfficerEventCriteriaItem = {
   minRequired?: number;
   scoreMax: number;
   isRequired: boolean;
+  requiredCount: number;
   autoPassed: boolean;
   autoMessage: string | null;
   matchedActivityCount: number;

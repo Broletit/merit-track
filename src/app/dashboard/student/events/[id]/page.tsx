@@ -5,13 +5,13 @@ import StudentEventDetailHeader from "@/components/student/events/StudentEventDe
 import StudentEventDetailCard from "@/components/student/events/StudentEventDetailCard";
 import StudentEventApplyForm from "@/components/student/events/StudentEventApplyForm";
 import StudentSubmissionEvidenceForm from "@/components/student/submissions/StudentSubmissionEvidenceForm";
-import { ensureActivityConductScores } from "@/server/conduct/ensureActivityConductScores";
 import type {
   StudentEventCriteriaItem,
   StudentEventDetail,
 } from "@/components/student/events/types";
 import { canSubmitToEvent } from "@/lib/events/eventSubmissionPhase";
 import { canEditSubmission } from "@/lib/submissions/submissionStatus";
+import { evaluateAutoCriteria } from "@/server/events/evaluateAutoCriteria";
 
 type EventRow = {
   id: number;
@@ -36,9 +36,32 @@ type CriteriaRow = {
   group_title: string;
   min_required: number;
   is_required: number;
+  required_count: number;
   auto_passed: number;
   auto_message: string | null;
 };
+
+function getAutoProgressMessage({
+  matchedCount,
+  requiredCount,
+  titles,
+  passed,
+}: {
+  matchedCount: number;
+  requiredCount: number;
+  titles: string[];
+  passed: boolean;
+}) {
+  if (matchedCount <= 0) return null;
+  const activityText = titles.length
+    ? ` từ hoạt động: ${titles.join(", ")}`
+    : "";
+  if (passed) {
+    return `Đạt tự động${activityText}.`;
+  }
+  const remaining = Math.max(0, requiredCount - matchedCount);
+  return `Đã ghi nhận tự động ${matchedCount}/${requiredCount} yêu cầu${activityText}. Cần bổ sung thêm ${remaining} minh chứng.`;
+}
 
 export default async function StudentEventDetailPage({
   params,
@@ -55,7 +78,6 @@ export default async function StudentEventDetailPage({
   if (!Number.isFinite(eventId) || eventId <= 0) notFound();
 
   const db = getDatabase();
-  (await ensureActivityConductScores());
   
   const event = (await db.first(`
       SELECT
@@ -107,6 +129,7 @@ export default async function StudentEventDetailPage({
               ctg.title AS group_title,
         ctg.min_required,
               cti.is_required,
+              cti.required_count,
 
               CASE
                 WHEN attended.activity_title IS NOT NULL THEN 1
@@ -188,6 +211,12 @@ export default async function StudentEventDetailPage({
               cti.sort_order ASC
             `, [templateId, user.id, templateId, user.id, event.term_id, templateId, templateId])) as CriteriaRow[])
       : [];
+  const automaticResults = templateId > 0
+    ? await evaluateAutoCriteria({ eventId: Number(event.id), userId: Number(user.id) })
+    : [];
+  const automaticByCriteria = new Map(
+    automaticResults.map((result) => [result.criteriaCode, result]),
+  );
 
   const item: StudentEventDetail = {
     id: Number(event.id),
@@ -205,25 +234,38 @@ export default async function StudentEventDetailPage({
     canSubmit,
   };
 
-  const criteria: StudentEventCriteriaItem[] = criteriaRows.map((row) => ({
-    code: String(row.code ?? ""),
-    title: String(row.title ?? ""),
-    description: row.description ? String(row.description) : null,
-    groupCode: String(row.group_code ?? ""),
-    groupTitle: String(row.group_title ?? ""),
-    minRequired: Number(row.min_required ?? 0),
-    isRequired: Number(row.is_required ?? 0) === 1,
-    autoPassed: Number(row.auto_passed ?? 0) === 1,
-    autoMessage: row.auto_message ? String(row.auto_message) : null,
-  }));
+  const criteria: StudentEventCriteriaItem[] = criteriaRows.map((row) => {
+    const code = String(row.code ?? "");
+    const requiredCount = Math.max(1, Number(row.required_count ?? 1));
+    const autoResult = automaticByCriteria.get(code);
+    return {
+      code,
+      title: String(row.title ?? ""),
+      description: row.description ? String(row.description) : null,
+      groupCode: String(row.group_code ?? ""),
+      groupTitle: String(row.group_title ?? ""),
+      minRequired: Number(row.min_required ?? 0),
+      isRequired: Number(row.is_required ?? 0) === 1,
+      requiredCount,
+      autoPassed: Boolean(autoResult?.passed),
+      autoMessage: autoResult
+        ? getAutoProgressMessage({
+            matchedCount: autoResult.matchedCount,
+            requiredCount,
+            titles: autoResult.matchedActivityTitles,
+            passed: autoResult.passed,
+          })
+        : null,
+    };
+  });
   const editing=query.edit==="1"&&Boolean(event.submission_id)&&canSubmit;
-  const editCriteria=editing?(await db.rows(`SELECT i.code,i.title,i.description,i.group_code,g.title group_title,g.min_required,i.is_required,ar.passed auto_passed,ar.message auto_message,si.content_text,(SELECT sf.file_name FROM submission_ready_files sf WHERE sf.submission_id=? AND sf.criteria_code=i.code ORDER BY sf.uploaded_at DESC,sf.id DESC LIMIT 1) file_name FROM event_criteria_items i INNER JOIN event_criteria_groups g ON g.event_id=i.event_id AND g.code=i.group_code LEFT JOIN submission_auto_results ar ON ar.submission_id=? AND ar.criteria_code=i.code LEFT JOIN submission_items si ON si.submission_id=? AND si.criteria_code=i.code WHERE i.event_id=? ORDER BY g.sort_order,i.sort_order`, [event.submission_id, event.submission_id, event.submission_id, event.id])) as Array<{code:string;title:string;description:string|null;group_code:string;group_title:string;min_required:number;is_required:number;auto_passed:number|null;auto_message:string|null;content_text:string|null;file_name:string|null}>:[];
+  const editCriteria=editing?(await db.rows(`SELECT i.code,i.title,i.description,i.group_code,g.title group_title,g.min_required,i.is_required,i.required_count,ar.passed auto_passed,ar.message auto_message,si.content_text,(SELECT sf.file_name FROM submission_ready_files sf WHERE sf.submission_id=? AND sf.criteria_code=i.code ORDER BY sf.uploaded_at DESC,sf.id DESC LIMIT 1) file_name FROM event_criteria_items i INNER JOIN event_criteria_groups g ON g.event_id=i.event_id AND g.code=i.group_code LEFT JOIN submission_auto_results ar ON ar.submission_id=? AND ar.criteria_code=i.code LEFT JOIN submission_items si ON si.submission_id=? AND si.criteria_code=i.code WHERE i.event_id=? ORDER BY g.sort_order,i.sort_order`, [event.submission_id, event.submission_id, event.submission_id, event.id])) as Array<{code:string;title:string;description:string|null;group_code:string;group_title:string;min_required:number;is_required:number;required_count:number;auto_passed:number|null;auto_message:string|null;content_text:string|null;file_name:string|null}>:[];
 
   return (
     <main className="space-y-6">
       <StudentEventDetailHeader item={item} />
       <StudentEventDetailCard item={item} showAction={!editing} />
-      {editing?<div id="minh-chung-can-bo-sung" className="scroll-mt-24"><StudentSubmissionEvidenceForm submissionId={Number(event.submission_id)} canEdit criteria={editCriteria.map((row)=>{const preview=criteria.find((item)=>item.code===row.code);return {code:row.code,title:row.title,description:row.description,groupCode:row.group_code,groupTitle:row.group_title,minRequired:Number(row.min_required),isRequired:Number(row.is_required)===1,autoPassed:Number(row.auto_passed??0)===1||Boolean(preview?.autoPassed),autoMessage:row.auto_message??preview?.autoMessage??null,contentText:row.content_text,fileName:row.file_name};})}/></div>:<StudentEventApplyForm
+      {editing?<div id="minh-chung-can-bo-sung" className="scroll-mt-24"><StudentSubmissionEvidenceForm submissionId={Number(event.submission_id)} canEdit viewHref={`/dashboard/student/submissions/${event.submission_id}`} criteria={editCriteria.map((row)=>{const preview=criteria.find((item)=>item.code===row.code);return {code:row.code,title:row.title,description:row.description,groupCode:row.group_code,groupTitle:row.group_title,minRequired:Number(row.min_required),requiredCount:Math.max(1,Number(row.required_count??1)),isRequired:Number(row.is_required)===1,autoPassed:Number(row.auto_passed??0)===1||Boolean(preview?.autoPassed),autoMessage:row.auto_message??preview?.autoMessage??null,contentText:row.content_text,fileName:row.file_name};})}/></div>:<StudentEventApplyForm
         eventId={item.id}
         criteria={criteria}
         canSubmit={canSubmit}

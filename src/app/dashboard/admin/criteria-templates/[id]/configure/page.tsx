@@ -5,6 +5,8 @@ import { getDatabase } from "@/server/db/mysql";
 import CriteriaTemplateConfigureHeader from "@/components/admin/criteria-templates/CriteriaTemplateConfigureHeader";
 import CriteriaTemplateConfigureClient from "@/components/admin/criteria-templates/CriteriaTemplateConfigureClient";
 import CloneTemplateForConfigurationButton from "@/components/admin/criteria-templates/CloneTemplateForConfigurationButton";
+import CriteriaTemplateEditControls from "@/components/admin/criteria-templates/CriteriaTemplateEditControls";
+import CriteriaTemplateEditNavigationGuard from "@/components/admin/criteria-templates/CriteriaTemplateEditNavigationGuard";
 import type {
   AdminCriteriaTemplateDetail,
   CriteriaTemplateActivityOption,
@@ -42,6 +44,7 @@ type CriteriaRow = {
   score_max: number;
   evidence_type: string;
   is_required: number;
+  required_count: number;
   sort_order: number;
 };
 
@@ -66,19 +69,31 @@ type ActivityRow = {
 
 export default async function AdminConfigureCriteriaTemplatePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ mode?: string }>;
 }) {
   await requireAdminContext();
 
   const { id } = await params;
-  const templateId = await getDatabase().resolveRouteRecordId(id);
+  const db = getDatabase();
+  // Configure has a suffix, so resolve the public route against its exact
+  // internal path as a defensive fallback for a freshly-created template.
+  const resolvedId = await db.resolveRouteRecordId(id);
+  const publicRouteId = resolvedId || (await db.first<{ id: number }>(`
+    SELECT ct.id
+    FROM public_page_routes pr
+    INNER JOIN criteria_templates ct
+      ON pr.internal_path = CONCAT('/dashboard/admin/criteria-templates/', ct.id, '/configure')
+    WHERE pr.token = ?
+    LIMIT 1
+  `, [id]))?.id || 0;
+  const templateId = Number(publicRouteId);
 
   if (!Number.isFinite(templateId) || templateId <= 0) {
     notFound();
   }
-
-  const db = getDatabase();
 
   const templateRow = (await db.first(`
       SELECT ct.id, ct.name, ct.description, ct.for_type,
@@ -91,6 +106,15 @@ export default async function AdminConfigureCriteriaTemplatePage({
   if (!templateRow) {
     notFound();
   }
+
+  const draft = Number(templateRow.used_events) > 0
+    ? await db.first<{draft_template_id:number;status:string}>("SELECT draft_template_id,status FROM criteria_template_edit_drafts WHERE original_template_id=?",[templateId])
+    : undefined;
+  const isEditing = (await searchParams).mode === "edit" && draft?.status === "editing";
+  const configurationId = isEditing ? draft.draft_template_id : templateId;
+  const affectedEvents = Number(templateRow.used_events) > 0
+    ? await db.rows<{id:number;title:string}>("SELECT id,title FROM events WHERE criteria_template_id=? ORDER BY title",[templateId])
+    : [];
 
   const groupRows = (await db.rows(`
       SELECT
@@ -110,7 +134,7 @@ export default async function AdminConfigureCriteriaTemplatePage({
       FROM criteria_template_groups g
       WHERE g.template_id = ?
       ORDER BY g.sort_order ASC, g.code ASC
-      `, [templateId])) as GroupRow[];
+      `, [configurationId])) as GroupRow[];
 
   const criteriaRows = (await db.rows(`
       SELECT
@@ -122,11 +146,12 @@ export default async function AdminConfigureCriteriaTemplatePage({
         score_max,
         evidence_type,
         is_required,
+        required_count,
         sort_order
 FROM criteria_template_items
       WHERE template_id = ?
       ORDER BY sort_order ASC, code ASC
-      `, [templateId])) as CriteriaRow[];
+      `, [configurationId])) as CriteriaRow[];
 
   const activityRuleRows = (await db.rows(`
       SELECT
@@ -138,13 +163,13 @@ FROM criteria_template_items
       INNER JOIN activities a ON a.id = r.activity_id
       WHERE r.template_id = ?
       ORDER BY a.title ASC
-      `, [templateId])) as ActivityRuleRow[];
+      `, [configurationId])) as ActivityRuleRow[];
 
   const conductRuleRows = (await db.rows(`
       SELECT id, criteria_code, min_score, period_scope
       FROM criteria_conduct_rules
       WHERE template_id = ?
-      `, [templateId])) as ConductRuleRow[];
+      `, [configurationId])) as ConductRuleRow[];
 
   const activityRows = (await db.rows(`
       SELECT a.id, a.title, a.term_id, at.name AS term_name, at.is_active
@@ -214,6 +239,7 @@ FROM criteria_template_items
     scoreMax: Number(item.score_max ?? 0),
     evidenceType: String(item.evidence_type ?? "manual"),
 isRequired: Number(item.is_required ?? 0) === 1,
+    requiredCount: Math.max(1, Number(item.required_count ?? 1)),
     sortOrder: Number(item.sort_order ?? 0),
     activityRules: activityRulesByCriteria.get(String(item.code ?? "")) ?? [],
     conductRule: conductRuleByCriteria.get(String(item.code ?? "")) ?? null,
@@ -225,17 +251,25 @@ isRequired: Number(item.is_required ?? 0) === 1,
 
       {Number(templateRow.used_events ?? 0) > 0 ? (
         <>
-          <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-amber-50 px-5 py-4 ring-1 ring-amber-200 shadow-md shadow-slate-200/60">
-            <div>
-              <h2 className="font-semibold text-amber-900">Cấu hình đã được khóa</h2>
-              <p className="mt-1 text-sm text-amber-800">
-                Bộ tiêu chuẩn đang được {templateRow.used_events} đợt xét sử dụng. Hãy tạo bản sao nếu cần thay đổi cấu hình.
+          {isEditing ? <>
+            <CriteriaTemplateEditNavigationGuard templateId={template.id} />
+            <CriteriaTemplateConfigureClient
+              templateId={configurationId} templateForType={template.forType}
+              groups={groups} criteria={criteria} activities={activities}
+              saveControl={<CriteriaTemplateEditControls templateId={template.id} events={affectedEvents} draftStatus="editing"/>}
+            />
+          </> : <>
+            <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-5 py-4 shadow-md ring-1 ring-amber-200 shadow-slate-200/60">
+              <p className="text-sm font-medium text-amber-900">
+                {draft?.status === "processing" ? "Đang cập nhật hồ sơ và báo cáo theo bộ tiêu chuẩn mới." : `Bộ tiêu chuẩn đang được ${templateRow.used_events} đợt xét sử dụng.`}
               </p>
-            </div>
-            <CloneTemplateForConfigurationButton template={template} />
-          </section>
-
-          <CriteriaDefinitionTable templateId={template.id} title="Cấu hình hiện tại"/>
+              <div className="flex flex-wrap items-center gap-2">
+                {draft?.status !== "processing" ? <CloneTemplateForConfigurationButton template={template} /> : null}
+                <CriteriaTemplateEditControls templateId={template.id} events={affectedEvents} draftStatus={draft?.status === "processing" ? "processing" : null}/>
+              </div>
+            </section>
+            <CriteriaDefinitionTable templateId={template.id} title="Cấu trúc tiêu chuẩn / tiêu chí"/>
+          </>}
         </>
       ) : (
         <CriteriaTemplateConfigureClient

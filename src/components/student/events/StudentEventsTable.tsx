@@ -78,6 +78,7 @@ export default function StudentEventsTable({
                   <td className="px-4 py-4 text-center align-top">
                     <Link
                       href={`/dashboard/student/events/${item.id}`}
+                      prefetch={false}
                       className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                     >
                       Xem

@@ -1,5 +1,4 @@
 "use client";
-import CohortFilter from "@/components/shared/CohortFilter";
 import FilterRow from "@/components/shared/filters/FilterRow";
 
 import { Search } from "lucide-react";
@@ -14,6 +13,7 @@ export default function ClassActivitiesFilter() {
 
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("cohort");
     if (value) params.set(key, value);
     else params.delete(key);
     params.set("page", "1");
@@ -28,8 +28,8 @@ export default function ClassActivitiesFilter() {
   }, [keyword]);
 
   return (
-    <FilterRow className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[minmax(280px,2fr)_repeat(3,minmax(170px,1fr))]">
-      <div className="relative">
+    <FilterRow className="grid w-full gap-4 md:grid-cols-[minmax(0,1fr)_11rem_11rem]">
+      <div data-filter-label="Tìm kiếm" className="relative">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           value={keyword}
@@ -38,17 +38,18 @@ export default function ClassActivitiesFilter() {
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
         />
       </div>
-      <CohortFilter />
       <select
+        data-filter-label="Cấp tổ chức"
         defaultValue={searchParams.get("level") ?? ""}
         onChange={(event) => updateParam("level", event.target.value)}
         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"
       >
         <option value="">Tất cả cấp tổ chức</option>
-        <option value="class">Hoạt động cấp lớp</option>
-        <option value="faculty">Hoạt động cấp khoa</option>
+        <option value="class">Chi đoàn</option>
+        <option value="faculty">Cấp khoa</option>
       </select>
       <select
+        data-filter-label="Trạng thái"
         defaultValue={searchParams.get("attendance") ?? ""}
         onChange={(event) => updateParam("attendance", event.target.value)}
         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-500"

@@ -12,7 +12,6 @@ type SearchParams = Promise<{ cohort?: string;
   class?: string;
   page?: string;
   termId?: string;
-  eventId?: string;
   round?: string;
   status?: string;
 }>;
@@ -46,7 +45,6 @@ export default async function FacultyOfficerReviewsPage({
   const classCode = String(params.class ?? "").trim();
   const page = Math.max(1, Number(params.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
-  const eventId = Number(params.eventId ?? 0);
   const status = String(params.status ?? "").trim();
 
   const classRows = (await db.rows(`
@@ -59,8 +57,6 @@ export default async function FacultyOfficerReviewsPage({
       `, [officer.id])) as { code: string }[];
 
   const classOptions = classRows.map((item) => String(item.code));
-  const eventOptions = (await db.rows(`SELECT DISTINCT e.id,e.title,e.start_at FROM submissions s INNER JOIN events e ON e.id=s.event_id WHERE e.term_id=? AND e.type='student' AND s.submitted_at IS NOT NULL AND EXISTS(SELECT 1 FROM faculty_class_assignments fca WHERE fca.faculty_officer_id=? AND fca.class_id=s.class_id) ORDER BY CAST(e.start_at AS DATETIME(3)) DESC`, [selectedTerm.id, officer.id])) as Array<{id:number;title:string}>;
-
   const where: string[] = [
     "s.submitted_at IS NOT NULL",
     "e.term_id = ?",
@@ -78,10 +74,6 @@ export default async function FacultyOfficerReviewsPage({
   const values: unknown[] = [selectedTerm.id, officer.id];
   addCohortFilter(where,values,params.cohort,"u.cohort");
 
-  if (Number.isFinite(eventId) && eventId > 0) {
-    where.push("e.id = ?");
-    values.push(eventId);
-  }
   if (status) { where.push("s.status = ?"); values.push(status); }
 
   if (classCode) {
@@ -90,7 +82,7 @@ export default async function FacultyOfficerReviewsPage({
   }
 
   if (keyword) {
-    where.push("(e.title LIKE ? OR u.full_name LIKE ? OR u.mssv LIKE ?)");
+    where.push("(u.full_name LIKE ? OR u.mssv LIKE ? OR e.title LIKE ?)");
     values.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
   }
 
@@ -158,13 +150,11 @@ export default async function FacultyOfficerReviewsPage({
         page={page}
         totalPages={totalPages}
         classOptions={classOptions}
-        eventOptions={eventOptions}
         searchParams={{ cohort: params.cohort,
           keyword,
           sort,
           class: classCode,
           termId: String(selectedTerm.id),
-          eventId: eventId > 0 ? String(eventId) : "",
           status,
         }}
       />

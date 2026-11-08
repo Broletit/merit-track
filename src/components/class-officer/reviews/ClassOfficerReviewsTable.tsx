@@ -34,7 +34,7 @@ export default function ClassOfficerReviewsTable({
   return (
     <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <div>
-        <ReviewFilters showSort={false} eventOptions={eventOptions} />
+        <ReviewFilters showSort={false} showCohort={false} showRound eventOptions={eventOptions} />
       </div>
 
       <div className="mt-5">

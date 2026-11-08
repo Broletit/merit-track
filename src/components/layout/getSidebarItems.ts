@@ -84,7 +84,7 @@ export function getSidebarGroups(role: string): SidebarGroup[] {
         items: [{ href: "/dashboard/faculty-officer", label: "Dashboard", icon: Gauge }],
       },
       {
-        label: "Theo dõi lớp",
+        label: "Theo dõi khoa",
         icon: GraduationCap,
         items: [
           { href: "/dashboard/faculty-officer/activities", label: "Hoạt động", icon: CalendarCheck2 },

@@ -74,17 +74,17 @@ export default async function FacultyOfficerActivitiesPage({
   }
 
   if (time === "upcoming") {
-    where.push("CAST(a.start_at AS DATETIME(3)) > CURRENT_TIMESTAMP(3)");
+    where.push("a.start_at > CURRENT_TIMESTAMP(3)");
   }
 
   if (time === "ongoing") {
     where.push(
-      "CAST(a.start_at AS DATETIME(3)) <= CURRENT_TIMESTAMP(3) AND CAST(a.end_at AS DATETIME(3)) >= CURRENT_TIMESTAMP(3)"
+      "a.start_at <= CURRENT_TIMESTAMP(3) AND a.end_at >= CURRENT_TIMESTAMP(3)"
     );
   }
 
   if (time === "ended") {
-    where.push("CAST(a.end_at AS DATETIME(3)) < CURRENT_TIMESTAMP(3)");
+    where.push("a.end_at < CURRENT_TIMESTAMP(3)");
   }
 
   const whereSql = `WHERE ${where.join(" AND ")}`;
@@ -124,13 +124,13 @@ export default async function FacultyOfficerActivitiesPage({
 
       FROM activities a
       ${whereSql}
-      ORDER BY CAST(a.start_at AS DATETIME(3)) DESC, a.id DESC
+      ORDER BY a.start_at DESC, a.id DESC
       LIMIT ?
       OFFSET ?
       `, [...values, PAGE_SIZE, offset])) as Row[];
 
   const totalPages = Math.max(1, Math.ceil(Number(total.total ?? 0) / PAGE_SIZE));
-  const upcoming = (await db.first(`SELECT COUNT(*) total FROM activities a ${whereSql} AND CAST(a.start_at AS DATETIME(3))>CURRENT_TIMESTAMP(3)`, [...values])) as {total:number};
+  const upcoming = (await db.first(`SELECT COUNT(*) total FROM activities a ${whereSql} AND a.start_at>CURRENT_TIMESTAMP(3)`, [...values])) as {total:number};
   const participation = (await db.first(`SELECT COUNT(DISTINCT CASE WHEN ar.status IN ('registered','attended','absent') THEN ar.user_id END) registered,COUNT(DISTINCT CASE WHEN ar.status='attended' THEN ar.user_id END) attended FROM activity_registrations ar INNER JOIN activities a ON a.id=ar.activity_id WHERE a.term_id=? AND a.audience_type='student'`, [selectedTerm.id])) as {registered:number;attended:number};
   const attendanceRate=participation.registered?Math.round(participation.attended/participation.registered*100):0;
 
