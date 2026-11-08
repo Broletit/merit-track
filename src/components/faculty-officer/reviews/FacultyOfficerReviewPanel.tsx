@@ -3,16 +3,19 @@
 import { useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { reviewSubmission } from "@/server/actions/reviews/reviewSubmission";
+import { reopenSubmission } from "@/server/actions/reviews/reopenSubmission";
 import ActionFeedback from "@/components/shared/ActionFeedback";
 
 export default function FacultyOfficerReviewPanel({
   submissionId,
   canReview,
+  canReopen = false,
   reviewRound,
   requirementsMet,
 }: {
   submissionId: number;
   canReview: boolean;
+  canReopen?: boolean;
   reviewRound: 1 | 2;
   requirementsMet: boolean;
 }) {
@@ -60,6 +63,19 @@ export default function FacultyOfficerReviewPanel({
     });
   }
 
+  function reopen() {
+    setMessage(""); setError("");
+    startTransition(async () => {
+      try {
+        const result = await reopenSubmission(submissionId);
+        setMessage(result.message);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Không thể mở lại hồ sơ.");
+      }
+    });
+  }
+
   return (
     <section id="review-panel" className="scroll-mt-6 rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
       <ActionFeedback pending={pending} message={message || error} ok={Boolean(message)} />
@@ -72,10 +88,15 @@ export default function FacultyOfficerReviewPanel({
         </p>
       </div>
 
-      {!canReview ? (
+      {!canReview && !canReopen ? (
         <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
           Hồ sơ hiện không ở trạng thái chờ duyệt. Bạn chỉ có thể xem lại
           nội dung và lịch sử xử lý.
+        </div>
+      ) : canReopen ? (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-100">
+          <span>Hồ sơ đã đóng. Có thể mở lại để tiếp tục xét duyệt.</span>
+          <button type="button" disabled={pending} onClick={reopen} className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60">{pending ? "Đang xử lý..." : "Mở lại hồ sơ"}</button>
         </div>
       ) : (
         <>

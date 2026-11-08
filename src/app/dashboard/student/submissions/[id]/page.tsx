@@ -58,6 +58,8 @@ type ReviewRow = {
   round: number;
   decision: string;
   note: string | null;
+  created_at: string | null;
+  reviewer_name: string | null;
 };
 
 type FileRow = {
@@ -152,12 +154,15 @@ export default async function StudentSubmissionDetailPage({
 
   const reviews = (await db.rows(`
       SELECT
-        round,
-        decision,
-        note
+        reviews.round,
+        reviews.decision,
+        reviews.note,
+        reviews.created_at,
+        reviewer.full_name AS reviewer_name
       FROM reviews
-      WHERE submission_id = ?
-      ORDER BY id DESC
+      LEFT JOIN users reviewer ON reviewer.id = reviews.reviewer_id
+      WHERE reviews.submission_id = ?
+      ORDER BY reviews.id DESC
       `, [submissionId])) as ReviewRow[];
 
   const files = (await db.rows(`
@@ -174,13 +179,13 @@ export default async function StudentSubmissionDetailPage({
   const editable = canEditSubmission(submission.status, {status:submission.event_status,startAt:submission.event_start_at,endAt:submission.event_end_at,allowLate:Number(submission.event_allow_late)===1});
   const timeline = (await getSubmissionTimeline(submissionId)).map((item) => ({
     ...item,
-    actorName: null,
   }));
   const reviewItems = reviews.map((item) => ({
     round: Number(item.round),
     decision: String(item.decision ?? ""),
     note: item.note ? String(item.note) : null,
-    reviewerName: null,
+    reviewerName: item.reviewer_name ? String(item.reviewer_name) : null,
+    createdAt: item.created_at ? String(item.created_at) : null,
   }));
   const firstMissingCriterion=criteria.find((item)=>Number(item.auto_passed??0)!==1&&!String(item.content_text??"").trim()&&Number(item.file_count??0)===0);
   const editHref=`/dashboard/student/events/${submission.event_id}?edit=1${firstMissingCriterion?`#criterion-${firstMissingCriterion.code}`:"#minh-chung-can-bo-sung"}`;
@@ -188,7 +193,7 @@ export default async function StudentSubmissionDetailPage({
     ...criterion,
     auto_message: formatAutoCriteriaMessage(criterion.auto_message,criterion.matched_activity_titles),
     files: files.filter((file) => file.criteria_code === criterion.code).map((file) => ({id:Number(file.id),fileName:String(file.file_name ?? ""),mimeType:String(file.mime_type ?? "")})),
-  })).filter((criterion) => Number(criterion.is_required) === 1 || Number(criterion.auto_passed ?? 0) === 1 || Boolean(criterion.content_text?.trim()) || criterion.files.length > 0);
+  })).filter((criterion) => Number(criterion.is_required) === 1 || Number(criterion.auto_passed ?? 0) === 1 || Boolean(criterion.content_text?.trim()) || criterion.files.length > 0 || ["pass", "fail"].includes(String(criterion.review_decision ?? "")));
 
   return (
     <main className="space-y-6">

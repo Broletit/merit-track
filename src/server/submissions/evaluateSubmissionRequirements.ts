@@ -23,7 +23,8 @@ export async function evaluateSubmissionRequirements(db:Database,submissionId:nu
     WHERE s.id=? ORDER BY g.sort_order,i.sort_order,i.id`,[round,submissionId]);
   const units=await db.rows<ManualUnitRow>(`SELECT eu.criteria_code,eu.related_activity_id,GREATEST(1,COALESCE(eu.claimed_count,1)) claimed_count,er.approved_count,er.decision
     FROM submission_evidence_units eu LEFT JOIN submission_evidence_reviews er ON er.evidence_unit_id=eu.id AND er.round=?
-    WHERE eu.submission_id=?`,[round,submissionId]);
+    WHERE eu.submission_id=?
+      AND (eu.related_activity_id IS NOT NULL OR EXISTS(SELECT 1 FROM submission_files sf WHERE sf.evidence_unit_id=eu.id AND sf.status='ready'))`,[round,submissionId]);
   const unitsByCriterion=new Map<string,ManualUnitRow[]>();
   for(const unit of units)unitsByCriterion.set(unit.criteria_code,[...(unitsByCriterion.get(unit.criteria_code)??[]),unit]);
   const configuredGroups=await db.rows<{code:string;title:string;min_required:number}>("SELECT g.code,g.title,g.min_required FROM event_criteria_groups g INNER JOIN submissions s ON s.event_id=g.event_id WHERE s.id=? ORDER BY g.sort_order",[submissionId]);

@@ -118,7 +118,7 @@ export default function ClassOfficerReviewsTable({
                       </Link>
                       {item.status === "submitted_v1" ? (
                         <Link
-                          href={`/dashboard/class-officer/reviews/${item.id}?mode=review${searchParams.termId ? `&termId=${encodeURIComponent(searchParams.termId)}` : ""}#review-panel`}
+                          href={`/dashboard/class-officer/reviews/${item.id}?mode=review${searchParams.termId ? `&termId=${encodeURIComponent(searchParams.termId)}` : ""}`}
                           className="inline-flex items-center rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                         >
                           Duyệt

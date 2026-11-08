@@ -3,15 +3,18 @@
 import { useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { reviewSubmission } from "@/server/actions/reviews/reviewSubmission";
+import { reopenSubmission } from "@/server/actions/reviews/reopenSubmission";
 import ActionFeedback from "@/components/shared/ActionFeedback";
 
 export default function ClassOfficerReviewPanel({
   submissionId,
   canReview,
+  canReopen = false,
   requirementsMet,
 }: {
   submissionId: number;
   canReview: boolean;
+  canReopen?: boolean;
   requirementsMet: boolean;
 }) {
   const router = useRouter();
@@ -67,11 +70,22 @@ export default function ClassOfficerReviewPanel({
         formData.set("note", note);
         const result = await reviewSubmission(submissionId, "reject", formData);
         setMessage(result.message || "Đã đóng hồ sơ.");
-        const nextParams = new URLSearchParams(searchParams.toString());
-        nextParams.set("mode", "view");
-        router.replace(`${pathname}?${nextParams.toString()}`);
+        router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Không thể đóng hồ sơ.");
+      }
+    });
+  }
+
+  function reopen() {
+    setMessage(""); setError("");
+    startTransition(async () => {
+      try {
+        const result = await reopenSubmission(submissionId);
+        setMessage(result.message);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Không thể mở lại hồ sơ.");
       }
     });
   }
@@ -83,9 +97,14 @@ export default function ClassOfficerReviewPanel({
         Duyệt hồ sơ vòng 1
       </h2>
 
-      {!canReview ? (
+      {!canReview && !canReopen ? (
         <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200 shadow-md shadow-slate-200/60">
           Hồ sơ đã được xử lý vòng 1. Bạn chỉ có thể xem lại nội dung và lịch sử.
+        </div>
+      ) : canReopen ? (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-100">
+          <span>Hồ sơ đã đóng. Có thể mở lại để tiếp tục xét duyệt.</span>
+          <button type="button" disabled={pending} onClick={reopen} className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60">{pending ? "Đang xử lý..." : "Mở lại hồ sơ"}</button>
         </div>
       ) : (
         <>

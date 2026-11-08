@@ -8,6 +8,7 @@ import { assertSubmissionReviewAccess } from "@/server/auth/submissionReviewAcce
 
 export async function reviewSubmissionCriterion(submissionId:number,criteriaCode:string,decision:"pass"|"fail",approvedCount=1){
   const user=await requireLogin();
+  const actingRole=user.loginContext??user.role;
   const db=getDatabase();
   if(!Number.isInteger(approvedCount)||approvedCount<0||approvedCount>50)throw new Error("Số lượt công nhận phải từ 0 đến 50.");
   if(!["pass","fail"].includes(decision))throw new Error("Kết quả tiêu chí không hợp lệ.");
@@ -26,20 +27,21 @@ export async function reviewSubmissionCriterion(submissionId:number,criteriaCode
   if(!round)throw new Error("Hồ sơ không ở trạng thái chờ duyệt.");
   if(Number(row.auto_passed)===1)throw new Error("Tiêu chí này đã đạt tự động.");
   if(!Number(row.has_file)&&!Number(row.has_note))throw new Error("Tiêu chí chưa có minh chứng để đánh giá.");
-  if(round===1&&(user.role==="class_officer"||user.role==="faculty_officer")){
-    const allowed=user.role==="class_officer"
+  if(round===1&&(actingRole==="class_officer"||actingRole==="faculty_officer")){
+    const allowed=actingRole==="class_officer"
       ? (await db.first(`SELECT 1 FROM class_members WHERE user_id=? AND class_id=? AND left_at IS NULL LIMIT 1`, [user.id, row.class_id]))
       : (await db.first(`SELECT 1 FROM faculty_class_assignments WHERE faculty_officer_id=? AND class_id=? LIMIT 1`, [user.id, row.class_id]));
     if(!allowed)throw new Error("Bạn không có quyền duyệt hồ sơ lớp này.");
-  }else if(round===2&&user.role==="faculty_officer"){
+  }else if(round===2&&actingRole==="faculty_officer"){
     const allowed=(await db.first(`SELECT 1 FROM faculty_class_assignments WHERE faculty_officer_id=? AND class_id=? LIMIT 1`, [user.id, row.class_id]));
     if(!allowed)throw new Error("Bạn không có quyền duyệt hồ sơ lớp này.");
-  }else if(user.role!=="admin")throw new Error("Bạn không có quyền đánh giá tiêu chí ở vòng này.");
+  }else if(actingRole!=="admin")throw new Error("Bạn không có quyền đánh giá tiêu chí ở vòng này.");
   (await db.execute(`INSERT INTO submission_criteria_reviews(submission_id,criteria_code,round,reviewer_id,decision,reviewed_at)
     VALUES(?,?,?,?,?,CURRENT_TIMESTAMP(3)) ON DUPLICATE KEY UPDATE reviewer_id=VALUES(reviewer_id),decision=VALUES(decision),reviewed_at=CURRENT_TIMESTAMP(3)`, [submissionId, criteriaCode, round, user.id, decision]));
   await db.execute(`INSERT INTO submission_evidence_reviews(submission_id,evidence_unit_id,round,reviewer_id,decision,approved_count,reviewed_at)
     SELECT eu.submission_id,eu.id,?,?,?,CASE WHEN ?='pass' THEN LEAST(GREATEST(1,COALESCE(eu.claimed_count,1)),?) ELSE 0 END,CURRENT_TIMESTAMP(3)
     FROM submission_evidence_units eu WHERE eu.submission_id=? AND eu.criteria_code=?
+      AND EXISTS(SELECT 1 FROM submission_files sf WHERE sf.evidence_unit_id=eu.id AND sf.status='ready')
     ON DUPLICATE KEY UPDATE reviewer_id=VALUES(reviewer_id),decision=VALUES(decision),approved_count=VALUES(approved_count),reviewed_at=CURRENT_TIMESTAMP(3)`, [round,user.id,decision,decision,approvedCount,submissionId,criteriaCode]);
   if(row.event_type==="officer")(await evaluateSubmission(submissionId));
   revalidatePath(`/dashboard/class-officer/reviews/${submissionId}`);

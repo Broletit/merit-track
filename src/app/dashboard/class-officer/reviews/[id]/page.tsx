@@ -180,6 +180,9 @@ export default async function ClassOfficerReviewDetailPage({
         mimeType: String(file.mime_type ?? ""),
       })),
   }));
+  const criteriaForReview = isReviewMode
+    ? criteriaWithFiles.filter((item) => Number(item.is_required) === 1 || item.evidence_files.length > 0 || Boolean(item.content_text?.trim()))
+    : criteriaWithFiles;
   const achievedCriteria = criteria.filter(
     (item) => Number(item.auto_passed) === 1 || item.review_decision === "pass",
   ).length;
@@ -221,17 +224,18 @@ export default async function ClassOfficerReviewDetailPage({
       {submission.submitted_at ? <ReviewHistory items={reviewItems} timeline={timeline} /> : null}
 
       <SubmissionCriteriaDetailList
-        items={criteriaWithFiles}
+        items={criteriaForReview}
         submissionId={isReviewMode ? submission.id : undefined}
         canReview={isReviewMode && submission.status === "submitted_v1" && !reviewUnavailableReason}
-        reviewHref={!isReviewMode ? `/dashboard/class-officer/reviews/${submission.id}?mode=review${sp.termId ? `&termId=${encodeURIComponent(sp.termId)}` : ""}#review-panel` : undefined}
-        canOpenReview={!reviewUnavailableReason && submission.status === "submitted_v1"}
+        reviewHref={!isReviewMode ? `/dashboard/class-officer/reviews/${submission.id}?mode=review${sp.termId ? `&termId=${encodeURIComponent(sp.termId)}` : ""}` : undefined}
+        canOpenReview={!reviewUnavailableReason && ["submitted_v1", "failed"].includes(submission.status)}
       />
 
       {isReviewMode && !reviewUnavailableReason ? (
         <ClassOfficerReviewPanel
           submissionId={submission.id}
           canReview={submission.status === "submitted_v1"}
+          canReopen={submission.status === "failed"}
           requirementsMet={requirements.valid}
         />
       ) : null}

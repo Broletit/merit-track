@@ -169,6 +169,9 @@ export default async function FacultyOfficerReviewDetailPage({
         mimeType: String(file.mime_type ?? ""),
       })),
   }));
+  const criteriaForReview = isReviewMode
+    ? criteriaWithFiles.filter((item) => Number(item.is_required) === 1 || item.evidence_files.length > 0 || Boolean(item.content_text?.trim()))
+    : criteriaWithFiles;
   const achievedCriteria = criteria.filter(
     (item) => Number(item.auto_passed) === 1 || item.review_decision === "pass",
   ).length;
@@ -199,17 +202,18 @@ export default async function FacultyOfficerReviewDetailPage({
       {submission.submitted_at ? <ReviewHistory items={reviewItems} timeline={timeline} /> : null}
 
       <SubmissionCriteriaDetailList
-        items={criteriaWithFiles}
+        items={criteriaForReview}
         submissionId={isReviewMode ? submission.id : undefined}
         canReview={isReviewMode && ["submitted_v1","submitted_v2"].includes(submission.status)}
-        reviewHref={!isReviewMode ? `/dashboard/faculty-officer/reviews/${submission.id}?mode=review${sp.termId ? `&termId=${encodeURIComponent(sp.termId)}` : ""}#review-panel` : undefined}
-        canOpenReview={["submitted_v1", "submitted_v2"].includes(submission.status)}
+        reviewHref={!isReviewMode ? `/dashboard/faculty-officer/reviews/${submission.id}?mode=review${sp.termId ? `&termId=${encodeURIComponent(sp.termId)}` : ""}` : undefined}
+        canOpenReview={["submitted_v1", "submitted_v2", "failed"].includes(submission.status)}
       />
 
       {isReviewMode ? (
         <FacultyOfficerReviewPanel
           submissionId={submission.id}
           canReview={["submitted_v1","submitted_v2"].includes(submission.status)}
+          canReopen={submission.status === "failed"}
           reviewRound={Number(submission.review_round) === 2 ? 2 : 1}
           requirementsMet={requirements.valid}
         />

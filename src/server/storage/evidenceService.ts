@@ -45,12 +45,34 @@ export async function saveEvidence(user: EvidenceUser, submissionId: number, for
   const codes = formData.getAll("criteriaCode").map(String).map(value => value.trim()).filter(Boolean);
   const submission = await authorizeEvidenceWrite(user, submissionId, codes);
   if (submission.type !== kind) throw new Error("Loại hồ sơ không hợp lệ.");
-  const changed = codes.filter(code => String(formData.get(`note_${code}`) || "").trim().length > 0);
+  const noteValues = new Map(codes.map(code => [code, String(formData.get(`note_${code}`) || "").trim()]));
+  const existingNotes = codes.length
+    ? await db.rows<{criteria_code:string;content_text:string|null}>(`SELECT criteria_code,content_text FROM submission_items WHERE submission_id=? AND criteria_code IN (${codes.map(() => "?").join(",")})`, [submissionId, ...codes])
+    : [];
+  const existingByCode = new Map(existingNotes.map(item => [item.criteria_code, String(item.content_text ?? "").trim()]));
+  const changed = codes.filter(code => {
+    const next = noteValues.get(code) ?? "";
+    return next.length > 0 && next !== (existingByCode.get(code) ?? "");
+  });
   const claimedCount=(code:string)=>{const value=Number(formData.get(`claimedCount_${code}`)??1);if(!Number.isInteger(value)||value<1||value>50)throw new Error(`Số lượt minh chứng của tiêu chí ${code} phải từ 1 đến 50.`);return value;};
   const provider = getStorageProvider();
   const prepared: {code: string; originalName: string; key: string; metadata: ObjectMetadata}[] = [];
+  const replacedObjects: EvidenceObject[] = [];
   let committed = false;
   try {
+    if (changed.length) {
+      const placeholders = changed.map(() => "?").join(",");
+      const existingFiles = await db.rows<{ criteria_code: string }>(`SELECT DISTINCT criteria_code
+        FROM submission_ready_files WHERE submission_id=? AND criteria_code IN (${placeholders})`, [submissionId, ...changed]);
+      const existingCodes = new Set(existingFiles.map(row => row.criteria_code));
+      const missingFileCodes = changed.filter(code => {
+        const file = formData.get(`file_${code}`);
+        return !existingCodes.has(code) && !(file instanceof File && file.size > 0);
+      });
+      if (missingFileCodes.length) {
+        throw new Error(`Vui lòng tải tệp minh chứng cho tiêu chí: ${missingFileCodes.join(", ")}.`);
+      }
+    }
     for (const code of codes) {
       const file = formData.get(`file_${code}`);
       if (!(file instanceof File) || !file.size) continue;
@@ -64,10 +86,22 @@ export async function saveEvidence(user: EvidenceUser, submissionId: number, for
     if (!changed.length && !prepared.length) throw new Error("Bạn chưa thêm hoặc thay đổi minh chứng nào để lưu.");
     await db.withTransaction(async () => {
       await authorizeEvidenceWrite(user, submissionId, codes);
-      const fileCodes=new Set(prepared.map(file=>file.code));
-      for (const code of changed.filter(code=>!fileCodes.has(code))) {
+      const replacedCodes = [...new Set(prepared.map(file => file.code))];
+      if (replacedCodes.length) {
+        const placeholders = replacedCodes.map(() => "?").join(",");
+        replacedObjects.push(...await db.rows<EvidenceObject>(`SELECT object_key,storage_provider FROM submission_ready_files WHERE submission_id=? AND criteria_code IN (${placeholders})`, [submissionId, ...replacedCodes]));
+        await db.execute(`UPDATE submission_files SET status='deleted',deleted_at=CURRENT_TIMESTAMP(3) WHERE submission_id=? AND criteria_code IN (${placeholders}) AND status='ready'`, [submissionId, ...replacedCodes]);
+      }
+      const affectedCodes = [...new Set([...changed, ...replacedCodes])];
+      if (affectedCodes.length) {
+        const placeholders = affectedCodes.map(() => "?").join(",");
+        await db.execute(`DELETE FROM submission_criteria_reviews WHERE submission_id=? AND criteria_code IN (${placeholders})`, [submissionId, ...affectedCodes]);
+      }
+      for (const code of changed) {
         const text = String(formData.get(`note_${code}`) || "").trim();
-        await db.execute("INSERT INTO submission_evidence_units(submission_id,criteria_code,source_type,note,claimed_count,created_by) VALUES(?,?,'manual',?,?,?)", [submissionId, code, text, claimedCount(code), user.id]);
+        await db.execute(`INSERT INTO submission_items(submission_id,criteria_code,content_text,updated_at)
+          VALUES(?,?,?,CURRENT_TIMESTAMP(3))
+          ON DUPLICATE KEY UPDATE content_text=VALUES(content_text),updated_at=CURRENT_TIMESTAMP(3)`, [submissionId, code, text]);
       }
       for (const file of prepared) {
         const note=String(formData.get(`note_${file.code}`)||"").trim()||null;
@@ -77,6 +111,7 @@ export async function saveEvidence(user: EvidenceUser, submissionId: number, for
       await refreshEvidenceEvaluation(submissionId);
     });
     committed = true;
+    await removeEvidenceObjects(replacedObjects);
     return submission;
   } finally {
     if (!committed) await removeEvidenceObjects(prepared.map(file => ({object_key:file.key, storage_provider:provider.kind})));

@@ -31,8 +31,8 @@ function getEvidenceStatus(item: CriteriaItem) {
   const hasContent = String(item.content_text ?? "").trim().length > 0;
 
   if (autoPassed) return "Đã đạt";
-  if (item.review_decision === "pass") return `Đạt vòng ${item.review_round}`;
-  if (item.review_decision === "fail") return `Chưa đạt vòng ${item.review_round}`;
+  if (item.review_decision === "pass") return "Đã đạt";
+  if (item.review_decision === "fail") return "Chưa đạt";
   if (fileCount > 0 || hasContent) return "Đã nộp minh chứng";
   return "Cần bổ sung minh chứng";
 }
@@ -40,16 +40,16 @@ function getEvidenceStatus(item: CriteriaItem) {
 function getEvidenceClass(item: CriteriaItem) {
   const label = getEvidenceStatus(item);
 
-  if (label === "Đã đạt" || label.startsWith("Đạt vòng")) {
-    return "bg-emerald-50 text-emerald-700 ring-emerald-100";
+  if (label === "Đã đạt") {
+    return "!bg-emerald-50 !text-emerald-700 !ring-emerald-100";
   }
 
   if (label === "Đã nộp minh chứng") {
-    return "bg-blue-50 text-blue-700 ring-blue-100";
+    return "!bg-blue-50 !text-blue-700 !ring-blue-100";
   }
 
-  if (label.startsWith("Chưa đạt vòng")) return "bg-rose-50 text-rose-700 ring-rose-100";
-  return "bg-amber-50 text-amber-700 ring-amber-100";
+  if (label === "Chưa đạt") return "!bg-rose-50 !text-rose-700 !ring-rose-100";
+  return "!bg-amber-50 !text-amber-700 !ring-amber-100";
 }
 
 

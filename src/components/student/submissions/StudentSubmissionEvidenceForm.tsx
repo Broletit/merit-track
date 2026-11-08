@@ -28,6 +28,7 @@ type CriteriaItem = {
   autoMessage: string | null;
   contentText: string | null;
   fileName: string | null;
+  reviewDecision?: string | null;
 };
 
 type State = {
@@ -52,7 +53,7 @@ function CriteriaItemPager({items,children}:{items:CriteriaItem[];children:(item
     previousPage.current=current;
     top.current?.scrollIntoView({block:"start",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});
   },[current]);
-  return <><span ref={top} className="block scroll-mt-4"/>{items.slice(start,start+5).map(children)}{items.length>5?<TableResultsFooter totalResults={items.length} resultLabel="tiêu chí"><button type="button" onClick={()=>setPage(value=>Math.max(1,value-1))} disabled={current===1} className="px-3 disabled:text-slate-300">‹</button><span className="text-sm text-slate-500">Trang {current}/{totalPages}</span><button type="button" onClick={()=>setPage(value=>Math.min(totalPages,value+1))} disabled={current===totalPages} className="px-3 disabled:text-slate-300">›</button></TableResultsFooter>:null}</>;
+  return <><span ref={top} className="block scroll-mt-4"/>{items.map((item,index)=><div key={item.code} hidden={index<start||index>=start+5}>{children(item)}</div>)}{items.length>5?<TableResultsFooter totalResults={items.length} resultLabel="tiêu chí"><button type="button" onClick={()=>setPage(value=>Math.max(1,value-1))} disabled={current===1} className="px-3 disabled:text-slate-300">‹</button><span className="text-sm text-slate-500">Trang {current}/{totalPages}</span><button type="button" onClick={()=>setPage(value=>Math.min(totalPages,value+1))} disabled={current===totalPages} className="px-3 disabled:text-slate-300">›</button></TableResultsFooter>:null}</>;
 }
 
 export default function StudentSubmissionEvidenceForm({
@@ -70,6 +71,7 @@ export default function StudentSubmissionEvidenceForm({
   const [fileStates, setFileStates] = useState<FileState>({});
   const [missingEvidence, setMissingEvidence] = useState<string[]>([]);
   const [groupErrors, setGroupErrors] = useState<Record<string, string>>({});
+  const evidenceNotNeeded=(item:CriteriaItem)=>!item.isRequired&&criteria.filter(candidate=>candidate.groupCode===item.groupCode&&candidate.autoPassed).length>=Math.max(item.minRequired,criteria.filter(candidate=>candidate.groupCode===item.groupCode&&candidate.isRequired).length);
 
   function handleFileChange(criteriaCode: string, event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
@@ -102,6 +104,15 @@ export default function StudentSubmissionEvidenceForm({
   async function saveAction(_prev: State, formData: FormData): Promise<State> {
     const totalFileSize=[...formData.values()].reduce((total,value)=>total+(value instanceof File?value.size:0),0);
     if(totalFileSize>maxRequestFileSize)return {ok:false,message:"Tổng dung lượng các tệp trong một lần lưu không được vượt quá 45 MB. Vui lòng lưu thành nhiều lần."};
+    const missingFiles=criteria.filter((item)=>{
+      const note=String(formData.get(`note_${item.code}`)??"").trim();
+      const file=formData.get(`file_${item.code}`);
+      return Boolean(note)&&!item.autoPassed&&!evidenceNotNeeded(item)&&!item.fileName&&!(file instanceof File&&file.size>0);
+    });
+    if(missingFiles.length){
+      setFileStates(current=>({...current,...Object.fromEntries(missingFiles.map(item=>[item.code,{name:current[item.code]?.name??"",error:"Vui lòng tải tệp minh chứng trước khi lưu mô tả."}]))}));
+      return {ok:false,message:"Vui lòng tải tệp minh chứng cho các tiêu chí đã nhập mô tả."};
+    }
     try {
       const result = await saveStudentSubmissionEvidence(submissionId, formData);
       setFileStates({});
@@ -177,7 +188,6 @@ export default function StudentSubmissionEvidenceForm({
     acc[key].push(item);
     return acc;
   }, {});
-  const evidenceNotNeeded=(item:CriteriaItem)=>!item.isRequired&&criteria.filter(candidate=>candidate.groupCode===item.groupCode&&candidate.autoPassed).length>=Math.max(item.minRequired,criteria.filter(candidate=>candidate.groupCode===item.groupCode&&candidate.isRequired).length);
 
   return (
     <section className="rounded-3xl bg-white p-6 shadow-md ring-1 ring-slate-100 shadow-slate-200/60">
@@ -199,7 +209,7 @@ export default function StudentSubmissionEvidenceForm({
       </div>
 
       <form id="student-evidence-form" action={saveFormAction} className="mt-4 space-y-3">
-        <CriteriaGroupsPagination totalGroups={Object.keys(grouped).length} className="space-y-3">{Object.entries(grouped).map(([groupTitle, items]) => (
+        <CriteriaGroupsPagination totalGroups={Object.keys(grouped).length} preserveChildren className="space-y-3">{Object.entries(grouped).map(([groupTitle, items]) => (
             <div
               key={groupTitle}
               className="overflow-hidden rounded-none border border-slate-200"
@@ -228,6 +238,10 @@ export default function StudentSubmissionEvidenceForm({
 
                     {item.autoPassed ? (
                       <AutoCriteriaBadge />
+                    ) : item.reviewDecision === "pass" ? (
+                      <span className="rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Đã đạt</span>
+                    ) : item.reviewDecision === "fail" ? (
+                      <span className="rounded bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700">Chưa đạt</span>
                     ) : evidenceNotNeeded(item) ? (
                       <span className="text-xs font-semibold text-slate-500">Không cần bổ sung</span>
                     ) : item.fileName ? (

@@ -45,6 +45,7 @@ export async function reviewSubmission(
   formData: FormData
 ) {
   const user = await requireLogin();
+  const actingRole = user.loginContext ?? user.role;
   const db = getDatabase();
 
   const note = String(formData.get("note") ?? "").trim();
@@ -88,11 +89,11 @@ export async function reviewSubmission(
   let nextStatus = "";
 
   if (submission.status === "submitted_v1") {
-    if (user.role !== "class_officer" && user.role !== "faculty_officer" && user.role !== "admin") {
+    if (!["class_officer", "faculty_officer", "admin"].includes(actingRole)) {
       throw new Error("Không có quyền duyệt vòng 1.");
     }
 
-    if (user.role === "class_officer") {
+    if (actingRole === "class_officer") {
       const assignment = (await db.first(`
           SELECT id
           FROM class_members
@@ -109,11 +110,11 @@ export async function reviewSubmission(
 
     nextStatus = nextStatusForV1(decision);
   } else if (submission.status === "submitted_v2") {
-    if (user.role !== "faculty_officer" && user.role !== "admin") {
+    if (!["faculty_officer", "admin"].includes(actingRole)) {
       throw new Error("Không có quyền duyệt vòng 2.");
     }
 
-    if (user.role === "faculty_officer") {
+    if (actingRole === "faculty_officer") {
       const assignment = (await db.first(`
           SELECT id
           FROM faculty_class_assignments
@@ -142,6 +143,25 @@ export async function reviewSubmission(
   }
 
   const reviewRound=submission.status==="submitted_v1"?1:2;
+  if (decision !== "approve") {
+    const pendingCriteria = (await db.first<{ total: number }>(`
+      SELECT COUNT(*) AS total
+      FROM event_criteria_items i
+      WHERE i.event_id = ?
+        AND COALESCE((SELECT ar.passed FROM submission_auto_results ar WHERE ar.submission_id=? AND ar.criteria_code=i.code LIMIT 1), 0) <> 1
+        AND (
+          EXISTS(SELECT 1 FROM submission_ready_files sf WHERE sf.submission_id=? AND sf.criteria_code=i.code)
+          OR EXISTS(SELECT 1 FROM submission_items si WHERE si.submission_id=? AND si.criteria_code=i.code AND TRIM(COALESCE(si.content_text,''))<>'')
+        )
+        AND NOT EXISTS(
+          SELECT 1 FROM submission_criteria_reviews cr
+          WHERE cr.submission_id=? AND cr.criteria_code=i.code AND cr.round=? AND cr.decision IN ('pass','fail')
+        )
+      `, [submission.event_id, submission.id, submission.id, submission.id, submission.id, reviewRound]))?.total ?? 0;
+    if (Number(pendingCriteria) > 0) {
+      throw new Error(`Còn ${pendingCriteria} tiêu chí có minh chứng chưa được đánh giá. Vui lòng chọn Đạt hoặc Chưa đạt trước khi trả hoặc đóng hồ sơ.`);
+    }
+  }
   const redundantEvidence=decision==="approve"?(await db.rows(`
     SELECT i.code
     FROM submissions s INNER JOIN event_criteria_items i ON i.event_id=s.event_id
@@ -156,7 +176,7 @@ export async function reviewSubmission(
       await db.execute("UPDATE submission_files SET status='deleted',deleted_at=CURRENT_TIMESTAMP(3) WHERE submission_id=? AND criteria_code=? AND status='ready'", [submission.id,item.code]);
       (await db.execute(`DELETE FROM submission_items WHERE submission_id=? AND criteria_code=?`, [submission.id, item.code]));
     }
-    if (user.role === "faculty_officer") {
+    if (actingRole === "faculty_officer") {
       const assignment = (await db.first(`SELECT id FROM faculty_class_assignments WHERE faculty_officer_id=? AND class_id=? LIMIT 1`, [user.id, submission.class_id]));
       if (!assignment) throw new Error("Không có quyền duyệt hồ sơ lớp này.");
     }

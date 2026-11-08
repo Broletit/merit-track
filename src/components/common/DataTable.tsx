@@ -19,9 +19,9 @@ function statusLabel(value:ReactNode) {
  return ({passed:"Đạt",failed:"Không đạt",submitted_v1:"Chờ duyệt vòng 1",submitted_v2:"Chờ duyệt vòng 2",needs_revision_v1:"Cần chỉnh sửa",needs_revision_v2:"Cần chỉnh sửa",not_joined:"Chưa tham gia xét"} as Record<string,string>)[value]??value;
 }
 function statusBadgeClass(value:string) {
- const normalized=value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
- if(["passed","dat","du dieu kien"].includes(normalized))return "bg-emerald-50 text-emerald-700";
- if(["failed","khong dat"].includes(normalized))return "bg-rose-50 text-rose-700";
+ const normalized=value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[đĐ]/g,"d").toLowerCase();
+ if(["passed","dat","da dat","du dieu kien"].includes(normalized))return "bg-emerald-50 text-emerald-700";
+ if(["failed","khong dat","chua dat"].includes(normalized))return "bg-rose-50 text-rose-700";
  if(normalized.includes("cho duyet"))return "bg-blue-50 text-blue-700";
  if(normalized.includes("can chinh sua")||normalized.includes("tiem nang"))return "bg-amber-50 text-amber-700";
  if(normalized.includes("chua tham gia"))return "bg-slate-100 text-slate-600";
